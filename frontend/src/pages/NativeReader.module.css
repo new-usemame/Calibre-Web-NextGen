@@ -41,4 +41,3 @@
   padding: var(--sp-1) var(--sp-3); border-radius: var(--r-full);
 }
 
-.lookupNotice { margin: 0; padding: var(--sp-2) var(--sp-4); background: var(--surface-1); color: var(--text); border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }

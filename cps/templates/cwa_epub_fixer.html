@@ -123,10 +123,10 @@
       return r.json();
     })
     .then(data => {
-      showNotification('{{ _("EPUB Fixer scheduled successfully") }}', 'success');
+      showNotification({{ _("EPUB Fixer scheduled successfully")|tojson }}, 'success');
     })
     .catch(err => {
-      showNotification('{{ _("Error scheduling EPUB Fixer") }}: ' + err.message, 'danger');
+      showNotification({{ _("Error scheduling EPUB Fixer")|tojson }} + ': ' + err.message, 'danger');
     });
   }
 
@@ -135,7 +135,7 @@
     container.innerHTML = '';
     if (!rows || !rows.length) {
       container.style.display = 'block';
-      container.innerHTML = '<div style="padding: 8px; color: #bbb;">{{ _("No matches found") }}</div>';
+      container.innerHTML = '<div style="padding: 8px; color: #bbb;">' + {{ _("No matches found")|tojson }} + '</div>';
       return;
     }
 
@@ -170,7 +170,7 @@
   async function searchEpubFixerBooks() {
     const query = document.getElementById('epub_fixer_book_search').value.trim();
     if (!query) {
-      showNotification('{{ _("Enter a search term") }}', 'warning');
+      showNotification({{ _("Enter a search term")|tojson }}, 'warning');
       return;
     }
     try {
@@ -178,14 +178,14 @@
       const data = await res.json();
       renderEpubFixerSearchResults((data && data.rows) ? data.rows : []);
     } catch (e) {
-      showNotification('{{ _("Failed to search library") }}', 'danger');
+      showNotification({{ _("Failed to search library")|tojson }}, 'danger');
     }
   }
 
   async function runEpubFixerForSelectedBook() {
     const bookId = document.getElementById('epub_fixer_selected_book_id').value;
     if (!bookId) {
-      showNotification('{{ _("Select a book first") }}', 'warning');
+      showNotification({{ _("Select a book first")|tojson }}, 'warning');
       return;
     }
     try {
@@ -198,12 +198,12 @@
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to start');
       }
-      showNotification('{{ _("EPUB Fixer started for selected book") }}', 'success');
+      showNotification({{ _("EPUB Fixer started for selected book")|tojson }}, 'success');
         setTimeout(function() {
           window.location.reload();
         }, 500);
     } catch (e) {
-      showNotification('{{ _("Error starting EPUB Fixer") }}: ' + e.message, 'danger');
+      showNotification({{ _("Error starting EPUB Fixer")|tojson }} + ': ' + e.message, 'danger');
     }
   }
   
@@ -221,7 +221,7 @@
       // the rest of the run. Back off and keep trying instead.
       console.error("Error: ", e);
       pollFailures += 1;
-      document.getElementById("pollMessage").textContent = "{{ _('Lost contact with the server, retrying...') }}";
+      document.getElementById("pollMessage").textContent = {{ _("Lost contact with the server, retrying...")|tojson }};
       timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
       return;
     }

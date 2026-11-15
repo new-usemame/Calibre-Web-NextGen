@@ -1,12 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link, useSearch } from 'wouter';
 import { ChevronLeft, ChevronRight, Folder, FolderOpen, Tag } from 'lucide-react';
 import { useColumns, useCcTree, useCcBooks, useMe } from '../lib/queries';
-import type { CcNode } from '../lib/api';
+import { apiUrl, type CcNode } from '../lib/api';
 import { BookCard } from '../components/BookCard';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
+import { SectionError } from '../components/SectionError';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { clampPage } from '../lib/pagination';
 import { canReadBooks } from '../lib/permissions';
 import { usePersistentBool } from '../lib/usePersistentBool';
@@ -25,9 +29,8 @@ function isAncestorPath(selected: string, nodePath: string): boolean {
  *    ▸ Folder       expandable node, collapsed
  *    •              leaf node — a plain row, never a fake expandable control
  *
- *  Expandable nodes keep the native <details>/<summary> behaviour: clicking the
- *  row toggles expansion, clicking the category name navigates (the <a> is the
- *  click's activation target, so navigation wins and the toggle does not fire).
+ *  Expandable nodes have separate native buttons and links: the button
+ *  toggles the children, while the category name opens its books.
  *  When `booksSlot` is provided (after-children mode) it renders as the last
  *  row of this node's content — after its children, before its siblings — for
  *  the selected node only, so the books visually belong to it. */
@@ -36,6 +39,11 @@ function TreeNode({ node, colId, selected, booksSlot }: {
 }) {
   const t = useT();
   const hasChildren = node.children.length > 0;
+  const childrenId = useId();
+  const [expanded, setExpanded] = useState(() => isAncestorPath(selected, node.path));
+  useEffect(() => {
+    if (isAncestorPath(selected, node.path)) setExpanded(true);
+  }, [selected, node.path]);
   const isSelected = selected === node.path;
   const href = `/cc/${colId}?path=${encodeURIComponent(node.path)}`;
   const link = (
@@ -46,12 +54,12 @@ function TreeNode({ node, colId, selected, booksSlot }: {
     </Link>
   );
   const count = (
-    <span className={styles.badge} aria-label={t('{count} books', { count: node.total_count })}>
+    <span role="img" className={styles.badge} aria-label={t(node.total_count === 1 ? '{count} book' : '{count} books', { count: node.total_count })}>
       {node.total_count}
     </span>
   );
 
-  // Leaf: a plain row — no <details>, no chevron, nothing pretend-expandable.
+  // Leaf: a plain row with no disclosure control.
   // Its books (when selected) follow immediately inside the same <li>, which
   // sits at the parent's content level — exactly the leaf's own level.
   if (!hasChildren) {
@@ -70,70 +78,57 @@ function TreeNode({ node, colId, selected, booksSlot }: {
 
   return (
     <li className={styles.treeNode}>
-      <details open={isAncestorPath(selected, node.path)}>
-        <summary className={styles.treeSummary}>
-          <ChevronRight size={14} className={styles.chevron} aria-hidden="true" focusable={false} />
-          {isSelected
-            ? <FolderOpen size={15} className={styles.nodeIcon} aria-hidden="true" focusable={false} />
-            : <Folder size={15} className={styles.nodeIcon} aria-hidden="true" focusable={false} />}
-          {link}
-          {count}
-        </summary>
-        <ul className={styles.children}>
-          {node.children.map((child) => (
-            <TreeNode key={child.path} node={child} colId={colId} selected={selected} booksSlot={booksSlot} />
-          ))}
-          {isSelected && booksSlot && (
-            <li className={styles.booksInset}>{booksSlot}</li>
-          )}
-        </ul>
-      </details>
+      <div className={styles.treeSummary}>
+        <button type="button" className={styles.disclosure} aria-expanded={expanded}
+          aria-controls={childrenId} aria-label={node.name}
+          onClick={() => setExpanded(value => !value)}>
+          <ChevronRight size={14} className={expanded ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}
+            aria-hidden="true" focusable={false} />
+        </button>
+        {isSelected
+          ? <FolderOpen size={15} className={styles.nodeIcon} aria-hidden="true" focusable={false} />
+          : <Folder size={15} className={styles.nodeIcon} aria-hidden="true" focusable={false} />}
+        {link}
+        {count}
+      </div>
+      <ul id={childrenId} className={styles.children} hidden={!expanded}>
+        {node.children.map(child => (
+          <TreeNode key={child.path} node={child} colId={colId} selected={selected} booksSlot={booksSlot} />
+        ))}
+        {isSelected && booksSlot && <li className={styles.booksInset}>{booksSlot}</li>}
+      </ul>
     </li>
   );
 }
 
-/** A FLAT column's value list — every value is one atomic string, so there is
- *  no hierarchy, no expansion and no invented parents. Dewey `778.3` is a
- *  single row, never a `778` row with a `3` child. The same TreeNode row shape
- *  is reused, which is why the server sends `path == name == value` and an
- *  empty `children` — a flat column is a tree of depth one. */
-function FlatList({ colId, selected, booksSlot }: {
+function RequestError({ title, error, retry, retrying }: {
+  title: string; error: unknown; retry: () => void; retrying: boolean;
+}) {
+  const t = useT();
+  const message = error instanceof Error ? error.message : t('An unexpected error occurred');
+  return <section className={styles.requestError}>
+    <h2>{title}</h2>
+    <SectionError message={message} onRetry={retry} retrying={retrying} />
+  </section>;
+}
+
+function ValuesList({ colId, selected, booksSlot }: {
   colId: string; selected: string; booksSlot: ReactNode;
 }) {
   const t = useT();
-  const { data, isLoading } = useCcTree(colId);
+  const { data, isLoading, isFetching, isError, error, refetch } = useCcTree(colId);
   if (isLoading) return <SpinnerCentered size={40} />;
+  if (isError) return <RequestError title={t('Could not load column')} error={error} retrying={isFetching} retry={() => { void refetch(); }} />;
   if (!data || data.nodes.length === 0) {
     return <EmptyState title={t('No values in this column yet')}
       message={t('Books assigned a value in this column will appear here.')} />;
   }
-  return (
-    <ul className={styles.tree} role="list">
-      {data.nodes.map((node) => (
-        <TreeNode key={node.path} node={node} colId={colId} selected={selected} booksSlot={booksSlot} />
-      ))}
-    </ul>
-  );
-}
-
-/** The tree for a hierarchical column, or a loading/empty state. */
-function ColumnTree({ colId, selected, booksSlot }: {
-  colId: string; selected: string; booksSlot: ReactNode;
-}) {
-  const t = useT();
-  const { data, isLoading } = useCcTree(colId);
-  if (isLoading) return <SpinnerCentered size={40} />;
-  if (!data || data.nodes.length === 0) {
-    return <EmptyState title={t('No values in this column yet')}
-      message={t('Books tagged with values in this column will appear here.')} />;
-  }
-  return (
-    <ul className={styles.tree} role="tree">
-      {data.nodes.map((node) => (
-        <TreeNode key={node.path} node={node} colId={colId} selected={selected} booksSlot={booksSlot} />
-      ))}
-    </ul>
-  );
+  // Native lists/buttons keep Tab and Space behavior without claiming the
+  // arrow-key tree-widget contract. Flat values simply have no children.
+  return <ul className={styles.tree}>
+    {data.nodes.map(node => <TreeNode key={node.path} node={node}
+      colId={colId} selected={selected} booksSlot={booksSlot} />)}
+  </ul>;
 }
 
 /** Books under the selected node, paged. An empty `path` lists every book
@@ -168,8 +163,11 @@ function NodeBooks({ colId, path, variant }: {
     setLastQueryId(queryId);
     setPage(1);
   }
-  const { data, isLoading, isFetching, isError, error } = useCcBooks(colId, path, page);
+  const { data, isLoading, isFetching, isPlaceholderData, isError, error, refetch } = useCcBooks(colId, path, page);
   const { data: me } = useMe();
+  const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const total = data?.total ?? 0;
   const perPage = data?.per_page || 24;
   const last = Math.max(1, Math.ceil(total / perPage));
@@ -178,14 +176,10 @@ function NodeBooks({ colId, path, variant }: {
   // one helper is one place to keep correct.
   const clamped = clampPage(page, last);
   useEffect(() => {
-    if (clamped !== page) setPage(clamped);
-  }, [clamped, page]);
-  if (!canReadBooks(me)) return null;
-  if (isLoading) return <SpinnerCentered size={40} />;
-  if (isError) {
-    return <EmptyState title={t('Could not load books')}
-      message={(error as Error | null)?.message || t('Please try again.')} />;
-  }
+    if (data && !isPlaceholderData && String(data.column.id) === colId && data.path === path && clamped !== page) setPage(clamped);
+  }, [clamped, page, data, isPlaceholderData, path, colId]);
+  if (isLoading || (isPlaceholderData && (data?.path !== path || String(data?.column.id) !== colId))) return <SpinnerCentered size={40} />;
+  if (isError) return <RequestError title={t('Could not load books')} error={error} retrying={isFetching} retry={() => { void refetch(); }} />;
   const items = data?.items ?? [];
   if (total === 0) {
     return <EmptyState title={t('No books here yet')}
@@ -197,14 +191,14 @@ function NodeBooks({ colId, path, variant }: {
         <span className={styles.sectionTitle}>
           {path || t('All')}
         </span>
-        <span className={styles.count}>{t('{count} books', { count: total })}</span>
+        <span className={styles.count}>{t(total === 1 ? '{count} book' : '{count} books', { count: total })}</span>
       </div>
       {items.length === 0 ? (
         <EmptyState title={t('Nothing on this page')}
           message={t('This node has fewer pages than the one you were reading.')} />
       ) : (
         <ul className={variant === 'inset' ? styles.insetGrid : styles.grid}>
-          {items.map((book) => <li key={book.id}><BookCard book={book} /></li>)}
+          {items.map((book) => <li key={book.id}><BookCard book={book} canRead={canReadBooks(me)} quickEdit={!!me?.role.edit} hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden} hideShelfTags={shelfBadgesHidden} /></li>)}
         </ul>
       )}
       {last > 1 && (
@@ -213,7 +207,7 @@ function NodeBooks({ colId, path, variant }: {
             onClick={() => setPage((p) => Math.max(1, p - 1))}>
             <ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Previous')}
           </button>
-          <span aria-current="page">{t('Page {page} of {last}', { page: clamped, last })}</span>
+          <span aria-current="page">{t('Page {page} of {pages}', { page: clamped, pages: last })}</span>
           <button type="button" disabled={clamped >= last || isFetching}
             onClick={() => setPage((p) => Math.min(last, p + 1))}>
             {t('Next')} <ChevronRight size={16} aria-hidden="true" focusable={false} />
@@ -246,6 +240,7 @@ export function CcBrowse({ id }: { id?: string }) {
   const path = new URLSearchParams(search).get('path') ?? '';
   const [afterChildren, setAfterChildren] = usePersistentBool('cwng:cc-books-after-children', false);
   // Hook order: both hooks run on both modes; only the relevant one is enabled.
+  const { data: me } = useMe();
   const columns = useColumns(!id);
   const tree = useCcTree(id ?? '', !!id);
   const isHierarchical = tree.data?.column.hierarchical !== false;
@@ -254,16 +249,19 @@ export function CcBrowse({ id }: { id?: string }) {
   // carries a "Tree" badge; a flat one does not, because it has no tree.
   if (!id) {
     return (
-      <main className={styles.container}>
+      <div className={styles.container}>
         <div className={styles.header}>
-          <h1 className={styles.title}>{t('Custom Columns')}</h1>
+          <h1 className={styles.title}>{t('Custom columns')}</h1>
+          {me && !me.role.anonymous && <a className={styles.profile} href={apiUrl('/me')}>{t('Choose visible columns')}</a>}
           {!!columns.data?.items.length && (
             <span className={styles.count}>
-              {t('{count} columns', { count: columns.data.items.length })}
+              {t(columns.data.items.length === 1 ? '{count} column' : '{count} columns', { count: columns.data.items.length })}
             </span>
           )}
         </div>
-        {columns.isLoading ? <SpinnerCentered size={40} /> : (columns.data?.items.length ?? 0) === 0 ? (
+        {columns.isLoading ? <SpinnerCentered size={40} /> : columns.isError ? (
+          <RequestError title={t('Could not load columns')} error={columns.error} retrying={columns.isFetching} retry={() => { void columns.refetch(); }} />
+        ) : (columns.data?.items.length ?? 0) === 0 ? (
           <EmptyState title={t('No custom columns to browse')}
             message={t('Tag-like custom columns defined in the library appear here.')} />
         ) : (
@@ -281,23 +279,25 @@ export function CcBrowse({ id }: { id?: string }) {
             ))}
           </ul>
         )}
-      </main>
+      </div>
     );
   }
 
   // In after-children mode the selected node's books render inside the list;
   // the slot is handed down and each TreeNode renders it when it is the
   // selected one. One books query feeds either placement.
-  const booksSlot = afterChildren && path
+  const containsPath = (nodes: CcNode[]): boolean => nodes.some(node => node.path === path || containsPath(node.children));
+  const useInset = afterChildren && !!path && containsPath(tree.data?.nodes ?? []);
+  const booksSlot = useInset
     ? <NodeBooks colId={id} path={path} variant="inset" />
     : null;
 
   // Column mode: toolbar + values + books.
   return (
-    <main className={styles.container}>
+    <div className={styles.container}>
       <Link href="/cc" className={styles.back}>
         <ChevronLeft size={16} aria-hidden="true" focusable={false} />
-        {t('Custom Columns')}
+        {t('Custom columns')}
       </Link>
       <div className={styles.header}>
         <h1 className={styles.title}>
@@ -324,12 +324,14 @@ export function CcBrowse({ id }: { id?: string }) {
           ? t('Select a category to see the books assigned to it and all of its sub-categories.')
           : t('Select a value to see the books assigned to it.')}
       </p>
-      {tree.isLoading ? <SpinnerCentered size={40} /> : (isHierarchical ? (
-        <ColumnTree colId={id} selected={path} booksSlot={booksSlot} />
+      {tree.isLoading ? <SpinnerCentered size={40} /> : tree.isError ? (
+        <RequestError title={t('Could not load column')} error={tree.error} retrying={tree.isFetching} retry={() => { void tree.refetch(); }} />
       ) : (
-        <FlatList colId={id} selected={path} booksSlot={booksSlot} />
-      ))}
-      {!afterChildren && <NodeBooks colId={id} path={path} variant="section" />}
-    </main>
+        <>
+          <ValuesList colId={id} selected={path} booksSlot={booksSlot} />
+          {!useInset && <NodeBooks colId={id} path={path} variant="section" />}
+        </>
+      )}
+    </div>
   );
 }

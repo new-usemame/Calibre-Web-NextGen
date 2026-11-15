@@ -1,0 +1,18 @@
+{
+ "shelf-only/fresh": [
+  {
+   "body": "[{\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"1\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"1\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"4\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"4\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"6\", \"IsRemoved\": true}, \"BookMetadata\": {\"Id\": \"6\"}}}]",
+   "continue": null,
+   "status": 200,
+   "token": "z1:eNqFj9EOgjAMRX+F7FnMpoLozyyFFbYA1myLxhj+3U59UIm6x53T3t6rMBBB7LOrAN9Yd0I9QIh6JONah4aJ2lbbnao2Ui7lIhM1UR8eUuMR4h/HJVy+/31fbnDgE/xF45Eay1zI308Jnhqhc40OFof2JTRXH2jEsUYfrDtqiEkoV2pdFLuyeqZ7OOueatIhkkcdqcdDuiFlcFXjDh0jrjyrMVsVoQt/rIk17hoc3UNUXuRSTDeog3iJ"
+  }
+ ],
+ "whole-library/fresh": [
+  {
+   "body": "[{\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"1\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"1\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"2\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"2\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"3\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"3\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"4\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"4\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"5\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"5\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"6\", \"IsRemoved\": true}, \"BookMetadata\": {\"Id\": \"6\"}}}, {\"NewEntitlement\": {\"BookEntitlement\": {\"Id\": \"8\", \"IsRemoved\": false}, \"BookMetadata\": {\"Id\": \"8\"}}}]",
+   "continue": null,
+   "status": 200,
+   "token": "z1:eNqFj0kOwjAMRa+CsqYoATpxmchtTBt1cJVEIIS4Ow6wACpolnnP/v5XYSCAOKyuAlzd2hPqHnzQAxl7tGiYqLzIS1XspdzI9UpURJ1/SrVDCAuOjbj4/Pu93GDPJ7iLxonqlrmQ/58SPDVAY2vtW+yPb6GJ+kIDDhU639pJQ4hCtlW7NC2z4pXu4Kw7qkj7QA51oA7HeEPM4KrGjg0jrjyrMVsVoPEL1o017uotPUJUkiZS3O6q2XiL"
+  }
+ ]
+}

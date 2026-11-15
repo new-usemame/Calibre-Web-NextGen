@@ -17,6 +17,7 @@ local Button = require("ui/widget/button")
 local ButtonDialog = require("ui/widget/buttondialog")
 local Catalog = require("cwng_catalog")
 local Device = require("device")
+local DocSettings = require("docsettings")
 local DocumentRegistry = require("document/documentregistry")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -220,7 +221,8 @@ end
 function Home:loadCatalog()
     local state = self.plugin:getLibraryState()
     local root = self.plugin:getLibraryRoot()
-    local all = Catalog.entries(state.manifest or {}, state.books or {}, root)
+    local books, shelves = self.plugin:libraryCatalog()
+    local all = Catalog.entries(books or {}, state.books or {}, root)
     local present, tracked = {}, {}
     for _, entry in ipairs(all) do
         if entry.present then present[#present + 1] = entry end
@@ -235,7 +237,7 @@ function Home:loadCatalog()
         present[#present + 1] = entry
     end
     self.all_entries = present
-    self.shelves = state.shelves or {}
+    self.shelves = shelves or {}
 end
 
 function Home:entries()
@@ -254,15 +256,40 @@ local function historyPaths(root)
     return paths
 end
 
--- KOReader's own status for a book here, or nil when it has none.
+-- KOReader's own status for a book here, or nil when it has no progress here.
 local function localStatus(path)
+    if BookList.getBookInfo then
+        local cached = BookList.getBookInfo(path)
+        local info = {
+            been_opened = cached.been_opened,
+            status = cached.status,
+            percent_finished = cached.percent_finished,
+        }
+        -- BookList says "reading" both for a book read here and for one that
+        -- was Reset; only the sidecar tells them apart (#2732).
+        if info.been_opened and info.status == "reading" then
+            local ok, settings = pcall(DocSettings.open, DocSettings, path)
+            if ok and settings then
+                info.has_summary = settings:readSetting("summary") ~= nil
+                info.reset = settings:isTrue("docsettings_reset_done")
+            end
+        end
+        return Catalog.deviceStatus(info)
+    end
     local status = BookList.getBookStatus(path)
     if status == "new" then return nil end
     return status
 end
 
 function Home:readingNow()
-    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, localStatus)
+    -- localStatus may parse a sidecar, and continueReading asks about a book
+    -- more than once, so each book is read once per build.
+    local statuses = {}
+    local function status(path)
+        if statuses[path] == nil then statuses[path] = { localStatus(path) } end
+        return statuses[path][1]
+    end
+    return Catalog.continueReading(self:entries(), historyPaths(self.plugin:getLibraryRoot()), nil, status)
 end
 
 function Home:defaultTab()
@@ -436,7 +463,11 @@ function Home:onSwipe(arg, ges_ev)
         end
         return true
     end
-    return BookList.onSwipe(self, arg, ges_ev)
+    -- KOReader's Menu:onSwipe returns nothing. Report the swipe as handled, or a
+    -- plugin that wraps full-screen widgets (Simple UI) dispatches it a second
+    -- time and every swipe turns two pages (#2730).
+    BookList.onSwipe(self, arg, ges_ev)
+    return true
 end
 
 function Home:refresh()

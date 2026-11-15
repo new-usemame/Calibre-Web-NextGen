@@ -54,6 +54,50 @@ def test_management_overview_includes_hidden_but_never_other_private_shelves(man
     assert {s['id'] for s in client.get('/api/v1/magicshelves').json['items']} == {2, 4}
 
 @pytest.mark.unit
+def test_sidebar_list_follows_the_saved_order_mode_but_manage_stays_alphabetical(management):
+    """#2824: the new-UI sidebar honours Smart shelves "Order Mode" like classic."""
+    from cps.api import magicshelves as api
+    client, _, _, _ = management
+
+    def ids(url='/api/v1/magicshelves'):
+        return [s['id'] for s in client.get(url).json['items']]
+
+    # Visible to user 7 are 'My own' (4) and 'Shared' (2): A->Z is [4, 2].
+    assert ids() == [4, 2]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [2, 4]}}
+    assert ids() == [2, 4]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'name_desc'}}
+    assert ids() == [2, 4]
+    # A hidden shelf (1) in the saved order never shows, and a shelf missing
+    # from it (4) goes after the ordered ones, as on the classic sidebar.
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [1, 2]}}
+    assert ids() == [2, 4]
+    # Malformed saved settings fall back to A->Z instead of failing the sidebar.
+    api.current_user.view_settings = ['not', 'a', 'dict']
+    assert ids() == [4, 2]
+    # The manage list is a management surface and keeps its A->Z order.
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'manual', 'order': [2, 4]}}
+    assert ids('/api/v1/magicshelves?manage=1') == [4, 1, 2]
+
+@pytest.mark.unit
+def test_sidebar_count_modes_sort_on_each_shelfs_book_count(management, monkeypatch):
+    """#2824: the count modes need book_count filled in before sorting, as classic does."""
+    from cps import magic_shelf
+    from cps.api import magicshelves as api
+    client, _, _, _ = management
+    counts = {2: 5, 4: 1}
+    monkeypatch.setattr(magic_shelf, 'cached_book_count_for_magic_shelf',
+                        lambda user_id, shelf_id: counts[shelf_id])
+
+    def ids():
+        return [s['id'] for s in client.get('/api/v1/magicshelves').json['items']]
+
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'book_count_desc'}}
+    assert ids() == [2, 4]
+    api.current_user.view_settings = {'magic_shelves': {'order_mode': 'book_count_asc'}}
+    assert ids() == [4, 2]
+
+@pytest.mark.unit
 def test_restore_and_hide_persist_classic_preferences_idempotently(management):
     client, session, ub, magic = management
     for _ in range(2):
@@ -111,3 +155,32 @@ def test_ordinary_shelf_opds_selection_is_per_viewer_and_partial_saves_preserve_
     finally:
         session.close()
         engine.dispose()
+
+@pytest.mark.unit
+@pytest.mark.parametrize('rules', [
+    {'condition': 'OR', 'rules': [{'condition': 'AND', 'rules': [
+        {'id': 'future_field', 'operator': 'contains', 'value': {'toString': None}},
+    ]}]},
+    {'condition': 'AND', 'rules': [
+        {'id': 'title', 'operator': 'retired_operator', 'value': 0},
+    ]},
+    {'condition': 'AND', 'rules': []},
+])
+def test_shelf_with_no_evaluable_filter_keeps_rules_for_editor(management, monkeypatch, rules):
+    from cps.api import magicshelves as api
+    client, session, ub, _ = management
+    shelf = session.query(ub.MagicShelf).get(4)
+    shelf.rules = rules
+    session.commit()
+    monkeypatch.setattr(api, 'load_configured_columns', lambda _: [])
+    monkeypatch.setattr(api.config, 'config_books_per_page', 24, raising=False)
+    client.application.add_url_rule('/api/v1/magicshelf/<int:shelf_id>',
+                                    view_func=inspect.unwrap(api.magic_shelf_books))
+    response = client.get('/api/v1/magicshelf/4')
+    assert response.status_code == 200
+    assert response.json['items'] == []
+    assert response.json['total'] == 0
+    assert response.json.get('rules') == rules
+    assert response.json['can_edit'] is True
+    # Returning rules must retain the existing private-shelf authorization gate.
+    assert client.get('/api/v1/magicshelf/3').status_code == 403

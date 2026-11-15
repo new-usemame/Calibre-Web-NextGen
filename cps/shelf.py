@@ -10,8 +10,10 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
+from markupsafe import Markup
 from .cw_login import current_user
 from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, constants, db, logger, ub, user_library
@@ -760,7 +762,7 @@ def order_shelf(shelf_id):
                 .join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id, isouter=True) \
                 .filter(ub.BookShelf.shelf == shelf_id).order_by(ub.BookShelf.order.asc()).all()
         return render_title_template('shelf_order.html', entries=result,
-                                     title=_("Change order of Shelf: '%(name)s'", name=shelf.name),
+                                     title=Markup(_("Change order of Shelf: '%(name)s'")) % {"name": shelf.name},
                                      shelf=shelf, page="shelfreorder")
     else:
         abort(404)
@@ -984,7 +986,7 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
         return render_title_template(page,
                                      entries=result,
                                      pagination=pagination,
-                                     title=_("Shelf: '%(name)s'", name=shelf.name),
+                                     title=Markup(_("Shelf: '%(name)s'")) % {"name": shelf.name},
                                      shelf=shelf,
                                      page="shelf",
                                      status=status,
@@ -1084,6 +1086,38 @@ def add_selected_to_shelf():
         }), 200
 
 
+SHELF_PICKER_PAGE_SIZE = 30
+
+
+def shelf_picker_books(shelf_id, query, offset, limit):
+    """Books for a shelf's "Add books" picker, shared by the classic modal and
+    ``GET /api/v1/shelves/<id>/available-books``.
+
+    A non-empty ``query`` matches like the library search (sorted by title) and
+    an empty one lists the most recently added books; both orders end in the
+    book id so offset paging is stable. Both apply the plain
+    ``common_filters()``: unlike browsing search results, the picker leaves out
+    archived books, because the add path refuses them. Paging happens in SQL,
+    and the user's stored search results are left alone. Returns ``(books,
+    total, in_shelf_ids)`` where ``books`` are ``db.Books`` rows for this page.
+    """
+    if query:
+        base = (calibre_db.search_query(query, config, eager_data=False)
+                .filter(calibre_db.common_filters()))
+        order = [db.Books.sort, db.Books.id]
+    else:
+        base = calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
+        order = BOOK_SORT_ORDERS["new"]
+    total = base.count()
+    # Search rows wrap the book in `.Books`; the plain query yields it directly.
+    page = (base.options(selectinload(db.Books.authors))
+            .order_by(*order).offset(offset).limit(limit).all())
+    books = [getattr(entry, 'Books', entry) for entry in page]
+    in_shelf = {row.book_id for row in
+                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
+    return books, total, in_shelf
+
+
 @shelf.route("/shelf/<int:shelf_id>/available_books", methods=["GET"])
 @user_login_required
 def shelf_available_books(shelf_id):
@@ -1103,28 +1137,11 @@ def shelf_available_books(shelf_id):
         return jsonify({'status': 'error',
                         'message': 'You are not allowed to add books to this shelf'}), 403
 
-    query = (request.args.get('query') or '').strip()
-    limit = 30
-    in_shelf = {row.book_id for row in
-                ub.session.query(ub.BookShelf.book_id).filter(ub.BookShelf.shelf == shelf_id).all()}
-
-    if query:
-        # get_search_results returns author-ordered rows that wrap the book in a
-        # `.Books` attribute (the shape the list/search templates consume).
-        entries, __, ___ = calibre_db.get_search_results(query, config, 0, None, limit)
-    else:
-        # A plain Books query returns Books instances directly (no `.Books`).
-        entries = (calibre_db.session.query(db.Books)
-                   .filter(calibre_db.common_filters())
-                   .order_by(*BOOK_SORT_ORDERS["new"])
-                   .limit(limit).all())
-
-    # Normalise the two shapes: search rows expose the book at `.Books`; the plain
-    # query yields the book itself.
-    books = []
-    for entry in entries:
-        book = getattr(entry, 'Books', entry)
-        books.append({
+    books, __, in_shelf = shelf_picker_books(
+        shelf_id, (request.args.get('query') or '').strip(), 0, SHELF_PICKER_PAGE_SIZE)
+    rows = []
+    for book in books:
+        rows.append({
             'id': book.id,
             'title': book.title,
             'authors': ' & '.join(author.name for author in book.authors) if book.authors else '',
@@ -1133,7 +1150,7 @@ def shelf_available_books(shelf_id):
         })
 
     return jsonify({'status': 'ok', 'shelf_id': shelf_id,
-                    'shelf_name': shelf.name, 'books': books})
+                    'shelf_name': shelf.name, 'books': rows})
 
 
 # ---------------------------------------------------------------------------

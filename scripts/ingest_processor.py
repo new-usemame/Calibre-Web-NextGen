@@ -9,19 +9,36 @@ import collections
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+from calibre_library_target import (library_target, calibredb_command, operation,
+                                    offline_library_operation, offline_library_access, offline_child_ownership,
+                                    offline_writer_ownership, LibraryBusyError, check_maintenance)
 import tempfile
 import time
 import shutil
+import signal
 import sqlite3
-import fcntl
 import threading
 from datetime import datetime
 from pathlib import Path
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
+
+# Single-instance locking goes through the same primitive the app uses
+# (cps/services/file_lock.py): flock on POSIX, msvcrt on Windows. The module
+# is dependency-free, so it loads standalone here WITHOUT firing
+# cps/__init__.py -- the eager-import ban that _load_optional_cps_modules()
+# exists for (CWA #1349) still holds on the fast-exit path.
+import importlib.util as _ilutil
+_lock_spec = _ilutil.spec_from_file_location(
+    "_cwng_ingest_file_lock",
+    Path(__file__).resolve().parents[1] / "cps" / "services" / "file_lock.py")
+file_lock = _ilutil.module_from_spec(_lock_spec)
+_lock_spec.loader.exec_module(file_lock)
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
 # initialize_runtime() (CWA #1349 by @navels) so the ingest-service can
@@ -47,15 +64,14 @@ from contextlib import contextmanager as _contextmanager
 
 
 @_contextmanager
-def _noop_metadata_db_write_lock(*args, **kwargs):
-    # No-op fallback used when running outside the container OR before
-    # _load_optional_cps_modules() has been called. The fcntl-based
-    # lock is advisory; in test paths that don't reach the cps import,
-    # this fallback preserves callsite semantics.
-    yield
+def _standalone_metadata_db_write_lock(*args, **kwargs):
+    # The shared primitive is dependency-free: a failed optional Flask import
+    # must not disable coordination with the app or a managed Calibre server.
+    with operation(timeout=kwargs.get("timeout", 120)) as fd:
+        yield fd
 
 
-metadata_db_write_lock = _noop_metadata_db_write_lock
+metadata_db_write_lock = _standalone_metadata_db_write_lock
 
 
 def _load_fork_cps_imports() -> None:
@@ -81,7 +97,7 @@ def _load_fork_cps_imports() -> None:
         from cps.services.calibre_db_lock import metadata_db_write_lock as _module_lock
         metadata_db_write_lock = _module_lock
     except ImportError:
-        metadata_db_write_lock = _noop_metadata_db_write_lock
+        metadata_db_write_lock = _standalone_metadata_db_write_lock
 
     try:
         from cps.services.kepub_package_normalizer import (
@@ -108,7 +124,7 @@ def _is_lock_error_stderr(stderr_text):
     return any(p in low for p in _LOCK_PATTERNS)
 
 
-def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
+def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0, **process_options):
     """Run calibredb add with retry+backoff on transient lock errors.
 
     Returns the successful CompletedProcess. Raises the last
@@ -120,6 +136,7 @@ def _run_calibredb_add_with_retry(cmd, env, max_attempts=4, base_backoff=2.0):
         try:
             return subprocess.run(
                 cmd, env=env, check=True, capture_output=True, text=True,
+                **process_options,
             )
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or ""
@@ -209,18 +226,18 @@ class ProcessLock:
                 lock_writable = False
             else:
                 if not lock_existed:
+                    # Mode bits are best-effort on Windows (no os.fchmod
+                    # there); the lock itself does not depend on them.
                     try:
                         os.fchmod(lock_fd, 0o666)
-                    except OSError:
+                    except (OSError, AttributeError):
                         pass
             self.lock_file = os.fdopen(lock_fd, 'r+' if lock_writable else 'r')
 
             # Try to acquire an exclusive lock with timeout
             start_time = time.time()
             while time.time() - start_time < timeout:
-                try:
-                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-
+                if file_lock.acquire(self.lock_file.fileno(), blocking=False):
                     # Successfully acquired lock. Replace the diagnostic PID
                     # only when this user can write the persistent inode.
                     if lock_writable:
@@ -233,10 +250,9 @@ class ProcessLock:
                     print(f"[ingest-processor] Lock acquired successfully (PID: {os.getpid()})")
                     return True
 
-                except (IOError, OSError):
-                    # The flock is authoritative. PID text is only diagnostic;
-                    # invalid text cannot make a contended lock stale.
-                    time.sleep(0.1)  # Brief wait before retry
+                # Contended. The lock is authoritative; the PID text is only
+                # diagnostic, so invalid text cannot make a contended lock stale.
+                time.sleep(0.1)  # Brief wait before retry
 
             # Timeout reached
             holding_pid = self._get_holding_pid()
@@ -256,7 +272,7 @@ class ProcessLock:
                 self.lock_file.seek(0)
                 pid_str = self.lock_file.read().strip()
                 return int(pid_str) if pid_str.isdigit() else "unknown"
-        except:
+        except (OSError, ValueError):
             pass
         return "unknown"
 
@@ -264,7 +280,7 @@ class ProcessLock:
         """Release the lock"""
         if self.acquired and self.lock_file:
             try:
-                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+                file_lock.release(self.lock_file.fileno())
                 self.lock_file.close()
                 self.lock_file = None
 
@@ -277,7 +293,7 @@ class ProcessLock:
             try:
                 self.lock_file.close()
                 self.lock_file = None
-            except:
+            except OSError:
                 pass
 
 def cleanup_lock():
@@ -789,7 +805,7 @@ def run_duplicate_scan_for_books(book_ids) -> None:
 _CONVERSION_FAILURE_GUIDANCE = {
     'acsm': (
         "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook — "
-        "Calibre can only convert it when an ACSM-capable plugin (e.g. the ACSM Input "
+        "Ingest can fulfill it when an ACSM-capable import plugin (e.g. the ACSM Input "
         "plugin) is installed. Your options: (1) set CWA_CALIBRE_USER_PLUGINS=true and "
         "place the ACSM Input plugin zip in /config/.config/calibre/plugins (see the "
         "'Calibre plugins' section of the README), or (2) open the .acsm in Adobe "
@@ -837,6 +853,23 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
     "has been moved to the failed books folder (processed_books/failed)."
 )
 
+
+# fork #1228: no import hook turned the ticket into a book and none announced
+# itself, so "install the plugin" may tell someone to place a zip they placed.
+# @sgreadly measured both causes on a real ADE setup.
+_ACSM_TICKET_RETURNED_GUIDANCE = (
+    "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook, "
+    "and no Calibre import plugin turned it into a book. Check two things: "
+    "(1) the plugin is registered, not only copied: the container log should show "
+    "'Registered Calibre plugin' for it, and a zip added after the first batch "
+    "registered needs: docker exec -e HOME=/config <container> "
+    "/opt/calibre/calibre-customize -a \"/config/.config/calibre/plugins/<plugin file>.zip\". "
+    "(2) DeACSM has a completed Adobe activation: without one it hands the ticket "
+    "back unchanged. Create the activation in Calibre desktop and copy its files "
+    "into the container's plugins/DeACSM folder, then restart. Details: "
+    "docs/calibre-plugins.md. The original file has been moved to the failed "
+    "books folder (processed_books/failed)."
+)
 
 def _distinct_book_ids(book_ids):
     """The distinct integer ids in ``book_ids``, ascending.
@@ -976,7 +1009,7 @@ _CONVERTER_LOG_TAIL_LINES = 400
 _CONVERTER_LOG_LINE_CHARS = 4096
 
 
-def _run_converter_streaming(cmd, env, timeout=None):
+def _run_converter_streaming(cmd, env, timeout=None, *, owned_process_group=False):
     """Run a converter, echoing its output live while keeping a bounded tail.
 
     The converter's output is the only place a Calibre plugin says why it
@@ -990,7 +1023,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
     when the deadline passes, OSError when the converter cannot be run.
     """
     proc = subprocess.Popen(
-        cmd, env=env,
+        cmd, env=env, start_new_session=owned_process_group and os.name == "posix",
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         # errors='replace' is load-bearing, not defensive. Under the default
         # strict policy one undecodable byte — a latin-1 title echoed by a
@@ -1001,6 +1034,13 @@ def _run_converter_streaming(cmd, env, timeout=None):
         # here may reintroduce a decode that can raise.
         text=True, encoding='utf-8', errors='replace', bufsize=1,
     )
+    def stop_owned_group():
+        if owned_process_group and os.name == "posix":
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # Leader and all ordinary descendants already exited.
+
     tail = collections.deque(maxlen=_CONVERTER_LOG_TAIL_LINES)
 
     def _pump():
@@ -1022,6 +1062,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
     try:
         returncode = proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
+        stop_owned_group()
         proc.kill()
         proc.wait()
         # Join before reading the tail, not after. This runs before the
@@ -1033,6 +1074,7 @@ def _run_converter_streaming(cmd, env, timeout=None):
         pump.join(timeout=5)
         raise subprocess.TimeoutExpired(cmd, timeout, output=''.join(tail))
     finally:
+        stop_owned_group()
         pump.join(timeout=5)
         try:
             if proc.stdout:
@@ -1051,6 +1093,29 @@ def _run_converter_streaming(cmd, env, timeout=None):
 # these it would file a junk entry — .acsm is an Adobe fulfilment ticket and
 # .lcpl a Readium LCP licence; backup("failed") preserves either in that folder.
 _NOT_A_BOOK_FORMATS = frozenset({'acsm', 'lcpl'})
+
+
+# Convert Library's working dirs (PRIVATE_TMP_PREFIX in convert_library.py). It runs
+# under its own lock, so a run may be converting a book in one of them right now.
+CONVERT_LIBRARY_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def empty_tmp_conversion_dir(tmp_conversion_dir) -> None:
+    """Remove what ingest left in the shared conversion dir, but not Convert Library's dirs."""
+    try:
+        entries = list(os.scandir(tmp_conversion_dir))
+    except FileNotFoundError:
+        return
+    for entry in entries:
+        if entry.name.startswith(CONVERT_LIBRARY_TMP_PREFIX):
+            continue
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path, ignore_errors=True)
+        else:
+            try:
+                os.unlink(entry.path)
+            except OSError:
+                pass  # as rmtree(ignore_errors=True) did: one stuck file must not stop the rest
 
 
 def is_a_book_format(input_format) -> bool:
@@ -1091,6 +1156,9 @@ def conversion_failure_guidance(input_format, filename, converter_output=None):
         if reason:
             return _ACSM_PLUGIN_RAN_GUIDANCE.format(
                 filename=filename, reason=reason)
+        from calibre_ticket_fulfillment import TICKET_RETURNED
+        if TICKET_RETURNED in (converter_output or ''):
+            return _ACSM_TICKET_RETURNED_GUIDANCE.format(filename=filename)
     return template.format(filename=filename)
 
 
@@ -1194,9 +1262,6 @@ class NewBookProcessor:
         # remain global-only because they have no authenticated uploader.
         self.uploader_user_id = None
         self.uploader_was_personal_library = False
-        # True when last_added_book_id(s) came from the most-recently-modified
-        # fallback guess rather than parsed calibredb output.
-        self.last_added_ids_are_fallback = False
         self.can_convert, self.input_format = self.can_convert_check()
         # Determine if the file is already in the desired target format using normalized extensions
         self.is_target_format = (self.input_format.lower() == str(self.target_format).lower())
@@ -1258,31 +1323,6 @@ class NewBookProcessor:
         except Exception:
             return []
 
-    def _fallback_last_added_book_id(self) -> None:
-        """Fallback to the most recently modified book when calibredb output lacks IDs."""
-        if self.last_added_book_id is not None:
-            return
-        try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
-                cur = con.cursor()
-                row = cur.execute(
-                    "SELECT id FROM books ORDER BY last_modified DESC LIMIT 1"
-                ).fetchone()
-                if row:
-                    self.last_added_book_id = int(row[0])
-                    self.last_added_book_ids = [self.last_added_book_id]
-                    # Guess, not parsed output — under concurrent ingest this
-                    # can be ANOTHER processor's book. Consumers that would
-                    # mis-attribute on a wrong id (original-filename capture)
-                    # check this flag and skip.
-                    self.last_added_ids_are_fallback = True
-                    print(
-                        "[ingest-processor] WARN: Could not parse calibredb output; using most recently modified book ID.",
-                        flush=True,
-                    )
-        except Exception as e:
-            print(f"[ingest-processor] WARN: Failed to infer book ID after import: {e}", flush=True)
-
     def _register_title_sort_function(self, connection: sqlite3.Connection) -> bool:
         """Register title_sort SQL function on a raw SQLite connection."""
         try:
@@ -1311,7 +1351,9 @@ class NewBookProcessor:
         arrive without one"). Best-effort throughout: an import must not fail
         because a cover could not be drawn, and a book that already has a cover
         is never touched — ``generate_cover_file`` refuses to overwrite, so a
-        re-run over the same library is a no-op rather than a rewrite.
+        re-run over the same library is a no-op rather than a rewrite. If the
+        flag commit fails, only this call's unchanged generated file is removed
+        so a later explicit enabled pass can generate again.
         """
         if book_id is None:
             return False
@@ -1327,39 +1369,44 @@ class NewBookProcessor:
             settings = cover_generator.settings_from_app_db(str(app_paths.app_db_path()))
             if not settings.auto_enabled:
                 return False
-
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                row = connection.execute(
-                    "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
-                    (int(book_id),),
-                ).fetchone()
-                if not row:
+            with sqlite3.connect(Path(self.metadata_db).resolve().as_uri() + "?mode=ro", uri=True, timeout=30) as connection:
+                row = connection.execute("SELECT path, has_cover FROM books WHERE id = ?", (int(book_id),)).fetchone()
+                if not row or row[1] or os.path.lexists(os.path.join(self.library_dir, row[0], "cover.jpg")):
                     return False
-                book_path, title, has_cover, series_index = row
-                if has_cover:
-                    return False
-                authors = [name for (name,) in connection.execute(
-                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
-                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
-                series_row = connection.execute(
-                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
-                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+            with offline_library_access(), metadata_db_write_lock():
+                with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                    row = connection.execute(
+                        "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
+                        (int(book_id),),
+                    ).fetchone()
+                    if not row:
+                        return False
+                    book_path, title, has_cover, series_index = row
+                    destination = os.path.join(self.library_dir, book_path, "cover.jpg")
+                    if has_cover or os.path.lexists(destination):
+                        return False
+                    authors = [name for (name,) in connection.execute(
+                        "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                        "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                    series_row = connection.execute(
+                        "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                        "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
 
-            destination = os.path.join(self.library_dir, book_path, "cover.jpg")
-            written = cover_generator.generate_cover_file(
-                destination,
-                cover_generator.BookCoverMeta(
-                    title=title or "",
-                    authors=authors,
-                    series=series_row[0] if series_row else None,
-                    series_index=series_index,
-                ),
-                preset=settings.default_preset,
-            )
-            if not written:
-                return False
-            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
-                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+                created = []
+                written = cover_generator.generate_cover_file(
+                    destination,
+                    cover_generator.BookCoverMeta(
+                        title=title or "",
+                        authors=authors,
+                        series=series_row[0] if series_row else None,
+                        series_index=series_index,
+                    ),
+                    preset=settings.default_preset, on_created=created.append,
+                )
+                if not written:
+                    return False
+                cover_generator.commit_generated_cover_flag(
+                    self.metadata_db, book_id, destination, created[0] if created else None, timeout=30)
             print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
                   f"({settings.default_preset}) — it was imported without one.", flush=True)
             return True
@@ -1403,7 +1450,7 @@ class NewBookProcessor:
             return  # user wants ASCII filenames; calibredb already produced them
 
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if not self._register_title_sort_function(con):
                     print(f"[ingest-processor] INFO: Skipping path fix for book {book_id} (title_sort unavailable).", flush=True)
                     return
@@ -1492,6 +1539,39 @@ class NewBookProcessor:
         return ingest_folder, library_dir, tmp_conversion_dir
 
 
+    def _folder_label_metadata(self) -> dict | None:
+        """Build the selected folder-label operation from the original path."""
+        _ensure_project_root_on_path()
+        from cps.services.ingest_folder_labels import (
+            IngestFolderLabelError,
+            TARGET_DISABLED,
+            TARGET_SETTING,
+            NESTED_SETTING,
+            folder_label_values,
+        )
+
+        target = self.cwa_settings.get(TARGET_SETTING, TARGET_DISABLED)
+        if target == TARGET_DISABLED:
+            return None
+        if not isinstance(target, str) or (target != "tags" and not target.startswith("#")):
+            raise PreserveIngestSourceError(
+                "Invalid ingest folder-label target; original file retained"
+            )
+        try:
+            values = folder_label_values(
+                self.filepath,
+                self.ingest_folder,
+                nested=bool(self.cwa_settings.get(NESTED_SETTING, False)),
+            )
+        except IngestFolderLabelError as exc:
+            raise PreserveIngestSourceError(
+                f"Cannot derive configured ingest folder labels: {exc}; original retained"
+            ) from exc
+        if values is None:
+            return None
+        return {"target": target, "values": values}
+
+
     def can_convert_check(self) -> tuple[bool, str]:
         """When the current filepath isn't of the target format, this function will check if the file is able to be converted to the target format,
         returning a can_convert bool with the answer"""
@@ -1555,7 +1635,7 @@ class NewBookProcessor:
             except Exception:
                 print("[ingest-processor] WARN: Acquisition post-import follow-up failed", flush=True)
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if self._register_title_sort_function(con):
                     stamp_books_with_import_time(con, self.last_added_book_ids,
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00"))
@@ -1593,14 +1673,6 @@ class NewBookProcessor:
             [self.last_added_book_id]
             if getattr(self, 'last_added_book_id', None) else [])
         if not book_ids:
-            return
-        if getattr(self, 'last_added_ids_are_fallback', False):
-            # The id is a most-recently-modified guess (calibredb output
-            # parsing failed) — under concurrent ingest it can belong to a
-            # DIFFERENT book, and a wrong "Imported as" is worse than none.
-            print("[ingest-processor] Skipping original-filename record: "
-                  "book id came from fallback inference, not calibredb "
-                  "output", flush=True)
             return
         try:
             with sqlite3.connect(get_app_db_path(), timeout=30) as con:
@@ -1664,6 +1736,132 @@ class NewBookProcessor:
             return False
 
 
+    def ingest_acsm(self) -> None:
+        """Fulfill once through import hooks, then use guarded ordinary ingest."""
+        from calibre_ticket_fulfillment import RESULT_PREFIX, load_result
+
+        ticket = Path(self.filepath)
+        source_digest = _sha256_file(ticket)
+        acquisition = getattr(self, "acquisition_intent", None)
+        previous = self._acquisition_result(source_digest) if acquisition else None
+        existing = previous["book_ids"] if previous else (
+            [] if acquisition else self._content_marker_book_ids(source_digest)
+        )
+        destination = app_paths.processed_books_dir() / 'acsm_fulfilled' / source_digest
+        if existing:
+            # This path reuses the normal durable receipt acknowledgement; it
+            # returns before metadata hooks and never fulfills the ticket again.
+            self.add_book_to_library(str(ticket), identity_path=str(ticket))
+            if self.last_added_book_ids:
+                shutil.rmtree(destination, ignore_errors=True)
+            return
+
+        try:
+            recovered = load_result(destination, source_digest)
+        except ValueError as error:
+            print(f"[ingest-processor] {error}; original retained for manual recovery", flush=True)
+            raise PreserveIngestSourceError(str(error)) from error
+        helper = Path(__file__).with_name("calibre_ticket_fulfillment.py")
+        try:
+            if recovered:
+                print(f"[ingest-processor] Reusing validated ACSM book: {recovered['path']}", flush=True)
+                result = recovered
+            else:
+                print(f"[ingest-processor] Fulfilling ACSM through Calibre import hooks: {self.filename}", flush=True)
+                output = _run_converter_streaming(
+                    ["calibre-debug", "-e", str(helper), "--", "--source", str(ticket),
+                     "--destination", str(destination)],
+                    env=self.calibre_env, timeout=conversion_budget_remaining(), owned_process_group=True,
+                )
+                result = next(json.loads(line[len(RESULT_PREFIX):]) for line in reversed(output.splitlines())
+                              if line.startswith(RESULT_PREFIX))
+                if result != load_result(destination, source_digest):
+                    raise ValueError("Fulfillment acknowledgement did not match its durable result")
+            fulfilled = Path(result['path'])
+            fulfilled_format = result['format']
+            if _sha256_file(ticket) != source_digest:
+                raise ValueError("Fulfillment changed the ticket identity")
+        except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError) as error:
+            print(f"[ingest-processor] ACSM fulfillment failed: {type(error).__name__}", flush=True)
+            if destination.exists():
+                print(f"[ingest-processor] Retained ACSM recovery entry at {destination}", flush=True)
+                raise PreserveIngestSourceError("ACSM fulfillment interrupted; original and recovery entry retained") from error
+            guidance = conversion_failure_guidance("acsm", self.filename,
+                converter_output=getattr(error, "output", None))
+            if guidance:
+                print(guidance, flush=True)
+            if not self.backup(str(ticket), backup_type="failed"):
+                raise PreserveIngestSourceError("ACSM fulfillment failed; original retained")
+            if acquisition:
+                raise PreserveIngestSourceError("ACSM fulfillment failed; acquisition original retained")
+            _remove_completed_import_manifest(str(ticket))
+            return
+
+        import_path = str(fulfilled)
+        # Auto-Convert governs the resulting book, not whether the ticket must
+        # be fulfilled. Its ignore list applies to the actual EPUB/PDF format.
+        if (self.auto_convert_on and fulfilled_format != self.target_format
+                and fulfilled_format not in self.convert_ignored_formats):
+            old_path, old_format = self.filepath, self.input_format
+            try:
+                self.filepath, self.input_format = str(fulfilled), fulfilled_format
+                successful, converted = (self.convert_to_kepub() if self.target_format == "kepub"
+                                         else self.convert_book())
+                if successful:
+                    import_path = converted
+                else:
+                    print("[ingest-processor] Importing the fulfilled book after optional conversion failed", flush=True)
+            finally:
+                self.filepath, self.input_format = old_path, old_format
+        self.add_book_to_library(import_path, identity_path=str(ticket))
+        if not self.last_added_book_ids:
+            print(f"[ingest-processor] Fulfilled ACSM import incomplete; book retained at {fulfilled}", flush=True)
+            raise PreserveIngestSourceError("Fulfilled ACSM book import incomplete; original and fulfilled book retained")
+        shutil.rmtree(destination, ignore_errors=True)
+
+    # Both upload routes stage a browser upload as
+    # "<new|format>_<id>_<YYYYmmdd>_<HHMMSS>_<ffffff>_<name>" so that parallel
+    # uploads never collide (cps.editbooks._get_ingest_path), and record the
+    # browser's own file name in the .cwa.json sidecar.
+    _UPLOAD_STAGING_PREFIX = re.compile(r"^(?:new|format)_\d+_\d{8}_\d{6}_\d{6}_")
+
+    def _presented_name(self, path) -> str:
+        """The file name ebook-convert and calibredb should see for ``path``.
+
+        Calibre takes the title from the file name when the file carries none,
+        so an upload staged as "new_1_20261113_112627_417824_Rig_Doc.docx" was
+        imported titled "new 1 20261113 112627 417824 Rig_Doc". The staged name
+        is also sanitised (spaces become underscores, a non-ASCII stem becomes
+        "book", #2701), so when the sidecar names the original file, present
+        its stem with the staged extension (the upload gate may have changed
+        it, e.g. .fb2.zip to .fbz). A watch-folder drop has no sidecar and
+        keeps its own name.
+        """
+        name = Path(path).name
+        original = getattr(self, "original_filename", name)
+        if original == Path(self.filepath).name:
+            return name
+        match = self._UPLOAD_STAGING_PREFIX.match(name)
+        if not match:
+            return name
+        fallback = name[match.end():] or name
+        suffix = Path(name).suffix
+        stem = Path(str(original).replace("\\", "/")).name
+        if suffix and stem.lower().endswith(suffix.lower()):
+            stem = stem[:-len(suffix)]
+        elif suffix.lower() == ".fbz" and stem.lower().endswith(".fb2.zip"):
+            stem = stem[:-len(".fb2.zip")]
+        else:
+            stem = Path(stem).stem
+        stem = "".join(ch for ch in stem if ch.isprintable()).strip().lstrip(".").strip()
+        # Leave room under NAME_MAX for the suffix and any temp-name decoration.
+        while len(stem.encode("utf-8")) > 200:
+            stem = stem[:-1]
+        stem = stem.rstrip()
+        if not stem:
+            return fallback
+        return stem + suffix
+
     def convert_book(self, end_format=None) -> tuple[bool, str]:
         """Uses the following terminal command to convert the books provided using the calibre converter tool:\n\n--- ebook-convert myfile.input_format myfile.output_format\n\nAnd then saves the resulting files to the calibre-web import folder."""
         print(f"[ingest-processor]: Starting conversion process for {self.filename}...", flush=True)
@@ -1674,10 +1872,29 @@ class NewBookProcessor:
             end_format = self.target_format # If end_format isn't given, the file is converted to the target format specified in the CWA Settings page
 
         original_filepath = Path(self.filepath)
-        target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
+        presented = self._presented_name(self.filepath)
+        input_path = self.filepath
+        if presented != original_filepath.name:
+            # Show the converter the uploaded name without renaming the watched
+            # source, which delete and backup still look for under its own name.
+            # tmp_conversion_dir is emptied after every ingest run.
+            # If that copy cannot be made, convert under the staging name as
+            # before rather than fail the book.
+            try:
+                presented_dir = tempfile.mkdtemp(prefix="presented-", dir=self.tmp_conversion_dir)
+                input_path = os.path.join(presented_dir, presented)
+                try:
+                    os.link(self.filepath, input_path)
+                except OSError:
+                    _copy_file(self.filepath, input_path)
+            except OSError as e:
+                print(f"[ingest-processor] WARN: could not present {self.filename} under its "
+                      f"uploaded name, converting it as staged: {e}", flush=True)
+                input_path = self.filepath
+        target_filepath = f"{self.tmp_conversion_dir}{Path(presented).stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            _run_converter_streaming(['ebook-convert', self.filepath, target_filepath],
+            _run_converter_streaming(['ebook-convert', input_path, target_filepath],
                                      env=self.calibre_env,
                                      timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
@@ -1687,7 +1904,7 @@ class NewBookProcessor:
             if self.cwa_settings['auto_backup_conversions']:
                 self.backup(self.filepath, backup_type="converted")
 
-            self.db.conversion_add_entry(original_filepath.stem,
+            self.db.conversion_add_entry(Path(presented).stem,
                                         self.input_format,
                                         self.target_format,
                                         str(self.cwa_settings["auto_backup_conversions"]))
@@ -1836,29 +2053,11 @@ class NewBookProcessor:
         if timeout is None:
             timeout_minutes = self.cwa_settings.get('ingest_timeout_minutes', 15)
             timeout = timeout_minutes * 60  # Convert to seconds
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout = 0  # Retry queues get one immediate writer probe.
 
-        start = time.time()
-        while time.time() - start < timeout:
-            if not os.path.exists(self.filepath):
-                return False
-            try:
-                # lsof '-F f' gets file access mode; we check for 'w' (write).
-                # Add timeout to prevent hanging (issue #654)
-                result = subprocess.run(['lsof', '-F', 'f', '--', self.filepath],
-                                      capture_output=True, text=True, timeout=10)
-                if 'w' not in result.stdout:
-                    return True # Not in use for writing
-            except subprocess.TimeoutExpired:
-                print("[ingest-processor] WARN: lsof command timed out. Assuming file is not in use.", flush=True)
-                return True  # If lsof hangs, assume file is ready to avoid indefinite wait
-            except FileNotFoundError:
-                print("[ingest-processor] WARN: 'lsof' command not found. Cannot reliably check if file is in use. Proceeding with caution.", flush=True)
-                return True # Fallback for systems without lsof
-            except Exception as e:
-                print(f"[ingest-processor] WARN: Error checking file usage with lsof: {e}", flush=True)
-                # On error, wait and retry to be safe
-            time.sleep(1)
-        return False # Timeout reached
+        from ingest_budget import wait_for_file_ready
+        return wait_for_file_ready(self.filepath, timeout)
 
 
     _COMIC_INGEST_EXTENSIONS = {'.cbz', '.cbt', '.cbr', '.cb7'}
@@ -1994,6 +2193,7 @@ class NewBookProcessor:
                 action,
             ),
             self.calibre_env,
+            **offline_child_ownership(),
         )
         return self._parse_calibre_transaction_result(completed)
 
@@ -2119,7 +2319,7 @@ class NewBookProcessor:
             for index, existing_path in enumerate(existing_paths, start=1):
                 destination = recovery_dir / f"{index}_{existing_path.name}"
                 source_digest = _sha256_file(existing_path)
-                shutil.copy2(existing_path, destination)
+                _copy_file(existing_path, destination)
                 if _sha256_file(destination) != source_digest:
                     raise OSError(f"digest mismatch preserving {existing_path}")
                 with destination.open("rb") as preserved_file:
@@ -2155,7 +2355,7 @@ class NewBookProcessor:
                 os.close(restore_fd)
                 restore_path = Path(restore_name)
                 try:
-                    shutil.copy2(preserved_path, restore_path)
+                    _copy_file(preserved_path, restore_path)
                     if _sha256_file(restore_path) != expected_digest:
                         raise OSError(f"digest mismatch restoring {existing_path}")
                     with restore_path.open("rb") as restored_file:
@@ -2200,6 +2400,7 @@ class NewBookProcessor:
             )
         return True
 
+    @offline_library_operation
     def _current_overwrite_candidates(
         self,
         staged_path: Path,
@@ -2210,6 +2411,13 @@ class NewBookProcessor:
     ) -> list[Path]:
         if getattr(self, "acquisition_intent", None) or self.cwa_settings.get("auto_ingest_automerge") != "overwrite":
             return []
+        if metadata_override.get("ingest_folder_labels"):
+            if self._content_marker_book_ids(source_digest):
+                # The surrounding caller holds metadata_db_write_lock for the
+                # transactional retry. A prior source marker makes format
+                # inspection unnecessary: this path only adds label values.
+                self._folder_label_marker_replay = True
+                return []
         inspection = self._run_calibre_transaction(
             staged_path,
             staged_identity_path,
@@ -2237,6 +2445,7 @@ class NewBookProcessor:
         format: str = "text",
         identity_path: str | None = None,
     ) -> None:
+        folder_label_data = self._folder_label_metadata()
         # A converter may emit different package bytes on each run. Its durable
         # retry identity is therefore the staged source that generated the
         # package, while the imported package gets a separate integrity hash.
@@ -2248,7 +2457,7 @@ class NewBookProcessor:
             identity_source_path = acquisition.source_path
             processing_dir = Path(tempfile.mkdtemp(prefix="acquisition-process-", dir=self.tmp_conversion_dir))
             processing_path = processing_dir / Path(book_path).name
-            shutil.copy2(book_path, processing_path)
+            _copy_file(book_path, processing_path)
             book_path = str(processing_path)
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
         # route lands here -- kepubify output, a file already in the target
@@ -2308,9 +2517,24 @@ class NewBookProcessor:
             return
 
         # Stage file for import
-        staged_path = Path(self.staging_dir) / source_path.name
+        staged_path = Path(self.staging_dir) / self._presented_name(source_path)
         try:
-            shutil.copy2(source_path, staged_path)
+            try:
+                _copy_file(source_path, staged_path)
+            except OSError as e:
+                if staged_path.name == source_path.name:
+                    raise
+                # Some filesystems (SMB, exFAT) refuse characters a browser
+                # name may carry, such as ':' or '?'. Import under the staged
+                # name rather than fail the book.
+                print(f"[ingest-processor] WARN: could not stage {source_path.name} as "
+                      f"{staged_path.name!r}, importing it under its sanitised name: {e}", flush=True)
+                if staged_path.exists():
+                    os.remove(staged_path)
+                staged_path = Path(self.staging_dir) / (
+                    self._UPLOAD_STAGING_PREFIX.sub("", source_path.name, count=1) or source_path.name
+                )
+                _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
@@ -2326,7 +2550,7 @@ class NewBookProcessor:
                 )
                 os.close(identity_fd)
                 staged_identity_path = Path(identity_name)
-                shutil.copy2(identity_source_path, staged_identity_path)
+                _copy_file(identity_source_path, staged_identity_path)
             except Exception as e:
                 print(f"[ingest-processor] ERROR: Failed to stage source identity: {e}", flush=True)
                 self.backup(self.filepath, backup_type="failed")
@@ -2358,10 +2582,36 @@ class NewBookProcessor:
             if already_imported_ids:
                 self.last_added_book_ids = already_imported_ids
                 self.last_added_book_id = already_imported_ids[-1]
+                if folder_label_data is None:
+                    if acquisition:
+                        self._finish_acquisition(prior_acquisition)
+                    print(
+                        f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
+                        flush=True,
+                    )
+                    return
+                # A known duplicate only needs a narrow metadata update. Do
+                # not run overwrite inspection or format recovery for it:
+                # those Calibre opens can fail independently of this safe
+                # additive tag operation, and no format should be replaced.
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
+                    replay_result = self._run_calibre_transaction(
+                        staged_path,
+                        staged_identity_path,
+                        imported_digest,
+                        source_digest,
+                        {"ingest_folder_labels": folder_label_data},
+                        "apply-folder-labels",
+                    )
+                replay_ids = [int(value) for value in replay_result.get("book_ids", [])]
+                if replay_ids:
+                    self.last_added_book_ids = replay_ids
+                    self.last_added_book_id = replay_ids[-1]
                 if acquisition:
-                    self._finish_acquisition(prior_acquisition)
+                    self._finish_acquisition(replay_result)
+                mark_ingest_batch_dirty()
                 print(
-                    f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
+                    f"[ingest-processor] Applied folder labels to already imported book: {staged_path.name}",
                     flush=True,
                 )
                 return
@@ -2402,15 +2652,28 @@ class NewBookProcessor:
                 if identifiers:
                     metadata_override["identifiers"] = identifiers
 
+            if folder_label_data is not None:
+                metadata_override["ingest_folder_labels"] = folder_label_data
+
             overwrite_validated = False
+            self._folder_label_marker_replay = False
             try:
-                candidates = self._current_overwrite_candidates(
-                    staged_path,
-                    staged_identity_path,
-                    imported_digest,
-                    source_digest,
-                    metadata_override,
-                )
+                # Folder-label imports defer overwrite inspection until the
+                # shared writer lock is held. Same-content imports can then
+                # observe the marker from the preceding process and skip the
+                # fragile, format-oriented Calibre inspection entirely.
+                if folder_label_data is None:
+                    candidates = self._current_overwrite_candidates(
+                        staged_path,
+                        staged_identity_path,
+                        imported_digest,
+                        source_digest,
+                        metadata_override,
+                    )
+                else:
+                    candidates = []
+            except (LibraryBusyError, TimeoutError):
+                raise
             except Exception as error:
                 self._quarantine_or_preserve_source(
                     staged_path,
@@ -2432,7 +2695,7 @@ class NewBookProcessor:
                 # Reinspect under the cooperating-writer lock. If a matching
                 # format appeared after the unlocked inspection, release the
                 # lock and validate before trying again.
-                with metadata_db_write_lock():
+                with offline_library_access(), metadata_db_write_lock() as transaction_fd, offline_writer_ownership(transaction_fd):
                     try:
                         candidates = self._current_overwrite_candidates(
                             staged_path,
@@ -2441,6 +2704,8 @@ class NewBookProcessor:
                             source_digest,
                             metadata_override,
                         )
+                    except (LibraryBusyError, TimeoutError):
+                        raise
                     except Exception as error:
                         self._quarantine_or_preserve_source(
                             staged_path,
@@ -2458,13 +2723,18 @@ class NewBookProcessor:
                             getattr(self, "_overwrite_recovery_pairs", ())
                         )
                         try:
+                            transaction_action = (
+                                "apply-folder-labels"
+                                if self._folder_label_marker_replay
+                                else "import"
+                            )
                             transaction_result = self._run_calibre_transaction(
                                 staged_path,
                                 staged_identity_path,
                                 imported_digest,
                                 source_digest,
                                 metadata_override,
-                                "import",
+                                transaction_action,
                             )
                         except Exception:
                             # A helper can fail after Calibre replaced the format
@@ -2480,7 +2750,11 @@ class NewBookProcessor:
                                     "Calibre helper failed and commit state could not be "
                                     f"determined; source and recovery retained: {marker_error}"
                                 ) from marker_error
-                            if committed_ids:
+                            # An identity marker may predate this folder-label
+                            # attempt. It cannot prove that the current helper
+                            # transaction applied the newly derived labels.
+                            if (committed_ids and not already_imported_ids
+                                    and not self._folder_label_marker_replay):
                                 transaction_result = {
                                     "status": "already_imported",
                                     "book_ids": committed_ids,
@@ -2517,10 +2791,16 @@ class NewBookProcessor:
             if imported_ids:
                 self.last_added_book_ids = imported_ids
                 self.last_added_book_id = imported_ids[-1]
+            elif acquisition:
+                raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
             else:
-                if acquisition:
-                    raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
-                self._fallback_last_added_book_id()
+                # Never guess which book this was (#2544): the newest row can be a book
+                # someone else just edited, and it would receive this import's metadata,
+                # cover, path fix, auto-send and timestamp.
+                raise PreserveIngestSourceError(
+                    f"Calibre reported no book id for {staged_path.name}; refusing to guess "
+                    "which book was added, so no post-import step ran and the source is kept"
+                )
             if acquisition:
                 self._finish_acquisition(transaction_result)
                 mark_ingest_batch_dirty()
@@ -2541,11 +2821,8 @@ class NewBookProcessor:
             # Optional post-import GDrive sync
             gdrive_sync_if_enabled()
 
-            # Fetch metadata if enabled, prefer exact book id from calibredb
-            if self.last_added_book_id is not None:
-                self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
-            else:
-                self.fetch_metadata_if_enabled(staged_path.stem)
+            # Fetch metadata if enabled, for the exact book Calibre reported
+            self.fetch_metadata_if_enabled(book_id=self.last_added_book_id)
 
             # Fix paths garbled by calibredb add's ascii_filename() transliteration.
             # Runs after fetch_metadata so any author-name update is already in the DB.
@@ -2561,20 +2838,14 @@ class NewBookProcessor:
                 self.generate_missing_cover_if_enabled(imported_id)
 
             # Trigger auto-send for users who have it enabled
-            if self.last_added_book_id is not None:
-                self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
-            else:
-                self.trigger_auto_send_if_enabled(staged_path.stem, book_path)
+            self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
 
             # Generate KOReader sync checksums for the imported book.
             # Gated on is_koreader_sync_enabled() so disabled-sync instances
             # skip the (slow) partial-MD5 work entirely — see PR #94 for the
             # same pattern in cps/helper.py, and fork #219 for the root cause.
             if _is_koreader_sync_enabled():
-                if self.last_added_book_id is not None:
-                    self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
-                else:
-                    self.generate_book_checksums(staged_path.stem)
+                self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id)
 
             # Ensure newly imported books have their timestamp set to the current time
             # so they appear at the top of "Recently Added" views.
@@ -2588,7 +2859,7 @@ class NewBookProcessor:
             )
             if imported_ids:
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
                         else:
@@ -2612,7 +2883,7 @@ class NewBookProcessor:
             # Update timestamp to last_modified for any rows changed by this import so sorting by 'new' reflects overwrites.
             if self.cwa_settings.get('auto_ingest_automerge') == 'overwrite':
                 try:
-                    with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                    with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                         cur = con.cursor()
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
@@ -2635,7 +2906,7 @@ class NewBookProcessor:
             )
             print(f"[ingest-processor] ERROR: {message}", flush=True)
             raise RetryIngestSourceError(message) from e
-        except (PreserveIngestSourceError, RetryIngestSourceError):
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError):
             raise
         except Exception as e:
             print(f"[ingest-processor] ingest-processor ran into the following error:\n{e}", flush=True)
@@ -2675,7 +2946,7 @@ class NewBookProcessor:
         # Stage file for import
         staged_path = Path(self.staging_dir) / source_path.name
         try:
-            shutil.copy2(source_path, staged_path)
+            _copy_file(source_path, staged_path)
         except Exception as e:
             print(f"[ingest-processor] ERROR: Failed to stage file for add_format: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
@@ -2684,9 +2955,11 @@ class NewBookProcessor:
         try:
             mark_ingest_batch_active()
             wait_for_duplicate_full_scan_to_finish()
-            result = subprocess.run([
-                "calibredb", "add_format", str(book_id), str(staged_path), f"--library-path={self.library_dir}"
-            ], env=self.calibre_env, check=True, capture_output=True, text=True)
+            with operation():
+                target = library_target(self.library_dir)
+                result = subprocess.run(calibredb_command([
+                    "calibredb", "add_format", str(book_id), str(staged_path), *target.args
+                ], target), env=self.calibre_env, check=True, capture_output=True, text=True, input=target.stdin)
             print(f"[ingest-processor] Added new format for book id {book_id}: {os.path.basename(str(staged_path))}", flush=True)
             mark_ingest_batch_dirty()
             run_duplicate_scan_for_books([book_id])
@@ -2698,8 +2971,12 @@ class NewBookProcessor:
             stderr_output = e.stderr if e.stderr else "No error details available"
             print(f"[ingest-processor] Failed to add format for book id {book_id}: {os.path.basename(str(staged_path))}\nCALIBREDB EXIT/ERROR CODE: {e.returncode}\nError details: {stderr_output}", flush=True)
             self.backup(str(staged_path), backup_type="failed")
+            raise RetryIngestSourceError("Calibre did not commit the new format") from e
+        except (LibraryBusyError, TimeoutError):
+            raise
         except Exception as e:
             print(f"[ingest-processor] Unexpected error while adding format for book id {book_id}: {e}", flush=True)
+            raise RetryIngestSourceError(str(e)) from e
         finally:
             clear_ingest_batch_active()
             if staged_path.exists():
@@ -2727,11 +3004,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    # Fallback: most recently added book
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for metadata fetch, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -2766,10 +3043,11 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
-                if book_id is not None:
-                    cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
-                else:
-                    cur.execute("SELECT id, title FROM books ORDER BY timestamp DESC LIMIT 1")
+                if book_id is None:
+                    # Never the newest book instead (#2544): it can be someone else's.
+                    print(f"[ingest-processor] No book id for auto-send, skipping: {book_title}", flush=True)
+                    return
+                cur.execute("SELECT id, title FROM books WHERE id = ?", (int(book_id),))
                 result = cur.fetchone()
 
             if not result:
@@ -3064,6 +3342,7 @@ def main(filepath=None):
                         exit_code = int(child_exit)
             return exit_code
 
+        check_maintenance()
         if not initialize_runtime():
             return 2
 
@@ -3073,12 +3352,16 @@ def main(filepath=None):
         ext_tmp_check = Path(nbp.filename).suffix.replace('.', '')
         if ext_tmp_check not in nbp.ingest_ignored_formats:
             timeout_minutes = nbp.cwa_settings.get('ingest_timeout_minutes', 15)
+            if os.environ.get('CWA_INGEST_READINESS_TIMEOUT_SECONDS') == '0':
+                timeout_minutes = 0
             print(f"[ingest-processor] Checking if file is ready (timeout: {timeout_minutes} minutes): {nbp.filename}", flush=True)
             ready = nbp.is_file_in_use()
             if not ready:
                 print(f"[ingest-processor] WARN: File did not become ready in time or vanished (after {timeout_minutes} minutes): {nbp.filename}", flush=True)
                 skip_delete = True
-                return 0
+                # A writer can reopen after PDF preflight. Preserve and queue
+                # an existing source instead of marking it successfully done.
+                return 2 if Path(filepath).exists() else 0
 
         # Sidecar manifest handling for explicit actions (e.g., add_format)
         manifest_path = filepath + ".cwa.json"
@@ -3144,6 +3427,8 @@ def main(filepath=None):
                     return 0
             if nbp.acquisition_required and not getattr(nbp, "acquisition_intent", None):
                 raise PreserveIngestSourceError("Acquisition manifest missing; original retained")
+        except (PreserveIngestSourceError, RetryIngestSourceError, LibraryBusyError, TimeoutError, PermissionError):
+            raise
         except Exception as e:
             if getattr(nbp, "acquisition_required", False):
                 raise PreserveIngestSourceError("Acquisition intent unavailable or invalid; original retained") from None
@@ -3159,7 +3444,19 @@ def main(filepath=None):
             skip_delete = True
             return 0
 
-        if nbp.is_target_format: # File can just be imported
+        if nbp.input_format == "acsm":
+            try:
+                nbp.ingest_acsm()
+            except (PreserveIngestSourceError, RetryIngestSourceError,
+                    LibraryBusyError, TimeoutError, PermissionError):
+                # Preserve the busy exit status used by the service retry timer,
+                # alongside the ACSM source/recovery preservation classifications.
+                raise
+            except Exception:
+                # Receipt lookup or unexpected hook/import failures must not
+                # delete a potentially consumable ticket in the outer cleanup.
+                raise RetryIngestSourceError("ACSM processing incomplete; original retained") from None
+        elif nbp.is_target_format: # File can just be imported
             if is_a_book_format(nbp.input_format):
                 print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, importing now...", flush=True)
                 nbp.add_book_to_library(filepath)
@@ -3212,15 +3509,10 @@ def main(filepath=None):
                         print(f"[ingest-processor]: Retaining original format ({nbp.input_format}) for {nbp.filename}...", flush=True)
                         # Find the book that was just added to get its ID
                         try:
-                            # Prefer the exact id we just added if available
-                            if nbp.last_added_book_id is not None:
-                                target_book_id = nbp.last_added_book_id
-                            else:
-                                with sqlite3.connect(nbp.metadata_db, timeout=30) as con:
-                                    cur = con.cursor()
-                                    cur.execute("SELECT id FROM books ORDER BY timestamp DESC LIMIT 1")
-                                    res = cur.fetchone()
-                                    target_book_id = res[0] if res else None
+                            # Only the exact id this import added. With none (the import
+                            # was skipped or quarantined), the newest book is someone
+                            # else's and must not get this file (#2544).
+                            target_book_id = nbp.last_added_book_id
 
                             if target_book_id is not None:
                                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
@@ -3229,8 +3521,11 @@ def main(filepath=None):
                                     print(f"[ingest-processor] Original file no longer exists or is empty, cannot retain format: {filepath}", flush=True)
                             else:
                                 print(f"[ingest-processor] Could not find book ID to add retained format for: {nbp.filename}", flush=True)
+                        except (LibraryBusyError, TimeoutError):
+                            raise
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
+                            raise RetryIngestSourceError("Original format was not retained") from e
 
                 elif conversion_attempted and is_rescuable_on_conversion_failure(nbp.input_format): # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
                     print(f"\n[ingest-processor]: {nbp.filename} could not be converted to {nbp.target_format}, importing the original {nbp.input_format} instead so the book still lands in your library...", flush=True)
@@ -3261,7 +3556,12 @@ def main(filepath=None):
         skip_delete = True
         print(f"[ingest-processor] RETRY: {error}", flush=True)
         return 1
+    except (LibraryBusyError, TimeoutError, PermissionError) as error:
+        skip_delete = True
+        print(f"[ingest-processor] BUSY: {error}; original retained", flush=True)
+        return 2
     except Exception as e:
+        skip_delete = True
         print(f"[ingest-processor] Unexpected error during processing: {e}", flush=True)
         raise
     finally:
@@ -3292,7 +3592,7 @@ def main(filepath=None):
 
             try:
                 # Cleanup the temp conversion folder, which now contains the staging dir
-                shutil.rmtree(nbp.tmp_conversion_dir, ignore_errors=True)
+                empty_tmp_conversion_dir(nbp.tmp_conversion_dir)
             except Exception as e:
                 print(f"[ingest-processor] Error cleaning up temp conversion directory: {e}", flush=True)
 

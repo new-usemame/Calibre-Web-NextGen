@@ -13,6 +13,7 @@ import { CcValuePicker } from '../components/CcValuePicker';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
+import { FileIsbnSuggestions } from '../components/FileIsbnSuggestions';
 import { RichTextEditor } from '../components/RichTextEditor';
 import type { MetadataUpdate, MetaResult, EditableCustomColumn } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
@@ -349,6 +350,11 @@ export function EditBook({ id }: { id: string }) {
             <Plus size={14} /> {t('Add identifier')}
           </button>
           <span className={styles.hint}>{t('Each type (isbn, amazon, google, doi…) may appear once.')}</span>
+          <FileIsbnSuggestions key={id} bookId={id} disabled={update.isPending} onUse={isbn => setForm(current => current ? {
+            ...current,
+            identifiers: [...current.identifiers.filter(identifier =>
+              !['isbn', 'isbn10', 'isbn_10', 'isbn13', 'isbn_13'].includes(identifier.type.trim().toLowerCase())), { type: 'isbn', val: isbn }],
+          } : current)} />
         </div>
 
         {/* Custom columns — the library's own fields (#pages, #status, …). The

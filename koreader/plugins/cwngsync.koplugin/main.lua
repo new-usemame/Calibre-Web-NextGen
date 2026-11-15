@@ -32,18 +32,21 @@ local Home = require("cwng_home")
 local LibraryRuntime = require("cwng_library_runtime")
 local Setup = require("cwng_setup")
 local SetupFlow = require("cwng_setup_flow")
+local ServerCapabilities = require("server_capabilities")
+local SleepScreen = require("sleep_screen")
 
 -- A settings file copied from another e-reader carries that e-reader's ID.
 local device_id_replaced = DeviceIdentity.settle(G_reader_settings, {
     isKindle = Device:isKindle(),
     isKobo = Device:isKobo(),
+    model = Device.model,
 }, md5, random.uuid)
 
 local CWNGSync = WidgetContainer:extend{
     name = "cwngsync",
     settings_key = "cwngsync",
     title = _("Login to NextGen Server"),
-    version = "4.1.45",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.70",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -123,6 +126,12 @@ function CWNGSync:init()
     self.settings = migrated_settings
         or G_reader_settings:readSetting("cwngsync", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
+    if self.recoverSleepScreen and not self:recoverSleepScreen() then
+        logger.warn("CWNGSync: sleep screen recovery requires a later successful storage write")
+    end
+    -- Persist before a later-initialized built-in plugin can schedule its
+    -- startup pull. The next-tick check below also guards the live instance.
+    self:checkBuiltinProgressSync()
     if device_id_replaced then
         device_id_replaced = false
         UIManager:nextTick(function()
@@ -138,6 +147,9 @@ function CWNGSync:init()
     self:installHomeButton()
     self:onDispatcherRegisterActions()
     self:registerEvents()
+    -- All plugins have initialized by the next tick, so disable the live
+    -- built-in handlers as well as persisting their setting.
+    UIManager:nextTick(function() self:checkBuiltinProgressSync() end)
     if not self.ui.document then
         UIManager:nextTick(function() self:onLibraryShown() end)
     end
@@ -146,6 +158,7 @@ end
 -- The file browser is up: finish a ready-made setup, offer to connect, or
 -- bring the library up to date.
 function CWNGSync:onLibraryShown()
+    self:checkBuiltinProgressSync()
     if self:importSetupBundle() then return end
     if not self:isConfigured() then
         if not self:bundlePending() then self:maybeWelcome() end
@@ -676,7 +689,9 @@ end
 function CWNGSync:setServer(server)
     logger.dbg("CWNGSync: Setting server to:", server)
     if server == "" then
+        if self.restoreSleepScreen and not self:restoreSleepScreen() then return end
         self.settings.server = nil
+        self:checkBuiltinProgressSync()
         return
     end
     -- Stored the way setup stores it, so the same server typed with a slash
@@ -688,7 +703,30 @@ function CWNGSync:setServer(server)
         })
         return
     end
+    if normalized ~= self.settings.server and self.restoreSleepScreen and not self:restoreSleepScreen() then return end
     self.settings.server = normalized
+    UIManager:nextTick(function() self:checkBuiltinProgressSync() end)
+end
+
+function CWNGSync:checkBuiltinProgressSync()
+    local ok, err = pcall(function()
+        require("builtin_sync_guard").check{
+            server = self.settings.server,
+            share_place_gates = ServerCapabilities.gatesEnforced(self.settings),
+            reader_settings = G_reader_settings,
+            builtin = PluginLoader:getPluginInstance("kosync"),
+            open_settings = function()
+                return require("luasettings"):open(require("datastorage"):getSettingsDir() .. "/kosync.lua")
+            end,
+            unschedule = function(task) UIManager:unschedule(task) end,
+            notice = function()
+                UIManager:show(InfoMessage:new{
+                    text = _("Automatic Progress sync was turned off for this server. CWNG sync handles your place and respects Share my place; Progress sync cannot identify this device when pulling. Manual Progress sync still pulls the shared place."),
+                })
+            end,
+        }
+    end)
+    if not ok then logger.warn("CWNGSync: could not check built-in Progress sync", err) end
 end
 
 function CWNGSync:setSyncForward(strategy)
@@ -772,7 +810,12 @@ function CWNGSync:doLogin(username, password, menu)
         service_spec = self.path .. "/api.json"
     }
     Device:setIgnoreInput(true)
-    local ok, status, body = pcall(client.authorize, client, username, password)
+    local ok, status, body, reason = pcall(client.authorize, client, username, password)
+    if ok and reason == nil then
+        ServerCapabilities.remember(self.settings, body)
+        G_reader_settings:saveSetting(self.settings_key, self.settings)
+        self:checkBuiltinProgressSync()
+    end
     if not ok then
         if status then
             UIManager:show(InfoMessage:new{
@@ -787,6 +830,10 @@ function CWNGSync:doLogin(username, password, menu)
         Device:setIgnoreInput(false)
         return
     elseif status then
+        if username ~= self.settings.username and self.restoreSleepScreen and not self:restoreSleepScreen() then
+            Device:setIgnoreInput(false)
+            return
+        end
         self.settings.username = username
         self.settings.password = password
         if menu then
@@ -804,7 +851,11 @@ function CWNGSync:doLogin(username, password, menu)
 end
 
 function CWNGSync:logout(menu)
+    if self.restoreSleepScreen and not self:restoreSleepScreen() then return end
     self.settings.password = nil
+    ServerCapabilities.remember(self.settings, nil)
+    G_reader_settings:saveSetting(self.settings_key, self.settings)
+    self:checkBuiltinProgressSync()
     if menu then
         menu:updateItems()
     end
@@ -1826,6 +1877,8 @@ function CWNGSync:pullLibraryProgress(ensure_networking)
             self.settings.username,
             self.settings.password,
             doc_digest,
+            Device.model,
+            self.device_id,
             function(request_ok, body)
                 logger.dbg("CWNGSync: [Bulk Pull] server response for", file_path, "ok=", request_ok, "body=", body)
                 if not request_ok or type(body) ~= "table" then
@@ -2092,6 +2145,8 @@ function CWNGSync:getProgress(ensure_networking, interactive)
         self.settings.username,
         self.settings.password,
         doc_digest,
+        Device.model,
+        self.device_id,
         function(ok, body)
             logger.dbg("CWNGSync: [Pull] progress for", current_file)
             logger.dbg("CWNGSync: ok:", ok, "body:", body)
@@ -2378,13 +2433,37 @@ local ANNOTATION_WATERMARK_KEY = "cwasync_pushed_annotation_ids"
 function CWNGSync:readAnnotationWatermark()
     local doc_settings = self.ui and self.ui.doc_settings
     if not (doc_settings and doc_settings.readSetting) then return {} end
-    return doc_settings:readSetting(ANNOTATION_WATERMARK_KEY) or {}
+    local Foreign = require("cwng_foreign_annotations")
+    return Foreign.filterIds(doc_settings:readSetting(ANNOTATION_WATERMARK_KEY), Foreign.proofs(doc_settings, self))
 end
 
 function CWNGSync:saveAnnotationWatermark(localList)
     local doc_settings = self.ui and self.ui.doc_settings
     if not (doc_settings and doc_settings.saveSetting) then return end
-    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, SyncLogic.annotationIds(localList))
+    local Foreign = require("cwng_foreign_annotations")
+    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY,
+        Foreign.filterIds(SyncLogic.annotationIds(localList), Foreign.proofs(doc_settings, self)))
+end
+
+function CWNGSync:forgetForeignAnnotationWatermark(ids)
+    if type(ids) ~= "table" or #ids == 0 then return end
+    local doc_settings = self.ui and self.ui.doc_settings
+    if not (doc_settings and doc_settings.saveSetting) then return end
+    local Foreign = require("cwng_foreign_annotations")
+    local foreign = Foreign.remember(doc_settings, self, ids)
+    local kept = Foreign.filterIds(self:readAnnotationWatermark(), foreign)
+    if self.readPending and self.writePending then
+        local queue = self:readPending()
+        local entry = queue[self:getDocumentDigest()]
+        local owner = self:accountOwner()
+        if entry and (entry.owner == nil or entry.owner == owner) and entry.annotations then
+            entry.annotations = Foreign.filterPayload(entry.annotations, foreign)
+            self:writePending(queue)
+        end
+    end
+    -- Save immediately, even if the following upload fails. These are not
+    -- deletions to retry against the server on this or any later sync.
+    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, kept)
 end
 
 -- Highlights just drawn from the server are known to both sides from that
@@ -2403,7 +2482,8 @@ function CWNGSync:addToAnnotationWatermark(ids)
             end
         end
     end
-    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, merged)
+    local Foreign = require("cwng_foreign_annotations")
+    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, Foreign.filterIds(merged, Foreign.proofs(doc_settings, self)))
 end
 
 function CWNGSync:syncAnnotations(interactive)
@@ -2445,12 +2525,23 @@ function CWNGSync:syncAnnotations(interactive)
     }
 
     client:pull_annotations(self.settings.username, self.settings.password, digest,
+        Device.model, self.device_id,
         function(ok, body)
             if not ok or type(body) ~= "table" then
                 if interactive then showSyncError() end
                 return
             end
             local remote = body.annotations or {}
+
+            if type(provider.removeForeign) == "function" then
+                local cleaned, forgotten, removed = pcall(provider.removeForeign, body.foreign_annotation_ids, self.device_id)
+                if not cleaned then return end
+                if forgotten and #forgotten > 0 then self:forgetForeignAnnotationWatermark(forgotten) end
+                if (removed or 0) > 0 then
+                    self:recordOpenedAnnotations()
+                    self:refreshLibraryViews({ self:getCurrentDocumentFile() })
+                end
+            end
 
             -- Kobo's VolumeID for a CW-synced kepub is the book UUID, which the
             -- server carries in content_id as "<uuid>!!<chapter>".
@@ -2478,6 +2569,13 @@ function CWNGSync:syncAnnotations(interactive)
                 -- trusting incomparable device clocks.
                 diff.send_to_server = localList
             end
+
+            -- Persisted proof also protects direct uploads if an older server
+            -- later sends the foreign copy without its reconciliation key.
+            local Foreign = require("cwng_foreign_annotations")
+            local outgoing = Foreign.filterPayload({ list = diff.send_to_server, deletions = plan.deletions },
+                Foreign.proofs(self.ui and self.ui.doc_settings, self))
+            diff.send_to_server, plan.deletions = outgoing.list, outgoing.deletions
 
             -- Every device applies now: KOReader's own annotations off Kobo,
             -- KoboReader.sqlite for a Kobo kepub. The deletions go too, so a
@@ -2555,7 +2653,7 @@ end
 -- The library folder, setup and automatic sync live in their own files; their
 -- functions become plugin methods. A name defined twice is a load error, not a
 -- silent override.
-for _, mixin in ipairs({ LibraryRuntime, SetupFlow, AutoSync }) do
+for _, mixin in ipairs({ LibraryRuntime, SetupFlow, AutoSync, SleepScreen }) do
     for key, value in pairs(mixin) do
         if type(value) == "function" and key:sub(1, 1) ~= "_" then
             assert(CWNGSync[key] == nil, "CWNGSync: duplicate method " .. key)

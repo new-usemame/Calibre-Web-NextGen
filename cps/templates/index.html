@@ -3,6 +3,18 @@
 {% import '_book_organizer.html' as organizer with context %}
 {% block header %}
 <style>
+.tag-group-navigation {
+    margin: 20px 15px;
+    overflow-wrap: anywhere;
+}
+.tag-group-navigation nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.tag-group-navigation h2 {
+    font-size: 1.25em;
+}
 .shelf-actions {
     display: flex;
     flex-direction: column;
@@ -26,7 +38,47 @@
 }
 </style>
 {% endblock %}
+{% macro discover_source_picker(state) %}
+<form id="discover-source-form" class="form-inline" action="{{ url_for('web.save_discover_source') }}" method="post" style="margin: 12px 0;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="discover-source">{{ _('Discover source') }}</label>
+  <select id="discover-source" class="form-control" name="source" style="min-height:44px;max-width:100%;margin:0 8px;">
+    {% if not state.available %}
+    <option value="{{ state.source }}" selected>{{ _('Unavailable source') }}</option>
+    {% endif %}
+    {% for source in state.sources %}
+      {% if state.available or source.value != state.source %}
+      <option value="{{ source.value }}" {% if state.available and source.value == state.source %}selected{% endif %}>
+        {% if source.kind == 'library' %}{{ _('Current library') }}
+        {% elif source.kind == 'shelf' %}{{ _('Shelf: {name}').replace('{name}', source.name) }}
+        {% else %}{{ _('Smart shelf: {name}').replace('{name}', source.name) }}{% endif %}
+      </option>
+      {% endif %}
+    {% endfor %}
+  </select>
+  <button class="btn btn-primary" type="submit" style="min-height:44px;">{{ _('Save Discover source') }}</button>
+  <p class="text-muted">{{ _('Only Discover picks change; books remain in your library.') }}</p>
+</form>
+{% endmacro %}
 {% block body %}
+{% if tag_breadcrumbs is defined %}
+<section class="tag-group-navigation">
+<nav aria-label="{{ _('Breadcrumb') }}">
+  <a href="{{ url_for('web.category_list') }}">{{ _('Tags') }}</a>
+  {% for name, path in tag_breadcrumbs %}
+    <span aria-hidden="true">›</span>
+    <a href="{{ url_for('web.tag_group', path=path) }}" {% if loop.last %}aria-current="page"{% endif %}>{{ name }}</a>
+  {% endfor %}
+</nav>
+{% if tag_subcategories %}
+<div><h2>{{ _('Subtags') }}</h2><ul role="list">
+  {% for child in tag_subcategories %}
+  <li><a href="{{ url_for('web.tag_group', path=child.path) }}">{{ child.name }} <span class="badge">{{ child.total_count }}</span></a></li>
+  {% endfor %}
+</ul></div>
+{% endif %}
+</section>
+{% endif %}
 {% if breadcrumbs %}
   {% from 'macros/hierarchy.html' import hierarchy_breadcrumbs %}
   <div class="discover">
@@ -58,6 +110,10 @@
 {% if current_user.show_detail_random() and page != "discover" %}
 <div class="discover random-books">
   <h2 class="random-books">{{_('Discover (Random Books)')}}</h2>
+  {% if page == 'root' and discover_source_state is defined and current_user.is_authenticated and not current_user.is_anonymous %}
+    {{ discover_source_picker(discover_source_state) }}
+    {% if not discover_source_state.available %}<p role="status">{{ _('This Discover source is unavailable. Choose another source.') }}</p>{% endif %}
+  {% endif %}
   <div class="row display-flex">
    {% for entry in random %}
     <div class="col-sm-3 col-lg-2 col-xs-6 book session" id="books_rand">
@@ -104,18 +160,9 @@
           ({{entry.Books.series_index|formatfloat(2)}})
         </p>
         {% endif %}
-        {% if entry.Books.ratings.__len__() > 0 %}
-        <div class="rating">
-          {% for number in range((entry.Books.ratings[0].rating/2)|int(2)) %}
-            <span class="glyphicon glyphicon-star good"></span>
-            {% if loop.last and loop.index < 5 %}
-              {% for numer in range(5 - loop.index) %}
-                <span class="glyphicon glyphicon-star-empty"></span>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
+        {% with library_rating=entry.Books.ratings[0].rating if entry.Books.ratings else 0 %}
+          {% include 'library_rating.html' %}
+        {% endwith %}
       </div>
     </div>
     {% endfor %}
@@ -126,13 +173,18 @@
   <h2 class="{{title}}">
     {{title | safe}}
   </h2>
+  {% if page == 'discover' and discover_source_state is defined and current_user.is_authenticated and not current_user.is_anonymous %}
+    {{ discover_source_picker(discover_source_state) }}
+    {% if not discover_source_state.available %}<p role="status">{{ _('This Discover source is unavailable. Choose another source.') }}</p>{% endif %}
+  {% endif %}
   {% if page == 'magicshelf' %}
   <div class="alert alert-warning visible-xs" style="margin-top: 10px;">
     <span class="glyphicon glyphicon-warning-sign"></span> 
-    <strong>{{_('Mobile Notice')}}</strong>: {{_('Magic shelf editing works best on desktop or tablet devices.')}}
+    <strong>{{_('Mobile Notice')}}</strong>: {{_('Smart shelf editing works best on desktop or tablet devices.')}}
   </div>
   {% endif %}
 
+  {% include '_book_list_export.html' %}
   {% set show_shelf_actions = page != 'discover' %}
   {% if show_shelf_actions %}<div class="shelf-actions">{% endif %}
     {% if page == 'global_library' %}
@@ -273,18 +325,9 @@
           ({{entry.Books.series_index|formatfloat(2)}})
         </p>
         {% endif %}
-        {% if entry.Books.ratings.__len__() > 0 %}
-        <div class="rating">
-          {% for number in range((entry.Books.ratings[0].rating/2)|int(2)) %}
-            <span class="glyphicon glyphicon-star good"></span>
-            {% if loop.last and loop.index < 5 %}
-              {% for numer in range(5 - loop.index) %}
-                <span class="glyphicon glyphicon-star-empty"></span>
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
+        {% with library_rating=entry.Books.ratings[0].rating if entry.Books.ratings else 0 %}
+          {% include 'library_rating.html' %}
+        {% endwith %}
       </div>
     </div>
     {% endfor %}
@@ -301,6 +344,10 @@
         </div>
       {% elif page == 'global_library' and recent_missing %}
         <div class="col-xs-12 text-center"><p>{{ _('Every book here is already in your library.') }}</p></div>
+      {% elif page == 'discover' and discover_source_state is defined and discover_source_available %}
+        <div class="col-xs-12 text-center"><p role="status">{{ _('No unread books in this Discover source.') }}</p></div>
+      {% elif page == 'discover' %}
+        <div class="col-xs-12 text-center"><p role="status">{{ _('This Discover source is unavailable. Choose another source.') }}</p></div>
       {% else %}
         <div class="col-xs-12 text-center"><p>{{ _('No books here.') }}</p></div>
       {% endif %}

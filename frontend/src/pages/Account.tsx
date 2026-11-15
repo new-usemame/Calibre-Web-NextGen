@@ -323,6 +323,20 @@ export function Account() {
           {updateNamedPreferences.isError && (
             <p className={styles.msgErr} role="alert">{t('Could not save.')}</p>
           )}
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.show_library_rating !== false}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ show_library_rating: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Show library rating')}</strong>
+              <small>{t('Show the labelled Calibre score alongside your own rating.')}</small></span>
+          </label>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.share_book_ratings === true}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ share_book_ratings: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Share my ratings in the household average')}</strong>
+              <small>{t('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}</small></span>
+          </label>
         </fieldset>
       </section>
 
@@ -512,11 +526,14 @@ export function Account() {
 
         <div className={styles.field}>
           <label className={styles.toggle}>
-            <input type="checkbox" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
+            <input type="checkbox" aria-describedby="acc-kobo-sync-help" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
             {shelfMarkAudience(me?.features) === 'ereader'
               ? t('Sync only selected shelves to e-readers (Kobo and KOReader)')
               : t('Sync only selected shelves to Kobo')}
           </label>
+          <p id="acc-kobo-sync-help" className={styles.hint}>
+            {t('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')}
+          </p>
           <label className={styles.toggle}>
             <input type="checkbox" checked={opdsSync} onChange={(e) => setOpdsSync(e.target.checked)} />
             {t('Expose only selected shelves over OPDS')}

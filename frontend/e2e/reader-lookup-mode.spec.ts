@@ -267,6 +267,18 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   await expect(page).toHaveURL(/\/app(\/|$|\?)/, { timeout: 20_000 });
   await expect(page.getByRole('button', { name: `Account: ${secondaryUser.username}` })).toBeVisible();
   await page.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
+  // This case observes account-wide Reading status. Devices start private,
+  // so explicitly opt this test's Browser into sharing through the real UI.
+  await page.goto('/app/account/devices');
+  const sharePlace = page.getByRole('checkbox', { name: 'Share my place Web reader', exact: true });
+  const [shared] = await Promise.all([
+    page.waitForResponse(response => response.request().method() === 'PATCH'
+      && /\/api\/annotations\/devices\/[^/?]+$/.test(response.url())),
+    sharePlace.click(),
+  ]);
+  expect(shared.ok(), await shared.text()).toBeTruthy();
+  await expect(sharePlace).toBeEnabled();
+  await expect(sharePlace).toBeChecked();
   const id = await readableEpub(page, adminPage, testInfo);
   // Establish a real saved position first, scoped to this test's owned account.
   await page.goto(`/app/read/${id}`);
@@ -294,17 +306,17 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   page.on('request', request => {
     if (request.method() === 'POST' && /\/bookmark(?:\/|\?|$)|\/(?:read|stop-reading)(?:\?|$)|\/ajax\/stopreading\//.test(request.url())) writes.push(request.url());
   });
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Open without saving progress', exact: true }).click();
+  // #2223: lookup is a visible action beside Read now, and the reader shows
+  // no notice that would cover its controls.
+  await page.getByRole('link', { name: 'Open without saving progress', exact: true }).click();
   await expect(page).toHaveURL(/lookup=1/);
   await readerReady(page);
-  await expect(page.getByText('Progress is not being saved.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Progress is not being saved.', { exact: true })).toHaveCount(0);
   for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
   for (const theme of ['Light', 'Dark']) {
     await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
     await page.getByRole('button', { name: theme, exact: true }).click();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(page.getByText('Progress is not being saved.', { exact: true })).toBeVisible();
     await capture(page, testInfo, `new-ui-lookup-${theme.toLowerCase()}`);
   }
   // A TOC jump exits the transient highlight preview; lookup must survive it.
@@ -393,7 +405,7 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   expect(lookupUrl).toContain('lookup=1');
   writes.length = 0;
   await page.goto(lookupUrl!);
-  await expect(page.locator('.reader-lookup-banner')).toHaveText('Progress is not being saved.');
+  await expect(page.getByText('Progress is not being saved.', { exact: true })).toHaveCount(0);
   await expect(page.locator('#viewer iframe').first()).toBeVisible({ timeout: 30_000 });
   // An iframe element alone only proves the reader shell rendered. Require
   // actual prose visible to the reader in its live document before capture.

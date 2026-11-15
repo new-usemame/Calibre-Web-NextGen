@@ -57,6 +57,14 @@ import cps.progress_syncing.models  # noqa: F401 — registers KOSyncProgress on
 
 # ── harness ──────────────────────────────────────────────────────────────────
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 def _session():
     engine = create_engine("sqlite:///:memory:")
     ub.Base.metadata.create_all(engine)
@@ -269,13 +277,16 @@ class TestMirrorReadStatusToReadBook:
         assert _read_status(session, 7, 42) == ub.ReadBook.STATUS_UNREAD
 
     @pytest.mark.unit
-    def test_marking_unread_does_not_create_a_row(self):
-        """Nothing to clear means nothing to write — an UNREAD row is the
-        default state and inventing one is just a row per never-read book."""
+    def test_marking_unread_records_intent_without_starting_or_creating_positions(self):
+        """A neutral Unread row keeps explicit intent for a later paused merge."""
         session = _session()
         self._mirror()(session, 7, 42, False)
         session.commit()
-        assert _read_status(session, 7, 42) is None
+        row = session.query(ub.ReadBook).filter_by(user_id=7, book_id=42).one()
+        assert row.read_status == ub.ReadBook.STATUS_UNREAD
+        assert row.read_status_choice_at is not None
+        assert row.times_started_reading == 0
+        assert row.kobo_reading_state is None
 
     @pytest.mark.unit
     def test_scoped_to_one_user_and_one_book(self):

@@ -90,7 +90,14 @@ local function newHarness(push_succeeds, own_highlights)
         end_xpointer = END, hidden = false, last_synced = "2026-09-23T23:00:00+00:00", color = "green" } }
     local pushes = {}
     local client = {
-        pull_annotations = function(_, _, _, _, callback) callback(true, { annotations = server }) end,
+        pull_annotations = function(_, user, password, document, device, device_id, callback)
+            -- PR 5: the pull names this device so the server serves only its own highlights.
+            assert(user == "reader" and password == "app" and document == "digest",
+                "pull for this reader and book")
+            assert(device == "Kindle" and device_id == "this-kindle", "pull names this device")
+            assert(type(callback) == "function", "callback is the last argument")
+            callback(true, { annotations = server })
+        end,
         push_annotations = function(_, _, _, _, list, deleted, device, device_id, callback)
             pushes[#pushes + 1] = { list = list, deleted = deleted, device = device, device_id = device_id }
             callback(push_succeeds, {}, push_succeeds and nil or "offline")

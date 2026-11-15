@@ -16,17 +16,18 @@ import threading
 # so this only guards against a wedged reader thread.
 _DRAIN_JOIN_TIMEOUT = 30
 
-def process_open(command, quotes=(), env=None, sout=subprocess.PIPE, serr=subprocess.PIPE, newlines=True):
+def process_open(command, quotes=(), env=None, sout=subprocess.PIPE, serr=subprocess.PIPE, newlines=True,
+                 stdin_payload=None):
     # Linux py2.7 encode as list without quotes no empty element for parameters
     # linux py3.x no encode and as list without quotes no empty element for parameters
     # windows py2.7 encode as string with quotes empty element for parameters is okay
     # windows py 3.x no encode and as string with quotes empty element for parameters is okay
     # separate handling for windows and linux
     if os.name == 'nt':
-        for key, element in enumerate(command):
-            if key in quotes:
-                command[key] = '"' + element + '"'
-        exc_command = " ".join(command)
+        # Popen receives one Windows command-line string. Let the platform
+        # serializer preserve spaces, quotes, empty arguments and trailing
+        # backslashes rather than relying on caller-specific quote indices.
+        exc_command = subprocess.list2cmdline(command)
     else:
         exc_command = [x for x in command]
 
@@ -36,8 +37,23 @@ def process_open(command, quotes=(), env=None, sout=subprocess.PIPE, serr=subpro
         # (calibredb -> calibre-parallel) can be killed as a group on timeout.
         popen_kwargs['start_new_session'] = True
 
-    return subprocess.Popen(exc_command, shell=False, stdout=sout, stderr=serr, universal_newlines=newlines, env=env,
-                            **popen_kwargs) # nosec
+    if stdin_payload is not None:
+        popen_kwargs['stdin'] = subprocess.PIPE
+
+    p = subprocess.Popen(exc_command, shell=False, stdout=sout, stderr=serr, universal_newlines=newlines,
+                         env=env, **popen_kwargs) # nosec
+    if stdin_payload is not None:
+        # calibredb reads --password <stdin> before it does anything else,
+        # so the pipe is closed straight away to signal end of input. The
+        # handle is then dropped: callers reap with communicate(), which
+        # flushes any stdin it still holds and raises on a closed one (#2210).
+        try:
+            p.stdin.write(stdin_payload if newlines else stdin_payload.encode('utf-8'))
+            p.stdin.close()
+        except (OSError, ValueError):
+            pass
+        p.stdin = None
+    return p
 
 
 def _drain_into(stream, sink):

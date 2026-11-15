@@ -9,6 +9,7 @@ import datetime
 import json
 from urllib.parse import unquote_plus
 
+from .unicode_collation import locale_sort_key, locale_initial
 from flask import Blueprint, request, render_template, make_response, abort, Response, g, url_for
 from flask_babel import get_locale
 from flask_babel import gettext as _
@@ -16,15 +17,16 @@ from flask_babel import lazy_gettext as N_
 
 
 from sqlalchemy.sql.expression import func, text, or_, and_, true, false
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 
-from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy
-from .custom_column_visibility import is_cc_visible
+from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy, tag_hierarchy
+from .custom_column_visibility import retryable_column_reads, browsable_columns, is_cc_visible
 from .usermanagement import requires_basic_auth_if_no_ano, auth
-from .helper import get_download_link, get_book_cover, hot_books_page
+from .helper import get_download_link, get_book_cover, hot_books_page, read_statuses_for_books, \
+    SQLITE_IN_CHUNK_SIZE
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
-from .web import render_read_books
+from .web import render_read_books, render_personal_read_status_books
 
 
 opds = Blueprint('opds', __name__)
@@ -83,14 +85,20 @@ def _opds_paged_url(offset):
     return base + '?' + urlencode(args)
 
 
-def _opds_search_url_path():
-    """Build the OpenSearch search-URL template (path form) with
-    ``{searchTerms}`` in the right spot relative to any propagated
-    query string (notably ``?lang=xx``). Issue #160 follow-up.
+def _opds_search_url_template():
+    """The OpenSearch template every catalog document advertises:
+    ``/opds/search?query={searchTerms}``, merged onto any query string
+    ``url_defaults`` produced (notably ``?lang=xx``, issue #160) instead of
+    clobbering it.
+
+    #2846: the query form, not the path form ``/opds/search/{searchTerms}``.
+    In a path ``+`` is a literal plus, so clients leave it unencoded, but the
+    path route reads ``+`` as a space for an old reader that sends it that way,
+    and "C++" searched for "C". In a query value ``+`` already means space and
+    clients encode a literal plus as ``%2B``, so both readings agree.
     """
-    placeholder = '__OPDS_SEARCH_PLACEHOLDER__'
-    built = url_for('opds.feed_cc_search', query=placeholder)
-    return built.replace(placeholder, '{searchTerms}')
+    base = url_for('opds.feed_normal_search')
+    return base + ('&' if '?' in base else '?') + 'query={searchTerms}'
 
 
 def _format_opds_rating(value):
@@ -130,7 +138,7 @@ def _is_real_pubdate(pubdate):
 def _opds_template_helpers():
     return {
         'opds_paged_url': _opds_paged_url,
-        'opds_search_url_path': _opds_search_url_path,
+        'opds_search_url_template': _opds_search_url_template,
         '_is_real_pubdate': _is_real_pubdate,
     }
 
@@ -142,6 +150,8 @@ OPDS_ROOT_ORDER_DEFAULT = [
     'random',
     'read',
     'currently_reading',
+    'did_not_finish',
+    'on_hold',
     'unread',
     'authors',
     'publishers',
@@ -207,6 +217,18 @@ OPDS_ROOT_ENTRY_DEFS = {
         'description': N_('Books currently being read'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
     },
+    'did_not_finish': {
+        'endpoint': 'opds.feed_did_not_finish',
+        'title': N_('Did not finish'),
+        'description': N_('Books you chose not to finish'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
+    'on_hold': {
+        'endpoint': 'opds.feed_on_hold',
+        'title': N_('On hold'),
+        'description': N_('Books you have paused for later'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
     'unread': {
         'endpoint': 'opds.feed_unread_books',
         'title': N_('Unread Books'),
@@ -227,8 +249,8 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'categories': {
         'endpoint': 'opds.feed_categoryindex',
-        'title': N_('Categories'),
-        'description': N_('Books ordered by category'),
+        'title': N_('Tags'),
+        'description': N_('Books grouped by tags'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_CATEGORY),
     },
     'series': {
@@ -263,8 +285,8 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'magic_shelves': {
         'endpoint': 'opds.feed_magic_shelfindex',
-        'title': N_('Magic Shelves'),
-        'description': N_('Books organized in magic shelves'),
+        'title': N_('Smart shelves'),
+        'description': N_('Books organized in smart shelves'),
         'visible': lambda user, allow_anonymous: user.is_authenticated or allow_anonymous,
     },
 }
@@ -576,9 +598,7 @@ def get_opds_hierarchy_root_entries(user):
     if not user.check_visibility(constants.SIDEBAR_CATEGORY):
         return []
     entries = []
-    for col in calibre_db.get_cc_columns(config):
-        if col.datatype not in ('text', 'enumeration'):
-            continue
+    for col in browsable_columns(calibre_db.get_cc_columns(config)):
         # A column the user hid on their profile page is not advertised. The
         # classic sidebar omits it and the SPA API 404s it, so listing it here
         # would be the one surface where hiding a column does not hide it.
@@ -607,20 +627,9 @@ def feed_osd():
     # hardcoded en-EN, so OPDS search clients that present a localized UI from
     # OSD metadata pick up the language the user picked via ``?lang=`` or
     # Accept-Language. Falls back to the get_locale() default ('en') when
-    # nothing else applies, matching pre-fix behavior.
-    #
-    # Build the atom search URL template here so the
-    # ``?query={searchTerms}`` OpenSearch marker is merged onto whatever
-    # query string ``url_defaults`` produced (notably ``?lang=xx``)
-    # instead of clobbering it. The path-form template is rendered via
-    # the ``opds_search_url_path`` context helper.
-    atom_base = url_for('opds.feed_normal_search')
-    atom_url = atom_base + ('&' if '?' in atom_base else '?') + 'query={searchTerms}'
-    return render_xml_template(
-        'osd.xml',
-        lang=str(get_locale()),
-        search_url_atom=atom_url,
-    )
+    # nothing else applies, matching pre-fix behavior. Both search templates
+    # come from the opds_search_url_template() context helper (#2846).
+    return render_xml_template('osd.xml', lang=str(get_locale()))
 
 
 # @opds.route("/opds/search", defaults={'query': ""})
@@ -633,10 +642,19 @@ def feed_cc_search(query):
     # ``/opds/search/<query>?lang=xx`` and the previous .split() picked up
     # ``<query>?lang=xx`` as the search term, breaking every search.
     # Strip the query string before extracting the term.
-    raw_uri = request.environ['RAW_URI'].split('/opds/search/', 1)[1]
-    path_only = raw_uri.split('?', 1)[0]
-    plus_query = unquote_plus(path_only).strip()
-    return feed_search(plus_query)
+    #
+    # #2846: the catalog now advertises the query form instead, so this path
+    # form is only for readers that build it themselves; it keeps their "+ is a
+    # space" reading. RAW_URI is set by both bundled servers but is not WSGI;
+    # REQUEST_URI is the common alternative. Without either, only the decoded
+    # path is left, where an encoded %2B can no longer be told from a "+".
+    raw_uri = request.environ.get('RAW_URI') or request.environ.get('REQUEST_URI')
+    if raw_uri and '/opds/search/' in raw_uri:
+        path_only = raw_uri.split('/opds/search/', 1)[1].split('?', 1)[0]
+        plus_query = unquote_plus(path_only)
+    else:
+        plus_query = query.replace('+', ' ')
+    return feed_search(plus_query.strip())
 
 
 @opds.route("/opds/search", methods=["GET"])
@@ -655,11 +673,11 @@ def feed_booksindex():
 @requires_basic_auth_if_no_ano
 def feed_letter_books(book_id):
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.ng_initial(db.Books.sort) == book_id
+    letter = true() if book_id == "00" else locale_initial(db.Books.sort, user=auth.current_user()) == book_id
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   letter,
-                                                  [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id],
+                                                  [locale_sort_key(db.Books.sort, user=auth.current_user()), db.Books.sort, db.Books.id],
                                                   True, config.config_read_column)
 
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
@@ -681,10 +699,14 @@ def feed_new():
 @opds.route("/opds/discover")
 @requires_basic_auth_if_no_ano
 def feed_discover():
-    if not auth.current_user().check_visibility(constants.SIDEBAR_RANDOM):
+    user = auth.current_user()
+    if not user.check_visibility(constants.SIDEBAR_RANDOM):
         abort(404)
     query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-    entries = query.filter(get_opds_restricted_common_filter()) \
+    from .services import discover_source
+    source_filter, _source_available = discover_source.filter_for(user)
+    entries = query.filter(get_opds_restricted_common_filter(user=user)) \
+        .filter(source_filter) \
         .order_by(func.random()).limit(config.config_books_per_page)
     pagination = Pagination(1, config.config_books_per_page, int(config.config_books_per_page))
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
@@ -693,11 +715,14 @@ def feed_discover():
 @opds.route("/opds/rated")
 @requires_basic_auth_if_no_ano
 def feed_best_rated():
+    from .personal_ratings import personal_score
+    from .sort_orders import viewer_id
+    uid = viewer_id(auth.current_user())
     if not auth.current_user().check_visibility(constants.SIDEBAR_BEST_RATED):
         abort(404)
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
-                                                  db.Books, db.Books.ratings.any(db.Ratings.rating > 9),
+                                                  db.Books, personal_score(uid) > 9 if uid is not None else db.Books.ratings.any(db.Ratings.rating > 9),
                                                   BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
@@ -730,11 +755,11 @@ def feed_letter_author(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_AUTHOR):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.ng_initial(db.Authors.sort) == book_id
+    letter = true() if book_id == "00" else locale_initial(db.Authors.sort, user=auth.current_user()) == book_id
     entries = calibre_db.session.query(db.Authors).join(db.books_authors_link).join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_authors_link.author'))\
-        .order_by(func.ng_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
+        .order_by(locale_sort_key(db.Authors.sort, user=auth.current_user()), db.Authors.sort, db.Authors.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.limit(config.config_books_per_page).offset(off).all()
@@ -758,7 +783,7 @@ def feed_publisherindex():
         .join(db.books_publishers_link)\
         .join(db.Books).filter(get_opds_restricted_common_filter())\
         .group_by(text('books_publishers_link.publisher'))\
-        .order_by(func.ng_sort_key(db.Publishers.sort), db.Publishers.sort, db.Publishers.id)\
+        .order_by(locale_sort_key(db.Publishers.name, user=auth.current_user()), db.Publishers.name, db.Publishers.id)\
         .limit(config.config_books_per_page).offset(off)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             len(calibre_db.session.query(db.Publishers).all()))
@@ -776,7 +801,57 @@ def feed_publisher(book_id):
 def feed_categoryindex():
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
+    if request.args.get('view') != 'flat':
+        tree = _opds_tag_tree()
+        if tree.hierarchical:
+            return _opds_tag_navigation(tree.items)
     return render_element_index(db.Tags.name, db.books_tags_link, 'opds.feed_letter_category')
+
+
+def _opds_tag_tree():
+    try:
+        return tag_hierarchy.read_tree(calibre_db, get_opds_restricted_common_filter())
+    except (SQLAlchemyError, ValueError, TypeError):
+        abort(503, description=_("Tag hierarchy temporarily unavailable. Please try again."))
+
+
+def _opds_tag_navigation(nodes, parent=None):
+    elements = []
+    if parent is not None:
+        elements.append({"name": _("All books in this tag group"),
+                         "opds_url": url_for('opds.feed_tag_group', path=parent, books=1)})
+    for node in nodes:
+        target = (url_for('opds.feed_tag_group', path=node['path']) if node['path'] is not None
+                  else url_for('opds.feed_category', book_id=node['id']))
+        elements.append({"name": node['name'], "opds_url": target})
+    pagination = Pagination(1, max(len(elements), 1), len(elements))
+    return render_xml_template('feed.xml', listelements=elements, pagination=pagination)
+
+
+@opds.route("/opds/tag_group")
+@requires_basic_auth_if_no_ano
+def feed_tag_group():
+    if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
+        abort(404)
+    path = request.args.get('path', '')
+    if not path or len(path) > 4096:
+        abort(404)
+    tree = _opds_tag_tree()
+    try:
+        predicate = tree.book_filter(path)
+    except LookupError:
+        abort(404)
+    path = '.'.join(hierarchy.split_path(path))
+    node = tree.get_node(path)
+    if node['children'] and request.args.get('books') != '1':
+        return _opds_tag_navigation(node['children'], parent=path)
+    offset = max(request.args.get('offset', 0, type=int), 0)
+    entries, __, pagination = fill_opds_indexpage(
+        offset // config.config_books_per_page + 1, 0, db.Books,
+        and_(predicate, get_opds_restricted_common_filter()), BOOK_SORT_ORDERS['new'],
+        True, config.config_read_column)
+    cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    return render_xml_template('feed.xml', entries=entries, pagination=pagination, cc=cc)
 
 
 @opds.route("/opds/category/letter/<book_id>")
@@ -785,13 +860,13 @@ def feed_letter_category(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.ng_initial(db.Tags.name) == book_id
+    letter = true() if book_id == "00" else locale_initial(db.Tags.name, user=auth.current_user()) == book_id
     entries = calibre_db.session.query(db.Tags)\
         .join(db.books_tags_link)\
         .join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_tags_link.tag'))\
-        .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id)
+        .order_by(locale_sort_key(db.Tags.name, user=auth.current_user()), db.Tags.name, db.Tags.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.offset(off).limit(config.config_books_per_page).all()
@@ -808,6 +883,7 @@ def feed_category(book_id):
 @opds.route("/opds/custom_column/<int:column_id>", defaults={'category_path': ''})
 @opds.route("/opds/custom_column/<int:column_id>/<path:category_path>")
 @requires_basic_auth_if_no_ano
+@retryable_column_reads
 def feed_cc_category(column_id, category_path):
     """OPDS navigation/acquisition feed for one custom column, in either mode.
 
@@ -824,22 +900,22 @@ def feed_cc_category(column_id, category_path):
     """
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
-    if not any(col.id == column_id and col.datatype in ('text', 'enumeration')
-               for col in calibre_db.get_cc_columns(config)):
+    if not any(col.id == column_id
+               for col in browsable_columns(calibre_db.get_cc_columns(config, fail_on_error=True))):
         abort(404)
     # A hidden column 404s its whole subtree, not just its root entry: a reader
     # who bookmarked a node must not keep reaching it after unticking the
     # column. Same contract the SPA API already has.
-    if not is_cc_visible(auth.current_user(), column_id):
+    if not is_cc_visible(auth.current_user(), column_id, fail_on_error=True):
         abort(404)
 
-    is_hierarchical = not calibre_db.is_flat_cc_column(column_id)
+    is_hierarchical = not calibre_db.is_flat_cc_column(column_id, fail_on_error=True)
     if is_hierarchical:
         # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
         path = hierarchy.join_path([category_path or ''])
     else:
         # Flat values are opaque atomic strings -- never canonicalised.
-        path = (category_path or '').strip()
+        path = category_path or ''
     off = int(request.args.get("offset") or 0)
     cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
     opds_filter = get_opds_restricted_common_filter()
@@ -860,7 +936,7 @@ def feed_cc_category(column_id, category_path):
 
     if path and is_hierarchical:
         opds_tree = calibre_db.get_hierarchical_tree(
-            column_id, book_filter=opds_filter)
+            column_id, book_filter=opds_filter, fail_on_error=True)
         node = hierarchy.get_node_by_path(opds_tree, path)
         if node is None:
             abort(404)
@@ -878,9 +954,9 @@ def feed_cc_category(column_id, category_path):
             calibre_db.flat_cc_filter(column_id, path)))
 
     if is_hierarchical:
-        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter)
+        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter, fail_on_error=True)
     else:
-        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter)
+        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter, fail_on_error=True)
     elements = [{'column_id': column_id, 'path': n['path'], 'name': n['name']}
                 for n in nodes]
     pagination = Pagination(1, max(len(elements), 1), len(elements))
@@ -902,13 +978,13 @@ def feed_letter_series(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_SERIES):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.ng_initial(db.Series.sort) == book_id
+    letter = true() if book_id == "00" else locale_initial(db.Series.sort, user=auth.current_user()) == book_id
     entries = calibre_db.session.query(db.Series)\
         .join(db.books_series_link)\
         .join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_series_link.series'))\
-        .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
+        .order_by(locale_sort_key(db.Series.sort, user=auth.current_user()), db.Series.sort, db.Series.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.offset(off).limit(config.config_books_per_page).all()
@@ -1161,7 +1237,8 @@ def opds_download_link(book_id, book_format):
     abort_unless_opds_book_exposed(book_id)
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
     return get_download_link(
-        book_id, book_format.lower(), client, allow_public_shelf_books=True)
+        book_id, book_format.lower(), client, allow_public_shelf_books=True,
+        filename_template=getattr(config, 'config_opds_filename_template', ''))
 
 
 @opds.route("/ajax/book/<string:uuid>/<library>")
@@ -1199,14 +1276,25 @@ def get_database_stats():
     return Response(json.dumps(stat), mimetype="application/json")
 
 
-@opds.route("/opds/thumb_240_240/<book_id>")
-@opds.route("/opds/cover_240_240/<book_id>")
-@opds.route("/opds/cover_90_90/<book_id>")
 @opds.route("/opds/cover/<book_id>")
 @requires_basic_auth_if_no_ano
 def feed_get_cover(book_id):
     abort_unless_opds_book_exposed(book_id)
     return get_book_cover(book_id)
+
+
+# The feed's image/thumbnail link points here (#2845). These routes used to
+# share feed_get_cover and send the full-size cover.jpg, so an OPDS client's
+# browse grid fetched every original. They now send the smallest generated
+# thumbnail (as JPEG, see get_book_cover_internal); until it exists the
+# original stands in, revalidating, as on the web.
+@opds.route("/opds/cover_90_90/<book_id>")
+@opds.route("/opds/cover_240_240/<book_id>")
+@opds.route("/opds/thumb_240_240/<book_id>")
+@requires_basic_auth_if_no_ano
+def feed_get_cover_thumbnail(book_id):
+    abort_unless_opds_book_exposed(book_id)
+    return get_book_cover(book_id, constants.COVER_THUMBNAIL_SMALL)
 
 
 @opds.route("/opds/readbooks")
@@ -1256,6 +1344,36 @@ def feed_currently_reading():
     return render_xml_template('feed.xml', entries=result, pagination=pagination)
 
 
+@opds.route("/opds/didnotfinish")
+@requires_basic_auth_if_no_ano
+def feed_did_not_finish():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_DID_NOT_FINISH, as_xml=True,
+        extra_filter=get_opds_book_filter())
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
+@opds.route("/opds/onhold")
+@requires_basic_auth_if_no_ano
+def feed_on_hold():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_ON_HOLD, as_xml=True,
+        extra_filter=get_opds_book_filter())
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
 @opds.route("/opds/unreadbooks")
 @requires_basic_auth_if_no_ano
 def feed_unread_books():
@@ -1290,12 +1408,21 @@ def feed_search(term):
         # policy as every other catalog feed. Pass the Basic-auth identity into
         # search_query as well as the final OPDS exposure filter: that query
         # builds both common policy predicates and per-user status joins.
-        entries = calibre_db.search_query(term, config=config, user=user).filter(
+        query = calibre_db.search_query(term, config=config, user=user).filter(
             get_opds_restricted_common_filter(user)
-        ) \
-            .order_by(func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id).all()
-        entries_count = len(entries) if len(entries) > 0 else 1
-        pagination = Pagination(1, entries_count, entries_count)
+        )
+        # #2847: page like every other OPDS list feed (books_per_page, with
+        # rel=next/previous), instead of sending every match in one document.
+        per_page = int(config.config_books_per_page) or 1
+        try:
+            off = max(int(request.args.get("offset") or 0), 0)
+        except ValueError:
+            off = 0
+        page = off // per_page + 1
+        total_count = query.order_by(None).count()
+        entries = query.order_by(locale_sort_key(db.Books.sort, user=user), db.Books.sort, db.Books.id) \
+            .limit(per_page).offset((page - 1) * per_page).all()
+        pagination = Pagination(page, per_page, total_count)
         # #750: name the feed after the query (reuses the existing "Search" msgid).
         return render_xml_template('feed.xml', searchterm=term, entries=entries, pagination=pagination,
                                    feed_title="{}: {}".format(_('Search'), term))
@@ -1383,6 +1510,103 @@ def _opds_internal_error(_error):
     return response
 
 
+def _signed_in_entry_book_ids(entries):
+    """``(user, sorted book ids)`` for a signed-in requester, else ``(None, [])``.
+
+    Per-entry personal state is never rendered for a guest or anonymous caller:
+    a guest's would be the shared guest account's.
+    """
+    user = auth.current_user()
+    if not entries or user is None or getattr(user, "is_anonymous", True):
+        return None, []
+    return user, sorted({int(entry.Books.id) for entry in entries
+                         if getattr(entry, "Books", None) is not None})
+
+
+def _entry_shared_places(entries):
+    """The requester's shared reading place for each book entry, as a 0-1 fraction (#2849).
+
+    This is the place an unidentified KOSync GET serves for the book: the
+    furthest ``KOSyncProgress`` row across the book id and every file checksum
+    registered for it (``get_progress_record``'s lookup, done here for a whole
+    page in a few queries instead of two per entry). Only shared places live in
+    that table: a device with "share my place" off writes its own
+    ``DeviceReadingPosition`` instead, and a Kobo's own bookmark is not read
+    here, so nothing a device kept to itself reaches a catalog app.
+    """
+    user, ids = _signed_in_entry_book_ids(entries)
+    if not ids:
+        return {}
+    # An optional per-entry element must not take the whole catalog down: a
+    # locked or unreadable app.db serves the feed without places, as the book
+    # page does for the same lookup (helper.get_kosync_progress_display).
+    try:
+        return _shared_places_for_books(user, ids)
+    except SQLAlchemyError:
+        log.warning("OPDS: could not read shared reading places", exc_info=True)
+        return {}
+
+
+def _shared_places_for_books(user, ids):
+    from .progress_syncing.models import KOSyncProgress
+    places = {}
+    for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+        chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+        book_for_key = {str(book_id): book_id for book_id in chunk}
+        checksums = calibre_db.session.query(
+            db.BookFormatChecksum.checksum, db.BookFormatChecksum.book).filter(
+            db.BookFormatChecksum.book.in_(chunk)).all()
+        book_for_key.update((checksum, int(book_id)) for checksum, book_id in checksums
+                            if checksum)
+        keys = list(book_for_key)
+        for key_start in range(0, len(keys), SQLITE_IN_CHUNK_SIZE):
+            rows = ub.session.query(
+                KOSyncProgress.document, KOSyncProgress.percentage,
+                KOSyncProgress.timestamp).filter(
+                KOSyncProgress.user_id == int(user.id),
+                KOSyncProgress.document.in_(keys[key_start:key_start + SQLITE_IN_CHUNK_SIZE])).all()
+            for document, percentage, timestamp in rows:
+                if percentage is None:
+                    continue
+                book_id = book_for_key[document]
+                rank = (percentage, timestamp is not None, timestamp)
+                if book_id not in places or rank > places[book_id][0]:
+                    places[book_id] = (rank, percentage)
+    return {book_id: round(min(max(percentage, 0.0), 100.0) / 100.0, 4)
+            for book_id, (_rank, percentage) in places.items()}
+
+
+def _entry_read_statuses(entries):
+    """The requester's own read status for each book entry, by book id (#2849).
+
+    Empty for a guest or anonymous caller: the element is personal state, and a
+    guest's would be the shared guest account's. Carriers are looked up by id
+    rather than read off the rows, because not every feed query joins the read
+    state, and the status names come from the same resolver the API uses, so a
+    custom read column and the personal DNF/on-hold overlays read the same here.
+    """
+    user, ids = _signed_in_entry_book_ids(entries)
+    if not ids:
+        return {}
+    read_column = config.config_read_column
+    if read_column:
+        column = getattr(db, "cc_classes", {}).get(read_column)
+        if column is None:
+            return {}
+    carriers = dict.fromkeys(ids)
+    for start in range(0, len(ids), SQLITE_IN_CHUNK_SIZE):
+        chunk = ids[start:start + SQLITE_IN_CHUNK_SIZE]
+        if read_column:
+            rows = calibre_db.session.query(column.book, column.value).filter(
+                column.book.in_(chunk)).all()
+        else:
+            rows = ub.session.query(ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk)).all()
+        carriers.update((int(book_id), value) for book_id, value in rows)
+    return read_statuses_for_books(carriers.items(), read_column, user)
+
+
 def render_xml_template(*args, feed_title=None, **kwargs):
     # ToDo: return time in current timezone similar to %z
     currtime = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
@@ -1394,6 +1618,8 @@ def render_xml_template(*args, feed_title=None, **kwargs):
     # renders "Instance - Feed Name".
     if feed_title is None:
         feed_title = _opds_feed_title_for_endpoint(request.endpoint)
+    kwargs.setdefault("read_statuses", _entry_read_statuses(kwargs.get("entries")))
+    kwargs.setdefault("shared_places", _entry_shared_places(kwargs.get("entries")))
     xml = render_template(current_time=currtime, instance=config.config_calibre_web_title,
                           feed_title=feed_title, constants=constants.sidebar_settings, *args, **kwargs)
     response = make_response(xml)
@@ -1428,26 +1654,23 @@ def _dataset_display_name(data_table, book_id):
 
 
 def render_element_index(database_column, linked_table, folder):
-    shift = 0
     off = int(request.args.get("offset") or 0)
-    initial = func.ng_initial(database_column)
+    initial = locale_initial(database_column, user=auth.current_user())
     entries = calibre_db.session.query(initial.label('id'), None, None)
     # query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
     if linked_table is not None:
         entries = entries.join(linked_table).join(db.Books)
     entries = entries.filter(get_opds_restricted_common_filter()) \
         .filter(initial.isnot(None)).filter(initial != '') \
-        .group_by(initial).order_by(func.ng_sort_key(database_column)).all()
-    elements = []
-    if off == 0 and entries:
-        elements.append({'id': "00", 'name': _("All")})
-        shift = 1
-    for entry in entries[
-                 off + shift - 1:
-                 int(off + int(config.config_books_per_page) - shift)]:
-        elements.append({'id': entry.id, 'name': entry.id})
+        .group_by(initial).order_by(locale_sort_key(initial, user=auth.current_user())).all()
+    # Treat All as the first item in the same sequence we paginate. Separate
+    # first-page offsets used to repeat a letter at each page boundary.
+    elements = ([{'id': "00", 'name': _("All")}] if entries else [])
+    elements.extend({'id': entry.id, 'name': entry.id} for entry in entries)
+    total = len(elements)
+    elements = elements[off:off + int(config.config_books_per_page)]
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
-                            len(entries) + 1)
+                            total)
     return render_xml_template('feed.xml',
                                letterelements=elements,
                                folder=folder,

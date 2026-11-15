@@ -131,6 +131,24 @@ def calibre_library_dir():
     )
 
 
+def detected_calibre_library_dir(_isfile=os.path.isfile):
+    """The configured library dir when it already holds ``metadata.db``.
+
+    This is the auto-detect fallback for an install whose Calibre database
+    location is not set yet. An unsafe configured value is logged and treated
+    as nothing detected, so a bad override cannot stop startup or the admin
+    database page; the user can still type a path there.
+    """
+    try:
+        library_dir = calibre_library_dir()
+    except RuntimePathError as exc:
+        _dirs_logger.warning("Not auto-detecting the Calibre library: %s", exc)
+        return None
+    if _isfile(posixpath.join(library_dir, 'metadata.db')):
+        return library_dir
+    return None
+
+
 AUTO_LIBRARY_UNIT_DIR = '/etc/s6-overlay/s6-rc.d/cwa-auto-library'
 
 
@@ -157,10 +175,6 @@ def tmp_conversion_dir():
         DEFAULT_TMP_CONVERSION_DIR,
     )
 
-# Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
-DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
-CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
-
 OAUTH_SSL_STRICT = os.environ.get('OAUTH_SSL_STRICT', "1").lower() in ("true", "1")
 
 if HOME_CONFIG:
@@ -174,13 +188,26 @@ else:
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
 
 
+# Derived cache belongs with writable per-install state, not image-owned code.
+# Existing explicit CACHE_DIR deployments keep their chosen location. Thumbnail
+# cache already uses CONFIG_DIR/thumbnails and is deliberately unchanged.
+DEFAULT_CACHE_DIR = os.path.join(CONFIG_DIR, 'cache')
+CACHE_DIR = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
+
+
 def config_path(*parts, _join=os.path.join):
     """Return a path beneath the resolved writable config root."""
     return _join(CONFIG_DIR, *parts)
 
 
 def processed_books_dir():
-    """Root for retained originals, failed conversions and backup archives."""
+    """Root for retained originals, failed conversions and backup archives.
+
+    ``CWA_PROCESSED_BOOKS_DIR`` places it apart from the config dir (#1883).
+    """
+    override = _dirs_environ.get('CWA_PROCESSED_BOOKS_DIR')
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, 'CWA_PROCESSED_BOOKS_DIR')
     return config_path("processed_books")
 
 # Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
@@ -338,7 +365,7 @@ EXTENSIONS_CONVERT_FROM = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2', 
 EXTENSIONS_CONVERT_TO = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2',
                          'lit', 'lrf', 'txt', 'htmlz', 'rtf', 'odt']
 EXTENSIONS_UPLOAD = {'txt', 'pdf', 'epub', 'kepub', 'mobi', 'azw', 'azw3', 'cbr', 'cbz', 'cbt', 'cb7', 'djvu', 'djv',
-                     'prc', 'doc', 'docx', 'fb2', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
+                     'prc', 'doc', 'docx', 'fb2', 'fbz', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
                      'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'lcpl', 'kfx', 'kfx-zip'}
 
 _extension = ""

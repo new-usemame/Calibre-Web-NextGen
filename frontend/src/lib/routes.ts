@@ -15,6 +15,7 @@ export const SPA_ROUTES = {
   seriesList: '/series',
   series: '/series/:id',
   tags: '/tags',
+  tagGroup: '/tag-group',
   tag: '/tags/:id',
   publishers: '/publishers',
   publisher: '/publishers/:id',

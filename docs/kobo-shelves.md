@@ -1,21 +1,20 @@
 # Choosing which books go to your Kobo
 
 Setting up Kobo sync connects the device to your library. It doesn't decide *what*
-lands on it. By default your Kobo syncs your whole library; to send it particular
-shelves instead — and have them appear as **collections** on the device — you need
-a couple of settings that live in different places.
+lands on it. New accounts default to syncing only selected shelves. Existing
+accounts keep their previous choice, including whole-library syncing. To send
+particular shelves — and have them appear as **collections** on the device —
+you need a couple of settings that live in different places.
 
 Which ones depends on whether the shelf is an ordinary shelf or a smart shelf, and
 the two behave differently enough that it's worth knowing which you have.
 
-## Smart shelves and Magic Shelves are the same thing
+## Smart shelves across both interfaces
 
-The new interface calls them **Smart shelves**. The classic interface calls them
-**Magic Shelves ✨**, and so does the admin setting below. The API calls them
-`magicshelf`.
-
-Same feature, three names. If you are looking at a *Smart* shelf and hunting for a
-setting that says *Magic*, you are in the right place.
+Both interfaces and the admin settings call these **Smart shelves**. They were
+called **Magic Shelves ✨** in older Classic versions. The feature and its saved
+rules are the same; the API route `magicshelf` and setting key
+`config_kobo_sync_magic_shelves` retain their existing names.
 
 ## The settings
 
@@ -24,7 +23,7 @@ setting that says *Magic*, you are in the right place.
 Admin → **Edit Basic Configuration** → **Enable Kobo sync**. This is the one you
 turned on when you set the device up.
 
-**2. "Sync Magic Shelves to Kobo" — required for smart shelves, and it ships OFF.**
+**2. "Sync smart shelves to Kobo" — required for smart shelves, and it ships OFF.**
 
 Ordinary shelves do not need this one. Smart shelves do, because they are computed
 from a rule rather than a fixed list of books. **It is disabled by default**, which
@@ -49,6 +48,12 @@ depends on where you find it, which does not help:
 All three are the same setting. On the classic pages it is hidden entirely until
 Kobo sync (setting 1) is on; on the new UI account page it is always shown, and
 simply has no effect until then.
+
+New accounts start with setting 3 enabled, including accounts created while
+Kobo sync is disabled. If your first sync brings no books, put books on an
+ordinary shelf and turn on that shelf’s Kobo sync mark. For a smart shelf, also
+enable setting 2. To send the whole library, uncheck setting 3 on your account
+page. Upgrading does not change existing accounts or their device contents.
 
 ## What each setting actually changes
 

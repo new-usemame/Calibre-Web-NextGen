@@ -1,3 +1,5 @@
+import { BookListExport } from '../components/BookListExport';
+import { useShelfDragSelection } from '../components/ShelfDrag';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
@@ -16,9 +18,13 @@ import type { Book } from '../lib/api';
 import { apiGet, ApiError } from '../lib/api';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Shelf.module.css';
+import { useCatalogDensity } from '../lib/catalogDensity';
+import { useCatalogRowsPerLoad } from '../lib/catalogRowsPerLoad';
+import { useMeasuredGridColumns } from '../lib/useMeasuredGridColumns';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import {
   canonicalMagicShelfSortAdoption,
@@ -43,6 +49,9 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
   return fresh.length ? [...prev, ...fresh] : prev;
 }
 
+/** Books per request before the grid has been measured (the old fixed size). */
+const MAGIC_SHELF_FALLBACK_PER_PAGE = 24;
+
 /** Native view of a saved smart shelf's matching books, with duplicate/delete. */
 export function MagicShelfView({ id }: { id: string }) {
   const [cardActionsHidden] = useCardActionsHidden();
@@ -52,6 +61,8 @@ export function MagicShelfView({ id }: { id: string }) {
   const announce = useAnnouncer();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  // The Library's density choice, read-only here, like regular shelves (#980).
+  const [density] = useCatalogDensity();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [selecting, setSelecting] = useState(false);
@@ -59,6 +70,9 @@ export function MagicShelfView({ id }: { id: string }) {
   const [selectAllBusy, setSelectAllBusy] = useState(false);
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
+  useShelfDragSelection({ ids: [...selected], busy: bulkBusy || selectAllBusy, onFailed: (ids) => {
+    setSelected(new Set(ids)); setSelecting(true);
+  } });
   const clearSelection = () => {
     selectAllRequest.current += 1;
     setSelectAllBusy(false);
@@ -84,8 +98,26 @@ export function MagicShelfView({ id }: { id: string }) {
   const [books, setBooks] = useState<Book[]>([]);
   const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const accKey = useRef('');
+  const [rowsChoice] = useCatalogRowsPerLoad();
+  const rowsPerLoad = Number(rowsChoice);
+  // Whole rows per request, as on regular shelves and the Library: rows x the
+  // columns the grid really renders. The first request waits for that
+  // measurement (fail-open after a moment) instead of fetching at a guess and
+  // refetching (#980, #1144).
+  const { gridRef, columns, measured: gridMeasured } = useMeasuredGridColumns({
+    fallbackColumns: Math.ceil(MAGIC_SHELF_FALLBACK_PER_PAGE / rowsPerLoad),
+    minWidthVar: '--shelf-grid-min',
+    layoutKey: density,
+  });
+  // Page N of an infinite scroll is only meaningful at the page size page 1 used,
+  // so follow the live measurement while on page 1 and hold that size once
+  // scrolling has started: a window resize mid-scroll then cannot skip or repeat
+  // books, and the next sort, bulk change or shelf starts afresh at page 1.
+  const pageSizeRef = useRef(rowsPerLoad * columns);
+  if (page === 1) pageSizeRef.current = rowsPerLoad * columns;
+  const perPage = pageSizeRef.current;
   const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(
-    id, page, sort, revision,
+    id, page, sort, revision, perPage, gridMeasured,
   );
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
@@ -120,6 +152,7 @@ export function MagicShelfView({ id }: { id: string }) {
   };
   const [actionError, setActionError] = useState<string | null>(null);
   const [koboWarning, setKoboWarning] = useState<string | null>(null);
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   // Route reuse: reset paging when the shelf id changes (#612).
   useLayoutEffect(() => {
@@ -179,7 +212,17 @@ export function MagicShelfView({ id }: { id: string }) {
     enabled: !!data && books.length < data.total && !isFetching,
   });
 
-  if (isLoading && !data) return <SpinnerCentered size={40} />;
+  // The loading state is itself a grid so there is something to measure before
+  // the first request is allowed to go out.
+  if ((isLoading || !gridMeasured) && !data) {
+    return (
+      <div className={styles.container}>
+        <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div className={styles.gridLoading}><SpinnerCentered size={40} /></div>
+        </div>
+      </div>
+    );
+  }
   if (error || !data) {
     return <div className={styles.container}>
       <Link href="/magic" className={styles.back}><ChevronLeft size={16} /> {t('Smart shelves')}</Link>
@@ -242,6 +285,8 @@ export function MagicShelfView({ id }: { id: string }) {
           <h1 className={styles.title}>{data.icon} {data.name}</h1>
         </div>
         <div className={styles.subRow}>
+          <BookListExport disabled={bulkBusy || isFetching || isPlaceholderData || !!error} source={{ source: 'smart_shelf', id: Number(id), params: { sort } }} />
+
           <span className={styles.count}>{total} {t('books')}</span>
           <button type="button"
             className={selecting ? styles.manageBtnActive : styles.manageBtn}
@@ -349,13 +394,13 @@ export function MagicShelfView({ id }: { id: string }) {
         <EmptyState message={t('No books match this smart shelf right now.')} />
       ) : (
         <>
-          <div className={styles.grid}>
+          <div ref={gridRef} className={`${styles.grid} ${styles[`density_${density}`]}`} data-testid="magic-shelf-grid">
             {books.map((b, i) => (
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
                 hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden}
                 hideShelfTags={shelfBadgesHidden}
-                canRead={!!me?.role?.viewer}
+                canRead={!!me?.role?.viewer} customColumnDefinitions={customColumns}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>

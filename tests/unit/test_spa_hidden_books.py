@@ -4,7 +4,7 @@
 import inspect
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import flask
 import pytest
@@ -13,6 +13,22 @@ from sqlalchemy.orm import sessionmaker
 
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.fixture
+def app_database(monkeypatch):
+    """List serialization reads optional favorite badges from the app DB."""
+    from cps import ub
+
+    engine = create_engine("sqlite:///:memory:")
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(ub, "session", session)
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
 
 
 def _book(book_id=7):
@@ -107,7 +123,7 @@ def test_book_list_items_expose_hidden_state_for_a_visible_marker():
     assert serialize_book_list_item(_book(), hidden=False)["hidden"] is False
 
 
-def test_show_hidden_query_opts_only_the_spa_list_into_hidden_rows():
+def test_show_hidden_query_opts_only_the_spa_list_into_hidden_rows(app_database):
     """``show_hidden=1`` reaches common_filters through fill_indexpage."""
     from cps.api import books as books_mod
     from cps.pagination import Pagination
@@ -130,6 +146,7 @@ def test_show_hidden_query_opts_only_the_spa_list_into_hidden_rows():
     assert "extra_filter" in fill.call_args.kwargs
     body = json.loads(response.get_data(as_text=True))
     assert body["items"][0]["hidden"] is True
+    assert body["items"][0]["favorited"] is False
 
 
 def test_default_spa_list_keeps_hidden_exclusion_enabled():
@@ -151,14 +168,18 @@ def test_default_spa_list_keeps_hidden_exclusion_enabled():
     assert fill.call_args.kwargs.get("allow_show_archived", False) is False
 
 
-def test_show_hidden_applies_to_library_search_and_marks_results():
+def test_show_hidden_applies_to_library_search_and_marks_results(app_database):
     from cps.api import books as books_mod
 
     row = SimpleNamespace(Books=_book(), is_archived=False, read_status=None)
+    query = MagicMock()
+    for method in ("filter", "options", "distinct", "order_by", "offset", "limit", "with_entities"):
+        getattr(query, method).return_value = query
+    query.count.return_value = 1
+    query.all.return_value = [row]
     app = flask.Flask(__name__)
     with app.test_request_context("/api/v1/books?search=plain&show_hidden=true"):
-        with patch.object(books_mod.calibre_db, "get_search_results",
-                          return_value=([row], 1, None)) as search, \
+        with patch.object(books_mod.calibre_db, "search_query", return_value=query) as search, \
              patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
              patch.object(books_mod, "current_user",
@@ -169,6 +190,7 @@ def test_show_hidden_applies_to_library_search_and_marks_results():
     assert search.call_args.kwargs["allow_show_hidden"] is True
     body = json.loads(response.get_data(as_text=True))
     assert body["items"][0]["hidden"] is True
+    assert body["items"][0]["favorited"] is False
 
 
 def test_anonymous_role_is_explicit_in_me_payload_for_action_gating():

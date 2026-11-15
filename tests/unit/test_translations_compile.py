@@ -13,7 +13,7 @@ per-locale failures are silent unless someone reads the build logs — and
 that's exactly how v4.0.47 shipped without ``hu/messages.mo``: I'd added
 four new translations but the file also contained an obsolete ``#~ msgid``
 duplicate of one of them; msgfmt rejected the file, the build kept going,
-and on teenyverse Hungarian users got the English fallback.
+and on the household host Hungarian users got the English fallback.
 
 This test runs plain ``msgfmt`` — the exact invocation the Docker build
 uses — against every ``messages.po`` in the translations tree, so a .po

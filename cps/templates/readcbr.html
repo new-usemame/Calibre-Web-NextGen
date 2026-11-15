@@ -15,7 +15,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/libs/normalize.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" type="text/css"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/kthoom.css') }}" type="text/css"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}" type="text/css"/>
 
   <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
@@ -25,7 +24,6 @@
   <script src="{{ url_for('static', filename='js/reading/annotations_comic.js') }}" defer></script>
 </head>
 <body>
-{% include '_reader_lookup_banner.html' %}
 <div id="sidebar">
   <div id="tocView" class="view" tabindex="-1">
     <ul id="thumbnails"></ul>

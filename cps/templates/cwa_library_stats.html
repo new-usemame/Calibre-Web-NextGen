@@ -241,41 +241,41 @@
 </style>
 
 <div class="stats-hero">
-    <h1>📚 Library Statistics</h1>
-    <p>Comprehensive insights into your Calibre library collection</p>
+    <h1>📚 {{ _('Library Statistics') }}</h1>
+    <p>{{ _('Comprehensive insights into your Calibre library collection') }}</p>
 </div>
 
 <!-- Time Period Filter -->
 <div class="filter-row">
     <select id="library-time-period" class="time-period-select" onchange="changeLibraryTimePeriod()">
-        <option value="7" {{ 'selected' if request.args.get('days') == '7' else '' }}>Last 7 Days</option>
-        <option value="30" {{ 'selected' if request.args.get('days') == '30' or not request.args.get('days') else '' }}>Last 30 Days</option>
-        <option value="90" {{ 'selected' if request.args.get('days') == '90' else '' }}>Last 90 Days</option>
-        <option value="180" {{ 'selected' if request.args.get('days') == '180' else '' }}>Last 6 Months</option>
-        <option value="365" {{ 'selected' if request.args.get('days') == '365' else '' }}>Last Year</option>
-        <option value="all" {{ 'selected' if request.args.get('days') == 'all' else '' }}>All Time</option>
-        <option value="custom" {{ 'selected' if request.args.get('start_date') else '' }}>Custom Range</option>
+        <option value="7" {{ 'selected' if request.args.get('days') == '7' else '' }}>{{ _('Last 7 Days') }}</option>
+        <option value="30" {{ 'selected' if request.args.get('days') == '30' or not request.args.get('days') else '' }}>{{ _('Last 30 Days') }}</option>
+        <option value="90" {{ 'selected' if request.args.get('days') == '90' else '' }}>{{ _('Last 90 Days') }}</option>
+        <option value="180" {{ 'selected' if request.args.get('days') == '180' else '' }}>{{ _('Last 6 Months') }}</option>
+        <option value="365" {{ 'selected' if request.args.get('days') == '365' else '' }}>{{ _('Last Year') }}</option>
+        <option value="all" {{ 'selected' if request.args.get('days') == 'all' else '' }}>{{ _('All Time') }}</option>
+        <option value="custom" {{ 'selected' if request.args.get('start_date') else '' }}>{{ _('Custom Range') }}</option>
     </select>
     
     <div id="library-custom-date-range" style="display: {{ 'flex' if request.args.get('start_date') else 'none' }}; gap: 10px; align-items: center;">
         <input type="date" id="library-start-date" value="{{ request.args.get('start_date', '') }}" />
-        <span>to</span>
+        <span>{{ _('to') }}</span>
         <input type="date" id="library-end-date" value="{{ request.args.get('end_date', '') }}" />
-        <button onclick="applyLibraryDateRange()" class="btn btn-primary btn-sm">Apply</button>
+        <button onclick="applyLibraryDateRange()" class="btn btn-primary btn-sm">{{ _('Apply') }}</button>
     </div>
 
     <button onclick="window.location.href='/cwa-stats-show?tab=library'" class="demo-toggle" style="margin-left: 10px;">
-        🔄 Reset
+        🔄 {{ _('Reset') }}
     </button>
     
     <button onclick="exportLibraryCSV()" class="demo-toggle" style="margin-left: 10px; background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
-        📥 Export CSV
+        📥 {{ _('Export CSV') }}
     </button>
     
     <button onclick="toggleLibraryDemoMode()" class="demo-toggle" id="library-demo-button" style="margin-left: auto;">
-        🎨 Show Demo Data
+        🎨 {{ _('Show Demo Data') }}
     </button>
-    <span class="demo-badge" id="library-demo-badge" style="display: none;">DEMO MODE</span>
+    <span class="demo-badge" id="library-demo-badge" style="display: none;">{{ _('DEMO MODE') }}</span>
     
 </div>
 
@@ -283,15 +283,15 @@
 <div class="library-stats-container">
     <div class="library-stat-card">
         <div class="library-stat-icon">📖</div>
-        <div class="library-stat-label">Total Books</div>
+        <div class="library-stat-label">{{ _('Total Books') }}</div>
         <div class="library-stat-value" id="total-books">{{ cwa_stats.total_books }}</div>
     </div>
     <div class="library-stat-card">
         <div class="library-stat-icon">➕</div>
-        <div class="library-stat-label">Added Books</div>
+        <div class="library-stat-label">{{ _('Added Books') }}</div>
         {% if books_added_stats.total == cwa_stats.total_books %}
-        <div class="library-stat-value" id="books-added">N/A</div>
-        <small style="color: #999; margin-top: 10px; display: block;">All time view</small>
+        <div class="library-stat-value" id="books-added">{{ _('N/A') }}</div>
+        <small style="color: #999; margin-top: 10px; display: block;">{{ _('All time view') }}</small>
         {% else %}
         <div class="library-stat-value" id="books-added">{{ books_added_stats.total }}</div>
         <div class="trend-indicator {{ 'trend-up' if books_added_stats.trend > 0 else 'trend-down' if books_added_stats.trend < 0 else 'trend-neutral' }}" id="books-added-trend">
@@ -302,7 +302,7 @@
     </div>
     <div class="library-stat-card">
         <div class="library-stat-icon">🔄</div>
-        <div class="library-stat-label">Conversions</div>
+        <div class="library-stat-label">{{ _('Conversions') }}</div>
         <div class="library-stat-value" id="conversion-count">{{ conversion_stats.total }}</div>
         <div class="trend-indicator {{ 'trend-up' if conversion_stats.trend > 0 else 'trend-down' if conversion_stats.trend < 0 else 'trend-neutral' }}" id="conversion-trend">
             {{ '↑' if conversion_stats.trend > 0 else '↓' if conversion_stats.trend < 0 else '→' }} 
@@ -311,14 +311,14 @@
     </div>
     <div class="library-stat-card">
         <div class="library-stat-icon">📦</div>
-        <div class="library-stat-label">Total Formats</div>
+        <div class="library-stat-label">{{ _('Total Formats') }}</div>
         <div class="library-stat-value" id="format-count">{{ library_formats|length }}</div>
     </div>
 </div>
 
 <!-- Library Growth Timeline (Hero Chart) -->
 <div class="chart-container">
-    <div class="chart-title">📈 Library Growth Over Time</div>
+    <div class="chart-title">📈 {{ _('Library Growth Over Time') }}</div>
     <div id="growth-chart" style="width: 100%; height: 450px;"></div>
 </div>
 
@@ -326,13 +326,13 @@
 <div class="row cwa-stats-row">
     <div class="col-md-6">
         <div class="chart-container">
-            <div class="chart-title">📚 Largest Series</div>
+            <div class="chart-title">📚 {{ _('Largest Series') }}</div>
             <div id="series-completion-chart" style="width: 100%; height: 400px;"></div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="chart-container">
-            <div class="chart-title">📅 Publication Year Distribution</div>
+            <div class="chart-title">📅 {{ _('Publication Year Distribution') }}</div>
             <div id="publication-year-chart" style="width: 100%; height: 400px;"></div>
         </div>
     </div>
@@ -342,13 +342,13 @@
 <div class="row cwa-stats-row">
     <div class="col-md-6">
         <div class="chart-container" style="min-height: 520px;">
-            <div class="chart-title">⭐ Rating Statistics</div>
+            <div class="chart-title">⭐ {{ _('Rating Statistics') }}</div>
             <div id="rating-stats-chart" style="width: 100%; height: 450px;"></div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="chart-container" style="min-height: 520px;">
-            <div class="chart-title">🛡️ Top Enforced Books</div>
+            <div class="chart-title">🛡️ {{ _('Top Enforced Books') }}</div>
             <div id="top-enforced-chart" style="width: 100%; height: 450px;"></div>
         </div>
     </div>
@@ -358,7 +358,7 @@
 <div class="row cwa-stats-row">
     <div class="col-md-12">
         <div class="chart-container" style="min-height: 520px;">
-            <div class="chart-title">🔄 Import Source Flows</div>
+            <div class="chart-title">🔄 {{ _('Import Source Flows') }}</div>
             <div id="import-sankey-chart" style="width: 100%; height: 450px;"></div>
         </div>
     </div>
@@ -368,7 +368,7 @@
 <div class="row cwa-stats-row">
     <div class="col-md-12">
         <div class="chart-container">
-            <div class="chart-title">📊 Format Distribution</div>
+            <div class="chart-title">📊 {{ _('Format Distribution') }}</div>
             <div id="library-formats-chart" style="width: 100%; height: 400px;"></div>
         </div>
     </div>
@@ -378,23 +378,23 @@
 <div class="row cwa-stats-row">
     <div class="col-md-12">
         <div class="chart-container">
-            <div class="chart-title">🔧 Most Fixed Books</div>
+            <div class="chart-title">🔧 {{ _('Most Fixed Books') }}</div>
             <div id="most-fixed-books-list" style="padding: 20px;">
                 {% if most_fixed_books %}
                     {% for filename, fix_count, total_fixes, last_fixed, file_path in most_fixed_books %}
                     <div class="fixed-book-item">
                         <div class="fixed-book-header">
                             <span class="fixed-book-name">📖 {{ filename }}</span>
-                            <span class="fixed-book-badge">{{ fix_count }} fix{{ 'es' if fix_count > 1 else '' }}</span>
+                            <span class="fixed-book-badge">{{ ngettext("%(count)s fix", "%(count)s fixes", fix_count, count=fix_count) }}</span>
                         </div>
                         <div class="fixed-book-details">
-                            <span class="fixed-book-meta">🕒 Last fixed: {{ last_fixed }}</span>
+                            <span class="fixed-book-meta">🕒 {{ _('Last fixed: %(date)s', date=last_fixed) }}</span>
                             <span class="fixed-book-meta">📁 {{ file_path }}</span>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p style="text-align: center; color: #999; padding: 20px;">No EPUB fixes recorded</p>
+                    <p style="text-align: center; color: #999; padding: 20px;">{{ _('No EPUB fixes recorded') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -473,7 +473,7 @@ function updateLibraryStatCards() {
     const booksAddedTrendEl = document.getElementById('books-added-trend');
     
     if (booksAdded === totalBooks) {
-        booksAddedEl.textContent = 'N/A';
+        booksAddedEl.textContent = {{ _('N/A') | tojson }};
         if (booksAddedTrendEl) {
             booksAddedTrendEl.style.display = 'none';
         }
@@ -500,7 +500,7 @@ function updateLibraryGrowthChart() {
     if (data.length === 0) {
         growthChart.setOption({
             title: {
-                text: 'No growth data available',
+                text: {{ _('No growth data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -529,13 +529,11 @@ function updateLibraryGrowthChart() {
                 const date = params[0].axisValue;
                 const added = params[0].value;
                 const total = params[1] ? params[1].value : cumulative;
-                return `${date}<br/>
-                        📥 Added: ${added}<br/>
-                        📚 Total: ${total}`;
+                return statsEscape(statsDate(date)) + "<br/>📥 " + statsEscape(statsFormat({{ _('Added: %(count)s', count='%(count)s') | tojson }}, {count: added})) + "<br/>📚 " + statsEscape(statsFormat({{ _('Total: %(count)s', count='%(count)s') | tojson }}, {count: total}));
             }
         },
         legend: {
-            data: ['Books Added', 'Total Library Size'],
+            data: [{{ _('Books Added') | tojson }}, {{ _('Total Library Size') | tojson }}],
             textStyle: {
                 color: '#fff'
             },
@@ -563,7 +561,7 @@ function updateLibraryGrowthChart() {
         yAxis: [
             {
                 type: 'value',
-                name: 'Books Added',
+                name: {{ _('Books Added') | tojson }},
                 nameTextStyle: {
                     color: '#fff'
                 },
@@ -579,7 +577,7 @@ function updateLibraryGrowthChart() {
             },
             {
                 type: 'value',
-                name: 'Total Books',
+                name: {{ _('Total Books') | tojson }},
                 nameTextStyle: {
                     color: '#fff'
                 },
@@ -596,7 +594,7 @@ function updateLibraryGrowthChart() {
         ],
         series: [
             {
-                name: 'Books Added',
+                name: {{ _('Books Added') | tojson }},
                 type: 'bar',
                 data: data.map(d => d[1]),
                 itemStyle: {
@@ -608,7 +606,7 @@ function updateLibraryGrowthChart() {
                 }
             },
             {
-                name: 'Total Library Size',
+                name: {{ _('Total Library Size') | tojson }},
                 type: 'line',
                 yAxisIndex: 1,
                 data: cumulativeData.map(d => d[1]),
@@ -639,7 +637,7 @@ function updateLibraryFormatsChart() {
     if (data.length === 0) {
         libraryFormatsChart.setOption({
             title: {
-                text: 'No format data available',
+                text: {{ _('No format data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -656,10 +654,11 @@ function updateLibraryFormatsChart() {
             trigger: 'item',
             backgroundColor: 'rgba(0,0,0,0.8)',
             textStyle: { color: '#fff' },
-            formatter: '{b}: {c} books ({d}%)'
+            formatter: params => statsEscape(statsFormat({{ _('%(format)s — books: %(count)s (%(percent)s%%)', format='%(format)s', count='%(count)s', percent='%(percent)s') | tojson }}, {format: statsFormatLabel(params.name), count: params.value, percent: params.percent}))
         },
         legend: {
             type: 'scroll',
+            formatter: statsFormatLabel,
             orient: 'horizontal',
             bottom: '5%',
             textStyle: { color: '#fff' }
@@ -686,7 +685,7 @@ function updateLibraryFormatsChart() {
             },
             label: {
                 color: '#fff',
-                formatter: '{b}: {d}%'
+                formatter: params => `${statsFormatLabel(params.name)}: ${params.percent}%`
             }
         }]
     };
@@ -700,7 +699,7 @@ function updateSeriesCompletionChart() {
     if (data.length === 0) {
         seriesChart.setOption({
             title: {
-                text: 'No series data available',
+                text: {{ _('No series data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -722,9 +721,7 @@ function updateSeriesCompletionChart() {
                 const series = params[0].name;
                 const bookCount = params[0].value;
                 const highestIndex = data[params[0].dataIndex][2];
-                return `<strong>${series}</strong><br/>
-                        Books: ${bookCount}<br/>
-                        Highest Index: ${highestIndex}`;
+                return `<strong>${statsEscape(series)}</strong><br/>` + statsEscape(statsFormat({{ _('Books: %(count)s', count='%(count)s') | tojson }}, {count: bookCount})) + "<br/>" + statsEscape(statsFormat({{ _('Highest Index: %(index)s', index='%(index)s') | tojson }}, {index: highestIndex}));
             }
         },
         grid: {
@@ -736,7 +733,7 @@ function updateSeriesCompletionChart() {
         },
         xAxis: {
             type: 'value',
-            name: 'Number of Books',
+            name: {{ _('Number of Books') | tojson }},
             nameLocation: 'middle',
             nameGap: 30,
             minInterval: 1,
@@ -764,7 +761,7 @@ function updateSeriesCompletionChart() {
         },
         series: [
             {
-                name: 'Books',
+                name: {{ _('Books') | tojson }},
                 type: 'bar',
                 data: data.map(d => d[1]),
                 itemStyle: {
@@ -793,7 +790,7 @@ function updatePublicationYearChart() {
     if (data.length === 0) {
         publicationYearChart.setOption({
             title: {
-                text: 'No publication year data available',
+                text: {{ _('No publication year data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: {
@@ -812,7 +809,7 @@ function updatePublicationYearChart() {
                 type: 'shadow'
             },
             formatter: (params) => {
-                return `${params[0].name}: ${params[0].value} books`;
+                return statsEscape(statsFormat({{ _('%(year)s — books: %(count)s', year='%(year)s', count='%(count)s') | tojson }}, {year: params[0].name, count: params[0].value}));
             }
         },
         grid: {
@@ -835,7 +832,7 @@ function updatePublicationYearChart() {
         },
         yAxis: {
             type: 'value',
-            name: 'Books',
+            name: {{ _('Books') | tojson }},
             nameTextStyle: {
                 color: '#fff'
             },
@@ -871,7 +868,7 @@ function updateRatingStatsChart() {
     if (!data.rating_distribution || data.rating_distribution.length === 0) {
         ratingStatsChart.setOption({
             title: {
-                text: 'No rating data available',
+                text: {{ _('No rating data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -905,7 +902,7 @@ function updateRatingStatsChart() {
                 fontWeight: 'bold'
             }
         }, {
-            text: `${trendIcon} ${Math.abs(trend)}% ${trend !== 0 ? 'vs prev period' : ''}`,
+            text: `${trendIcon} ${Math.abs(trend)}% ${trend !== 0 ? {{ _('vs previous period') | tojson }} : ''}`,
             left: 'center',
             top: '15%',
             textStyle: {
@@ -914,7 +911,7 @@ function updateRatingStatsChart() {
                 fontWeight: 'normal'
             }
         }, {
-            text: `${unratedPct}% Unrated`,
+            text: statsFormat({{ _('%(percent)s%% Unrated', percent='%(percent)s') | tojson }}, {percent: unratedPct}),
             left: 'center',
             top: '22%',
             textStyle: {
@@ -935,12 +932,12 @@ function updateRatingStatsChart() {
             formatter: (params) => {
                 const stars = params[0].name;
                 const count = params[0].value;
-                return `${stars} Star${stars > 1 ? 's' : ''}: ${count} books`;
+                return statsEscape(statsFormat({{ _('Rating: %(stars)s; books: %(count)s', stars='%(stars)s', count='%(count)s') | tojson }}, {stars, count}));
             }
         },
         xAxis: {
             type: 'value',
-            name: 'Books',
+            name: {{ _('Books') | tojson }},
             axisLabel: { color: '#fff' },
             axisLine: { lineStyle: { color: '#3a4451' } },
             splitLine: { lineStyle: { color: '#3a4451' } }
@@ -979,7 +976,7 @@ function updateTopEnforcedChart() {
     if (data.length === 0) {
         topEnforcedChart.setOption({
             title: {
-                text: 'No enforcement data available',
+                text: {{ _('No enforcement data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -996,9 +993,7 @@ function updateTopEnforcedChart() {
                 const title = params[0].name;
                 const count = params[0].value;
                 const lastEnforced = data[params[0].dataIndex][3];
-                return `<strong>${title}</strong><br/>
-                        Enforcements: ${count}<br/>
-                        Last: ${lastEnforced}`;
+                return `<strong>${statsEscape(title)}</strong><br/>` + statsEscape(statsFormat({{ _('Enforcements: %(count)s', count='%(count)s') | tojson }}, {count})) + "<br/>" + statsEscape(statsFormat({{ _('Last: %(date)s', date='%(date)s') | tojson }}, {date: statsDate(lastEnforced)}));
             }
         },
         grid: {
@@ -1010,7 +1005,7 @@ function updateTopEnforcedChart() {
         },
         xAxis: {
             type: 'value',
-            name: 'Enforcements',
+            name: {{ _('Enforcements') | tojson }},
             axisLabel: { color: '#fff' },
             axisLine: { lineStyle: { color: '#3a4451' } },
             splitLine: { lineStyle: { color: '#3a4451' } }
@@ -1054,7 +1049,7 @@ function updateImportSankeyChart() {
     if (data.length === 0) {
         importSankeyChart.setOption({
             title: {
-                text: 'No conversion data available',
+                text: {{ _('No conversion data available') | tojson }},
                 left: 'center',
                 top: 'center',
                 textStyle: { color: '#999', fontSize: 14 }
@@ -1063,18 +1058,21 @@ function updateImportSankeyChart() {
         return;
     }
     
-    // Extract unique nodes (formats)
-    const nodeSet = new Set();
+    // A format can be both an input and an output. Separate the two stages so
+    // reciprocal conversions and same-format imports remain an acyclic graph.
+    const nodeMap = new Map();
     data.forEach(([source, target, value]) => {
-        nodeSet.add(source);
-        nodeSet.add(target);
+        nodeMap.set(`source:${source}`, {name: `source:${source}`, format: source});
+        nodeMap.set(`target:${target}`, {name: `target:${target}`, format: target});
     });
-    
-    const nodes = Array.from(nodeSet).map(name => ({ name }));
+
+    const nodes = Array.from(nodeMap.values());
     const links = data.map(([source, target, value]) => ({
-        source,
-        target,
-        value
+        source: `source:${source}`,
+        target: `target:${target}`,
+        value,
+        sourceFormat: source,
+        targetFormat: target
     }));
     
     const option = {
@@ -1083,9 +1081,9 @@ function updateImportSankeyChart() {
             triggerOn: 'mousemove',
             formatter: (params) => {
                 if (params.dataType === 'edge') {
-                    return `${params.data.source} → ${params.data.target}<br/>Conversions: ${params.data.value}`;
+                    return statsEscape(`${statsFormatLabel(params.data.sourceFormat)} → ${statsFormatLabel(params.data.targetFormat)}`) + "<br/>" + statsEscape(statsFormat({{ _('Conversions: %(count)s', count='%(count)s') | tojson }}, {count: params.data.value}));
                 }
-                return params.name;
+                return statsEscape(statsFormatLabel(params.data.format));
             }
         },
         series: [{
@@ -1108,7 +1106,8 @@ function updateImportSankeyChart() {
             label: {
                 color: '#fff',
                 fontSize: 12,
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                formatter: params => statsFormatLabel(params.data.format)
             }
         }]
     };
@@ -1134,7 +1133,7 @@ function applyLibraryDateRange() {
     const endDate = document.getElementById('library-end-date').value;
     
     if (!startDate || !endDate) {
-        alert('Please select both start and end dates');
+        alert({{ _('Please select both start and end dates') | tojson }});
         return;
     }
     
@@ -1293,12 +1292,12 @@ function toggleLibraryDemoMode() {
     
     if (libraryDemoMode) {
         currentLibraryData = generateLibraryDemoData();
-        button.textContent = '📊 Show Real Data';
+        button.textContent = '📊 ' + {{ _('Show Real Data') | tojson }};
         button.classList.add('active');
         badge.style.display = 'inline-block';
     } else {
         currentLibraryData = realLibraryData;
-        button.textContent = '🎨 Show Demo Data';
+        button.textContent = '🎨 ' + {{ _('Show Demo Data') | tojson }};
         button.classList.remove('active');
         badge.style.display = 'none';
     }

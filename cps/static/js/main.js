@@ -63,6 +63,17 @@ $(document).on("change", "input[type=\"checkbox\"][data-control]", function () {
     });
 });
 
+// Same as above, but hides the related fields when the checkbox is checked
+$(document).on("change", "input[type=\"checkbox\"][data-control-invert]", function () {
+    var $this = $(this);
+    var name = $this.data("control-invert");
+    var showOrHide = !$this.prop("checked");
+
+    $("[data-related=\"" + name + "\"]").each(function () {
+        $(this).toggle(showOrHide);
+    });
+});
+
 // Generic control/related handler to show/hide fields based on a select' value
 $(document).on("change", "select[data-control]", function() {
     var $this = $(this);
@@ -795,6 +806,7 @@ $(function() {
 
     // Init all data control handlers to default
     $("input[data-control]").trigger("change");
+    $("input[data-control-invert]").trigger("change");
     $("select[data-control]").trigger("change");
     $("select[data-controlall]").trigger("change");
 
@@ -1031,6 +1043,11 @@ $(function() {
         $("#flash_danger").remove();
         $.post(getPath() + request_path, formData, function(data) {
             $('#config_upload_formats').val(data.config_upload);
+            $("#config_calibre_server_password_e").val("")
+                .prop("disabled", data.calibre_server_password_set)
+                .attr("placeholder", data.calibre_server_password_set ? "********" : "");
+            $("#calibre_server_password_clear_group")
+                .toggle(data.calibre_server_password_set && !data.calibre_server_password_env);
             if(data.reboot) {
                 $("#spinning_success").show();
                 var rebootInterval = setInterval(function(){
@@ -1063,6 +1080,14 @@ $(function() {
     $("#kobo_kepub_backfill").click(function() {
         this.blur();
         submitConfigForm($(this).closest("form"), this);
+    });
+
+    $("#config_calibre_server_password_clear").click(function() {
+        $.post(getPath() + "/admin/config/clear_calibre_server_password", function(data) {
+            $("#config_calibre_server_password_e").val("").prop("disabled", false).removeAttr("placeholder");
+            $("#calibre_server_password_clear_group").hide();
+            handle_response(data.result);
+        });
     });
 
     $("#delete_shelf").click(function(event) {

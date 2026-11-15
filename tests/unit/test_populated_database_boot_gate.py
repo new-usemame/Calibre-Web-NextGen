@@ -114,6 +114,37 @@ def _formatted_migration_output(caplog, captured) -> str:
     )
 
 
+def test_read_status_choice_baseline_is_added_once_and_survives_restart(
+        tmp_path, monkeypatch, caplog, capsys):
+    """Actual startup snapshots old clocks once; later activity/NULL stays distinct."""
+    db_path = tmp_path / "app.db"
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    _restore_fixture(db_path)
+    assert "read_status_choice_at" not in _actual_schema(db_path)["book_read_link"]
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("""INSERT INTO book_read_link
+            (book_id, user_id, read_status, last_modified, times_started_reading)
+            VALUES (108100, 1, 2, '2020-01-01 00:00:00.000000', 3)""")
+    output = _boot_migrations(db_path, config_dir, monkeypatch, caplog, capsys)
+    assert FORBIDDEN_MIGRATION_OUTPUT.search(output) is None, output
+    with sqlite3.connect(db_path) as connection:
+        assert connection.execute("""SELECT read_status_choice_at, times_started_reading
+            FROM book_read_link WHERE book_id=108100""").fetchone() == ('2020-01-01 00:00:00.000000', 3)
+        connection.execute("""UPDATE book_read_link SET last_modified='2030-01-01 00:00:00.000000'
+            WHERE book_id=108100""")
+        connection.execute("""INSERT INTO book_read_link
+            (book_id, user_id, read_status, last_modified, times_started_reading)
+            VALUES (108101, 1, 2, '2030-01-01 00:00:00.000000', 1)""")
+    output = _boot_migrations(db_path, config_dir, monkeypatch, caplog, capsys)
+    assert FORBIDDEN_MIGRATION_OUTPUT.search(output) is None, output
+    with sqlite3.connect(db_path) as connection:
+        rows = connection.execute("""SELECT book_id, read_status_choice_at, last_modified
+            FROM book_read_link WHERE book_id IN (108100,108101) ORDER BY book_id""").fetchall()
+    assert rows == [(108100, '2020-01-01 00:00:00.000000', '2030-01-01 00:00:00.000000'),
+                    (108101, None, '2030-01-01 00:00:00.000000')]
+
+
 def test_populated_historical_database_reaches_current_schema_in_one_quiet_boot(
         tmp_path, monkeypatch, caplog, capsys):
     db_path = tmp_path / "app.db"
@@ -203,7 +234,7 @@ def test_populated_historical_database_reaches_current_schema_in_one_quiet_boot(
 
     # The system-shelf migration filters on ROLE_ANONYMOUS.  With a Guest row
     # in the fixture that filter is load-bearing: dropping it gives the Guest
-    # five shelves it must never have, and the total moves 45 -> 50.
+    # seven shelves it must never have, and the total moves 63 -> 70.
     anonymous_shelves = [
         count for role, count in system_shelves_per_user
         if role & constants.ROLE_ANONYMOUS
@@ -217,7 +248,7 @@ def test_populated_historical_database_reaches_current_schema_in_one_quiet_boot(
             system_shelves_per_user
         )
     )
-    assert real_user_shelves == [5] * 9, system_shelves_per_user
+    assert real_user_shelves == [7] * 9, system_shelves_per_user
 
     migration_dir = config_dir / ".cwa_migrations"
     assert (migration_dir / "favorites_sidebar_v1").is_file()

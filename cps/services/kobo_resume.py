@@ -28,20 +28,26 @@ log = logging.getLogger(__name__)
 # A stalled filesystem can occupy at most two daemon workers. There is no queue,
 # and a timed-out worker retains its permit until it actually finishes.
 _SLOTS = threading.BoundedSemaphore(2)
+_WARM_SLOT = threading.BoundedSemaphore(1)
 
 
-def _resume_timeout():
+def _resume_timeout(default=0.05):
     try:
-        value = float(os.environ.get('CWA_KOBO_RESUME_TIMEOUT_SECONDS', '0.05'))
+        value = float(os.environ.get('CWA_KOBO_RESUME_TIMEOUT_SECONDS', str(default)))
         if math.isfinite(value) and value > 0:
             return value
     except ValueError:
         pass
-    log.warning('Invalid CWA_KOBO_RESUME_TIMEOUT_SECONDS; using 0.05 seconds')
-    return 0.05
+    log.warning('Invalid CWA_KOBO_RESUME_TIMEOUT_SECONDS; using %s seconds', default)
+    return default
 
 
 RESUME_TIMEOUT_SECONDS = _resume_timeout()
+# A proven KEPUB span may need cold alignment after a restart or cache eviction.
+# Measured cold resolution of a 353 KB EPUB took 119–154 ms, beyond the generic
+# 50 ms budget. Keep a bounded quarter-second wait only for this bridge path;
+# an explicit operator timeout still overrides both defaults.
+KEPUB_RESUME_TIMEOUT_SECONDS = _resume_timeout(default=0.25)
 _CACHE_MAX_ENTRIES = 256
 _CACHE_TTL_SECONDS = 300
 _CACHE = OrderedDict()
@@ -136,13 +142,17 @@ def _chapter_snapshot(epub_path, source, chapter_percent):
 _EXACT_KINDS = ('KoboSpan', KOREADER_LOCATION_TYPE)
 
 
-def exact_resume(book_id, source, kind, value, *, wait=True):
+def exact_resume(book_id, source, kind, value, *, wait=True, kepub_identity=None):
     """``{'cfi', 'epub_sha256'}`` for a device locator, or ``None``.
 
     With ``wait=False`` the conversion only starts (when a slot is free) so a
-    later call finds it cached; nothing is waited for or returned.
+    later call finds it cached; nothing is waited for or returned. Proven
+    KEPUB locators revalidate the files on every call instead of caching the
+    result, so a replaced book or revoked proof cannot reuse an exact place.
     """
-    deadline = time.monotonic() + RESUME_TIMEOUT_SECONDS
+    budget = (KEPUB_RESUME_TIMEOUT_SECONDS if kind == 'KoboSpan' and kepub_identity
+              else RESUME_TIMEOUT_SECONDS)
+    deadline = time.monotonic() + budget
     if kind not in _EXACT_KINDS or not source or not value:
         return None
     from .. import config
@@ -157,7 +167,7 @@ def exact_resume(book_id, source, kind, value, *, wait=True):
         return None
     try:
         cached = _CACHE.get(key)
-        if cached:
+        if not kepub_identity and cached:
             expires, exact = cached
             if time.monotonic() < expires:
                 return exact.copy()
@@ -173,8 +183,9 @@ def exact_resume(book_id, source, kind, value, *, wait=True):
 
     def worker():
         try:
-            exact = _resolve(book_id, source, kind, value)
-            if exact and exact.get('cfi') and exact.get('epub_sha256'):
+            exact = (_resolve(book_id, source, kind, value, kepub_identity=kepub_identity)
+                     if kepub_identity else _resolve(book_id, source, kind, value))
+            if not kepub_identity and exact and exact.get('cfi') and exact.get('epub_sha256'):
                 # Publish even after the requesting greenlet has timed out.
                 # Never hold this lock across I/O. Expiry is from completion,
                 # not last access; hot entries cannot live indefinitely.
@@ -207,27 +218,34 @@ def exact_resume(book_id, source, kind, value, *, wait=True):
     return result[0] if result else None
 
 
-def _resolve(book_id, source, kind, value):
+def _library_paths(book_id):
     # No SQLAlchemy session is shared across threads. Both metadata lookup and
     # file access happen here, never on the request/hub thread.
     from .. import config
-    from .kobo_position import _resume_snapshot
     if config.config_use_google_drive or not config.config_calibre_dir:
-        return None
+        return None, None
     metadata = Path(config.config_calibre_dir) / 'metadata.db'
     connection = sqlite3.connect(metadata.resolve().as_uri() + '?mode=ro', uri=True, timeout=0)
     try:
-        row = connection.execute(
-            "SELECT b.path, d.name FROM books b JOIN data d ON d.book=b.id "
-            "WHERE b.id=? AND d.format='EPUB' LIMIT 1", (book_id,),
-        ).fetchone()
+        rows = connection.execute(
+            "SELECT b.path, d.name, d.format FROM books b JOIN data d ON d.book=b.id "
+            "WHERE b.id=? AND d.format IN ('EPUB', 'KEPUB')", (book_id,),
+        ).fetchall()
     finally:
         connection.close()
-    if not row:
-        return None
     root = Path(config.get_book_path()).resolve()
-    path = (root / row[0] / (row[1] + '.epub')).resolve()
-    if not path.is_relative_to(root):
+    paths = {}
+    for directory, name, fmt in rows:
+        path = (root / directory / (name + '.' + fmt.lower())).resolve()
+        if path.is_relative_to(root):
+            paths.setdefault(fmt, path)
+    return paths.get('EPUB'), paths.get('KEPUB')
+
+
+def _resolve(book_id, source, kind, value, *, kepub_identity=None):
+    from .kobo_position import _resume_snapshot
+    path, kepub = _library_paths(book_id)
+    if path is None:
         return None
     if kind == KOREADER_LOCATION_TYPE:
         from .koreader_position import web_resume
@@ -236,4 +254,51 @@ def _resolve(book_id, source, kind, value):
     if snapshot:
         cfi, fingerprint = snapshot
         return {'cfi': cfi, 'epub_sha256': fingerprint}
+    if kind != 'KoboSpan' or not kepub_identity or kepub is None:
+        return None
+    from .kobo_place_gate import _readable_kepub_identity
+    from .kepub_alignment import span_to_xpointer
+    from .koreader_xpointer import xpointer_to_cfi
+
+    def bridge():
+        if _readable_kepub_identity(kepub) != kepub_identity:
+            return None
+        xp = span_to_xpointer(path, kepub, source, value)
+        cfi = xpointer_to_cfi(path, xp) if xp else None
+        return cfi if _readable_kepub_identity(kepub) == kepub_identity else None
+
+    snapshot = _resume_snapshot(path, source, kind, value, bridge=bridge)
+    if snapshot:
+        cfi, fingerprint = snapshot
+        return {'cfi': cfi, 'epub_sha256': fingerprint}
     return None
+
+
+def warm_alignment(book_id):
+    """Best-effort preparse of existing files; no queue, conversion or proof.
+
+    A cold novel can exceed the GET deadline. Downloads and journal reports
+    prepare the identity-keyed parser caches on at most one daemon worker.
+    GET still proves the reporting device's download and rechecks both files.
+    """
+    if not _WARM_SLOT.acquire(blocking=False):
+        return
+
+    def worker():
+        try:
+            from . import kepub_alignment
+            epub, kepub = _library_paths(book_id)
+            if epub is None or kepub is None:
+                return
+            parsed = kepub_alignment._kepub(kepub)
+            if parsed is not None:
+                kepub_alignment._aligned_epub(epub, parsed)
+        except Exception:
+            log.debug('Could not warm Kobo alignment for book %s', book_id, exc_info=True)
+        finally:
+            _WARM_SLOT.release()
+
+    try:
+        threading.Thread(target=worker, name='kobo-alignment-warm', daemon=True).start()
+    except Exception:
+        _WARM_SLOT.release()

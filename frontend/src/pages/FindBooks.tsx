@@ -35,6 +35,7 @@ import { useAnnouncer } from '../lib/a11y/announcer';
 import { EmptyState } from '../components/EmptyState';
 import { SectionError } from '../components/SectionError';
 import { SpinnerCentered } from '../components/Spinner';
+import { AcquisitionBundleChoices } from '../components/AcquisitionBundleChoices';
 import styles from './FindBooks.module.css';
 import { AcquisitionSearch } from './AcquisitionSearch';
 
@@ -54,6 +55,7 @@ function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'act
     }
     switch (job.state) {
       case 'awaiting_approval': return { label: t('Waiting for approval'), tone: 'muted' as const };
+      case 'awaiting_selection': return { label: t('Waiting for you to choose a book'), tone: 'muted' as const };
       case 'queued': return { label: t('Queued'), tone: 'active' as const };
       case 'resolving': return { label: t('Contacting the source'), tone: 'active' as const };
       case 'downloading': return { label: t('Downloading'), tone: 'active' as const };
@@ -92,6 +94,8 @@ export function FindBooks() {
   const protocolErrorText = useAcquisitionErrorText();
   const jobStateText = useJobStateText();
   const searchInputId = useId();
+  const catalogResultsRef = useRef<HTMLDivElement>(null);
+  const focusCatalogAfterNavigation = useRef(false);
 
   const [searchAll, setSearchAll] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -258,7 +262,18 @@ export function FindBooks() {
       : undefined,
   });
 
+  useEffect(() => {
+    // Explicit navigation can remove its focused button. Restore focus only
+    // when that selected page settles; background refreshes never take it.
+    if (focusCatalogAfterNavigation.current && !catalog.isFetching
+      && ['ready', 'empty', 'error'].includes(catalogView.body)) {
+      catalogResultsRef.current?.focus();
+      focusCatalogAfterNavigation.current = false;
+    }
+  }, [catalog.isFetching, catalogView.body, catalog.dataUpdatedAt]);
+
   const openSelection = (nav: AcquisitionNavigation) => {
+    focusCatalogAfterNavigation.current = true;
     setTrail((steps) => [...steps, { title: nav.title || t('Catalog'), selection: nav.selection }]);
   };
 
@@ -450,6 +465,7 @@ export function FindBooks() {
               canAcquire={canAcquire} requestsPaused={!runtime?.available}
               pendingOffer={request.isPending ? request.variables?.offerId : undefined}
               onOpen={(nav) => {
+                focusCatalogAfterNavigation.current = true;
                 setConnectionId(result.connection.id);
                 setTrail([{ title: t('Search: {query}', { query }), selection: nav.selection }]);
                 setSearchAll(false);
@@ -458,7 +474,9 @@ export function FindBooks() {
           />}
 
 
-          {!searchAll && catalogView.body === 'loading' && <SpinnerCentered />}
+          {!searchAll && <div ref={catalogResultsRef} tabIndex={-1}
+            role="region" aria-label={catalog.data?.title || t('Catalog')}>
+          {catalogView.body === 'loading' && <SpinnerCentered />}
 
           {!searchAll && catalogView.body === 'error' && (
             // role="alert": browsing is a keyboard-and-listening activity as
@@ -512,6 +530,7 @@ export function FindBooks() {
               />
             </>
           )}
+          </div>}
         </>
       )}
 
@@ -597,6 +616,12 @@ export function FindBooks() {
                       </button>
                     )}
                   </div>
+                  <AcquisitionBundleChoices
+                    job={job}
+                    ownerId={me?.id}
+                    canAcquire={canAcquire}
+                    requestsPaused={!runtime?.available}
+                  />
                 </li>
               );
             })}
@@ -744,7 +769,7 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
             </button>
           ))}
         </div>
-      ) : (
+      ) : (publication.unavailable_reason || publication.navigation.length === 0) ? (
         // Buy / borrow / preview / templated links are deliberately not offered
         // here: they are not a complete file this server can import.
         <p className={styles.muted}>{publication.unavailable_reason === 'untrusted_release_origin'
@@ -754,7 +779,7 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
           : publication.unavailable_reason === 'download_client_unavailable'
             ? t('The download client for this source is unavailable. Ask an administrator to check it.')
             : t('No EPUB or PDF available from this catalog.')}</p>
-      )}
+      ) : null}
 
       {publication.navigation.length > 0 && (
         <ul className={styles.navList} role="list">

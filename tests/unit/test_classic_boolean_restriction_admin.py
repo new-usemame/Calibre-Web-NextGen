@@ -129,10 +129,16 @@ def test_switch_to_boolean_column_is_rejected_before_other_settings_change(monke
     conf = _config(("catalogue",), ())
     conf.config_restricted_column = 4
     conf.config_calibre_web_title = "Existing title"
+    conf.config_default_role = 0
+    rendered = {}
     monkeypatch.setattr(admin, "config", conf)
     monkeypatch.setattr(admin, "restricted_column_datatype", lambda _column: "bool")
     monkeypatch.setattr(admin, "boolean_restrictions_compatible", lambda: False)
-    monkeypatch.setattr(admin, "view_configuration", lambda: "rendered config")
+    def render(**kwargs):
+        rendered.update(kwargs)
+        return "rendered config"
+
+    monkeypatch.setattr(admin, "view_configuration", render)
     monkeypatch.setattr(admin, "flash", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(admin, "_", lambda value, **kwargs: value % kwargs if kwargs else value)
 
@@ -145,6 +151,8 @@ def test_switch_to_boolean_column_is_rejected_before_other_settings_change(monke
     assert response == "rendered config"
     assert conf.config_calibre_web_title == "Existing title"
     assert conf.config_allowed_column_value == "catalogue"
+    assert rendered["draft_config"].config_calibre_web_title == "Should not be saved"
+    assert rendered["draft_config"].config_restricted_column == 9
 
 
 @pytest.mark.unit

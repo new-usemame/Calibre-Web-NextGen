@@ -75,6 +75,7 @@
 .field {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -83,6 +84,8 @@
 .field input,
 .field select,
 .field textarea {
+  min-width: 0;
+  width: 100%;
   background: var(--surface-0, var(--bg));
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -95,6 +98,10 @@
 .field input:focus-visible,
 .field select:focus-visible,
 .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* Native WebKit selects inherit preformatted whitespace. Long translated
+   options can widen the page's scroll area even within a constrained control. */
+.field select { white-space: normal; }
 
 .fieldHint { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
 

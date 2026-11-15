@@ -71,3 +71,13 @@ test('the edit link for a saved default view carries its criteria', async () => 
   assert.deepEqual(advancedSearchFromQuery(href.slice(href.indexOf('?'))), saved);
   assert.equal(advancedSearchHref(null), '/search');
 });
+
+
+test('exact reading statuses survive a bookmarked search and a remount', () => {
+  for (const status of ['in_progress', 'did_not_finish', 'on_hold'] as const) {
+    const params = { title: 'Book', read_status: status };
+    const query = advancedSearchToQuery(params);
+    assert.deepEqual(advancedSearchFromQuery(query), params);
+    assert.equal(new URLSearchParams(query).get('read_status'), status);
+  }
+});

@@ -139,6 +139,63 @@ def store_checksum(
         return False
 
 
+def store_filename_checksums(names, db_connection=None) -> int:
+    """Register the filename-matching digest of each ``(book_id, format, name)``.
+
+    A device in filename document matching identifies a book by the MD5 of the
+    name its file has. The KOReader library hands out those names before any
+    download, and a device that already holds a book renames it in place when
+    its listed name changes (#2565), so the digest has to be known from the
+    listing, not only from a download. One lookup and at most one
+    commit for the whole batch; a name already registered is left alone.
+
+    Returns how many digests were added.
+    """
+    from sqlalchemy import text
+
+    wanted = {}
+    for book_id, book_format, name in names:
+        digest = calculate_koreader_filename_md5(name)
+        if digest and book_format:
+            wanted[(int(book_id), str(book_format).upper(), digest)] = None
+    if not wanted:
+        return 0
+    # Through the request's own calibre session, not a connection opened and
+    # closed here: the engine's StaticPool shares one connection, and closing
+    # it rolls back whatever another request has sent but not yet committed.
+    # Every page of every sync reads; only a name not seen before writes.
+    if db_connection is None:
+        from ... import calibre_db
+        connection = calibre_db.session
+    else:
+        connection = db_connection
+    digests = sorted({key[2] for key in wanted})
+    known = set()
+    for start in range(0, len(digests), 500):
+        chunk = digests[start:start + 500]
+        marks = ", ".join(":d%d" % i for i in range(len(chunk)))
+        rows = connection.execute(text(
+            "SELECT book, format, checksum FROM book_format_checksums "
+            "WHERE checksum IN (%s)" % marks),
+            {"d%d" % i: value for i, value in enumerate(chunk)})
+        known.update((int(row[0]), str(row[1]).upper(), row[2]) for row in rows)
+    missing = [key for key in wanted if key not in known]
+    if missing:
+        created = datetime.now(timezone.utc).isoformat()
+        try:
+            connection.execute(text(
+                "INSERT INTO book_format_checksums (book, format, checksum, version, created) "
+                "VALUES (:book, :format, :checksum, :version, :created)"),
+                [{"book": book, "format": fmt, "checksum": digest,
+                  "version": FILENAME_CHECKSUM_VERSION, "created": created}
+                 for book, fmt, digest in missing])
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+    return len(missing)
+
+
 def calculate_and_store_checksum(
     book_id: int,
     book_format: str,

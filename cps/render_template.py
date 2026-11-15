@@ -14,7 +14,7 @@ from .cw_login import current_user
 from sqlalchemy.sql.expression import or_
 
 from . import config, constants, logger, ub
-from .custom_column_visibility import is_cc_visible
+from .custom_column_visibility import browsable_columns, is_cc_visible
 from .ub import User
 from .duplicate_notice import duplicate_setup_notice_dismissed
 from .translation_notice import last_notified, record_notified
@@ -166,12 +166,29 @@ def get_sidebar_config(kwargs=None):
         {"glyph": "glyphicon-eye-close", "text": _('Unread Books'), "link": 'web.books_list', "id": "unread",
          "visibility": constants.SIDEBAR_READ_AND_UNREAD, 'public': (not current_user.is_anonymous), "page": "unread",
          "show_text": _('Show unread'), "config_show": False})
+    sidebar.extend([
+        {"glyph": "glyphicon-book", "text": _('Currently Reading'),
+         "link": 'web.books_list', "id": "in_progress",
+         "visibility": constants.SIDEBAR_READ_AND_UNREAD,
+         'public': (not current_user.is_anonymous), "page": "in_progress",
+         "show_text": _('Show Currently Reading Books'), "config_show": False},
+        {"glyph": "glyphicon-fast-forward", "text": _('Did not finish'),
+         "link": 'web.books_list', "id": "did_not_finish",
+         "visibility": constants.SIDEBAR_READ_AND_UNREAD,
+         'public': (not current_user.is_anonymous), "page": "did_not_finish",
+         "show_text": _('Show Books You Did Not Finish'), "config_show": False},
+        {"glyph": "glyphicon-pause", "text": _('On hold'),
+         "link": 'web.books_list', "id": "on_hold",
+         "visibility": constants.SIDEBAR_READ_AND_UNREAD,
+         'public': (not current_user.is_anonymous), "page": "on_hold",
+         "show_text": _('Show Books On Hold'), "config_show": False},
+    ])
     sidebar.append({"glyph": "glyphicon-random", "text": _('Discover'), "link": 'web.books_list', "id": "rand",
                     "visibility": constants.SIDEBAR_RANDOM, 'public': True, "page": "discover",
                     "show_text": _('Show Random Books'), "config_show": True})
-    sidebar.append({"glyph": "glyphicon-inbox", "text": _('Categories'), "link": 'web.category_list', "id": "cat",
+    sidebar.append({"glyph": "glyphicon-inbox", "text": _('Tags'), "link": 'web.category_list', "id": "cat",
                     "visibility": constants.SIDEBAR_CATEGORY, 'public': True, "page": "category",
-                    "show_text": _('Show Category Section'), "config_show": True})
+                    "show_text": _('Show Tags Section'), "config_show": True})
     sidebar.append({"glyph": "glyphicon-bookmark", "text": _('Series'), "link": 'web.series_list', "id": "serie",
                     "visibility": constants.SIDEBAR_SERIES, 'public': True, "page": "series",
                     "show_text": _('Show Series Section'), "config_show": True})
@@ -250,6 +267,16 @@ def get_sidebar_config(kwargs=None):
     else:
         g.favorite_book_ids = set()
 
+    # The custom read column is shared and boolean. Personal paused choices
+    # take precedence on Classic cards just as on the detail page and API.
+    g.paused_read_statuses = {}
+    if not current_user.is_anonymous:
+        g.paused_read_statuses = dict(ub.session.query(
+            ub.ReadBook.book_id, ub.ReadBook.read_status).filter(
+                ub.ReadBook.user_id == int(current_user.id),
+                ub.ReadBook.read_status.in_((ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                            ub.ReadBook.STATUS_ON_HOLD))).all())
+
     return sidebar, simple
 
 
@@ -273,9 +300,7 @@ def get_custom_column_sidebar_entries():
         # NOT a filter here: gating enumeration on the hierarchy detector is
         # what made Dewey/LCC columns disappear from the sidebar, from /me and
         # from OPDS with no way for a user to switch them back on.
-        for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
-                continue
+        for col in browsable_columns(calibre_db.get_cc_columns(config)):
             if not is_cc_visible(current_user, col.id):
                 continue
             entries.append({
@@ -297,10 +322,11 @@ def get_custom_column_sidebar_entries():
     return entries
 
 
-def get_custom_column_visibility_options():
+def get_custom_column_visibility_options(user=None):
     """All browsable custom columns with their per-user sidebar visibility
     state, for the named checkbox group on the profile page (/me).
     Disabled columns are included so they can be re-enabled."""
+    user = current_user if user is None else user
     options = []
     try:
         from . import calibre_db, db
@@ -310,13 +336,11 @@ def get_custom_column_visibility_options():
         # gets a checkbox. The option list and the sidebar are gated by the
         # SAME predicate on purpose -- if only one were filtered, a user could
         # tick a column with no sidebar entry and vice versa.
-        for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
-                continue
+        for col in browsable_columns(calibre_db.get_cc_columns(config)):
             options.append({
                 'id': col.id,
                 'name': col.name,
-                'visible': is_cc_visible(current_user, col.id),
+                'visible': is_cc_visible(user, col.id),
             })
     except Exception:
         log.debug("Could not build custom column visibility options", exc_info=True)
@@ -403,6 +427,19 @@ def _format_update_banner_message(current_version: str, latest_version: str) -> 
     }
 
 
+def _count_missing_translations(po) -> int:
+    """Count the live entries a user of this language still sees in English.
+
+    Uses polib's ``translated()``, the definition
+    ``scripts/generate_translation_status.py`` publishes in the README table:
+    plural entries are judged by ``msgstr_plural`` (polib leaves ``msgstr``
+    empty for them), every plural form must be filled, and a fuzzy entry
+    counts as missing because msgfmt leaves it out of the compiled .mo.
+    Obsolete (``#~``) entries are not shown anywhere, so they never count.
+    """
+    return sum(1 for entry in po if not entry.obsolete and not entry.translated())
+
+
 def _format_translation_missing_message(language: str, count: int) -> str:
     # Static msgid with named placeholders (see _format_update_banner_message):
     # the old ``_(f"...{language}...{count}...")`` interpolated before gettext,
@@ -482,7 +519,7 @@ def translations_missing_notification() -> None:
     if os.path.isfile(po_path):
         try:
             po = polib.pofile(po_path)
-            missing_count = sum(1 for entry in po if not entry.msgstr.strip())
+            missing_count = _count_missing_translations(po)
         except Exception as e:
             print(f"[translation-notification-service] Error reading {po_path}: {e}", flush=True)
     if missing_count <= 0:

@@ -26,15 +26,8 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUN_SCRIPT = (
-    REPO_ROOT
-    / "root"
-    / "etc"
-    / "s6-overlay"
-    / "s6-rc.d"
-    / "cwa-ingest-service"
-    / "run"
-)
+# The service body; its s6 run file only execs it (#2094).
+RUN_SCRIPT = REPO_ROOT / "scripts" / "services" / "cwa-ingest-service.sh"
 
 
 def _pid_exists(pid: int) -> bool:
@@ -119,12 +112,15 @@ def test_sigterm_stops_ingest_service_and_its_watcher_tree(
     cwa_as_abc = bin_dir / "cwa-as-abc"
     cwa_as_abc.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s\\n' \"$*\" > \"$WATCHER_READY_FILE\"\n"
         "printf '%s\\n' \"$*\" >> \"$WATCHER_INVOCATIONS_FILE\"\n"
         "printf '%s\\n' \"$BASHPID\" >> \"$WATCHER_PID_FILE\"\n"
         "if [ \"${WATCHER_IGNORE_TERM:-0}\" = 1 ]; then trap '' TERM; fi\n"
         "sleep 30 &\n"
         "printf '%s\\n' \"$!\" >> \"$WATCHER_PID_FILE\"\n"
+        # Readiness must publish complete contents after both levels exist.
+        # Redirection creates an empty file before printf writes its payload.
+        "printf '%s\\n' \"$*\" > \"${WATCHER_READY_FILE}.part\"\n"
+        "mv \"${WATCHER_READY_FILE}.part\" \"$WATCHER_READY_FILE\"\n"
         "wait \"$!\"\n"
     )
     cwa_as_abc.chmod(0o755)
@@ -135,6 +131,7 @@ def test_sigterm_stops_ingest_service_and_its_watcher_tree(
     env.update(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
+            "CWA_RUN_AS": "cwa-as-abc",
             "WATCH_FOLDER": str(watch_folder),
             "NETWORK_SHARE_MODE": network_share_mode,
             "CWA_WATCH_MODE": "inotify",
@@ -240,6 +237,7 @@ def test_sigterm_during_pid_publication_does_not_orphan_group(
     env.update(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
+            "CWA_RUN_AS": "cwa-as-abc",
             "WATCH_FOLDER": str(watch_folder),
             "NETWORK_SHARE_MODE": network_share_mode,
             "CWA_WATCH_MODE": "inotify",
@@ -368,6 +366,7 @@ def test_inotify_failure_still_falls_back_to_polling(tmp_path: Path):
     env.update(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
+            "CWA_RUN_AS": "cwa-as-abc",
             "WATCH_FOLDER": str(watch_folder),
             "NETWORK_SHARE_MODE": "false",
             "CWA_WATCH_MODE": "inotify",

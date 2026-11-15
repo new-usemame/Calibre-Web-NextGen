@@ -147,12 +147,12 @@ def test_stale_attempt_cannot_delete_source_adopted_by_publishing_replacement(fi
     repo, worker, job, now, calls, ingest = fixture
     original = repo.prepare_publication
     permits = []
-    def intercepted(job_id, token, publication_token):
+    def intercepted(job_id, token, publication_token, **kwargs):
         now[0] += 61
         replacement = repo.claim()
-        permits.append(original(job_id, replacement.token, publication_token))
+        permits.append(original(job_id, replacement.token, publication_token, **kwargs))
         repo.advance(job_id, replacement.token, 'publishing', 'failed', error_code='publication_io')
-        return original(job_id, token, publication_token)
+        return original(job_id, token, publication_token, **kwargs)
     monkeypatch.setattr(repo, 'prepare_publication', intercepted)
     assert worker.run_once().state == 'failed'
     permit = permits[0]
@@ -252,7 +252,7 @@ def _refuse_publication(monkeypatch):
 def _run_ingest_service(book, exit_code):
     """Drive the production shell service with a processor exit status."""
     root = Path(__file__).resolve().parents[2]
-    run_script = root / 'root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run'
+    run_script = root / 'scripts/services/cwa-ingest-service.sh'
     scratch = book.parent.parent / f'service-test-{exit_code}'
     scratch.mkdir()
     stub = scratch / 'processor.sh'

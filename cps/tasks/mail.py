@@ -101,10 +101,11 @@ class EmailSSL(EmailBase, smtplib.SMTP_SSL):
 
 class TaskEmail(CalibreTask):
     def __init__(self, subject, filepath, attachment, settings, recipient, task_message, text, id=0, internal=False,
-                 html=None, cover_user_id=None):
+                 html=None, cover_user_id=None, attachment_name=None):
         super(TaskEmail, self).__init__(task_message)
         self.subject = subject
         self.attachment = attachment
+        self.attachment_name = attachment_name or attachment
         self.settings = settings
         self.filepath = filepath
         self.recipient = recipient
@@ -155,7 +156,7 @@ class TaskEmail(CalibreTask):
                 if content_type is None or encoding is not None:
                     content_type = 'application/octet-stream'
                 main_type, sub_type = content_type.split('/', 1)
-                message.add_attachment(data, maintype=main_type, subtype=sub_type, filename=self.attachment)
+                message.add_attachment(data, maintype=main_type, subtype=sub_type, filename=self.attachment_name)
             else:
                 self._handleError("Attachment not found")
                 return
@@ -276,7 +277,9 @@ class TaskEmail(CalibreTask):
                 book_id=self.book_id,
                 book_format=(book_format or "").upper(),
                 file_path=file_path,
-                filename_for_matching=attachment_name,
+                # The MIME name may keep ":" (#2650), but a reader's storage
+                # cannot hold it, so match on the name the device can store.
+                filename_for_matching=(attachment_name or "").replace(":", "_") or None,
             )
         except Exception as ex:
             log.error("Failed to register KOReader checksum for emailed book %s: %s",
@@ -326,7 +329,7 @@ class TaskEmail(CalibreTask):
                         personal_copy[0], personal_copy[1] + "." + extension)
             except Exception as ex:
                 log.warning("Could not prepare personal-cover email attachment: %s", ex)
-            self._register_kosync_checksum(datafile, extension, filename)
+            self._register_kosync_checksum(datafile, extension, self.attachment_name)
             with open(datafile, 'rb') as file_:
                 data = file_.read()
             if personal_copy is not None:
@@ -353,7 +356,7 @@ class TaskEmail(CalibreTask):
                             personal_copy[0], personal_copy[1] + "." + extension)
                 except Exception as ex:
                     log.warning("Could not prepare personal-cover email attachment: %s", ex)
-                self._register_kosync_checksum(datafile, extension, filename)
+                self._register_kosync_checksum(datafile, extension, self.attachment_name)
                 with open(datafile, 'rb') as file_:
                     data = file_.read()
                 if personal_copy is not None:

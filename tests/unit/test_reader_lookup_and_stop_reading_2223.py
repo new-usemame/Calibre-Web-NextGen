@@ -15,6 +15,14 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from cps.services.read_status import stop_reading
 
 
+@pytest.fixture(autouse=True)
+def _share_place_switch_off(monkeypatch):
+    """These tests pin the shared (pre share-my-place) behaviour, which since
+    PR 5 needs the emergency off switch: unset now means gates on. The gated
+    behaviour is covered by tests/unit/test_share_place_*."""
+    monkeypatch.setenv("CWNG_SHARE_PLACE_GATES", "0")
+
+
 @pytest.mark.unit
 def test_stop_reading_changes_only_active_status_and_preserves_carriers():
     Base = declarative_base()
@@ -29,6 +37,7 @@ def test_stop_reading_changes_only_active_status_and_preserves_carriers():
         book_id = Column(Integer, nullable=False)
         read_status = Column(Integer, nullable=False)
         last_modified = Column(DateTime(timezone=True))
+        read_status_choice_at = Column(DateTime(timezone=True))
         last_time_started_reading = Column(DateTime(timezone=True))
         times_started_reading = Column(Integer, nullable=False)
 
@@ -68,6 +77,9 @@ def test_stop_reading_changes_only_active_status_and_preserves_carriers():
     still_finished = session.query(ReadBook).filter_by(user_id=10, book_id=8).one()
     saved = session.query(SavedCarrier).filter_by(user_id=10, book_id=7).one()
     assert changed.read_status == ReadBook.STATUS_UNREAD
+    assert changed.read_status_choice_at > modified.replace(tzinfo=None)
+    assert untouched.read_status_choice_at is None
+    assert still_finished.read_status_choice_at is None
     assert (changed.last_time_started_reading, changed.times_started_reading) == (
         started.replace(tzinfo=None), 4,
     )

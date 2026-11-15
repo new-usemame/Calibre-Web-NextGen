@@ -18,6 +18,7 @@ from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
 from ..ui_themes import config_theme_code
+from ..ui_font_preferences import seed_new_user_ui_font_defaults
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -244,8 +245,17 @@ def _me_payload(user):
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})
     default_filter = catalog_settings.get("default_filter") if isinstance(catalog_settings, dict) else None
+    custom_field_ids = catalog_settings.get("custom_field_ids") if isinstance(catalog_settings, dict) else None
+    custom_field_labels = catalog_settings.get("custom_field_labels") if isinstance(catalog_settings, dict) else None
     payload["catalog"] = {
         "default_filter": default_filter if isinstance(default_filter, dict) else None,
+        "custom_field_ids": (custom_field_ids if isinstance(custom_field_ids, list)
+                             and all(type(column_id) is int for column_id in custom_field_ids)
+                             else None),
+        "custom_field_labels": (custom_field_labels if isinstance(custom_field_labels, dict)
+                                and all(type(key) is str and type(value) is str
+                                        for key, value in custom_field_labels.items())
+                                else None),
     }
     payload["display"] = {
         # Some auth tests and bootstrap paths intentionally provide a minimal
@@ -560,6 +570,7 @@ def auth_register():
         content.theme = config_theme_code(getattr(config, "config_theme", None))
     except Exception:
         pass
+    seed_new_user_ui_font_defaults(content, config)
     try:
         ub.session.add(content)
         ub.session.commit()

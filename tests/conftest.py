@@ -627,6 +627,11 @@ def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
 
     Never raises. Failing to tidy up is not a reason to fail someone's test run.
     """
+    # Windows kill(pid, 0) calls TerminateProcess; it is not a liveness probe.
+    # Leave these directories alone until there is a non-destructive Windows
+    # owner check. Cleanup is optional; another running suite must stay safe.
+    if os.name == "nt":
+        return
     try:
         entries = os.listdir(base)
     except OSError:
@@ -649,13 +654,7 @@ def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
         except ProcessLookupError:
             pass          # owner is gone: reapable
         except SystemError:
-            # CPython on Windows can raise SystemError from os.kill rather than
-            # ProcessLookupError for a pid that no longer exists. Not an
-            # OSError, so the branch below cannot catch it, and an exception
-            # escaping here fails the whole run -- which is the one thing this
-            # function promises never to do. Treat it as "not reapable" and
-            # leave the directory; leaking a temp dir beats failing a suite.
-            continue
+            continue      # liveness unknown; preserve the owner's directory
         except OSError:
             continue      # e.g. EPERM -- another user's live process; leave it
         else:
@@ -683,6 +682,30 @@ def pytest_configure(config):
 
 
 # ---------------------------------------------------------------------------
+# `-n auto` worker cap
+# ---------------------------------------------------------------------------
+#
+# xdist's `-n auto` starts one worker per core. On a shared workstation that
+# starves everything else: parallel worktrees each running `-n auto` beside
+# Docker drove the 5-minute load to 680 and blocked other builds for hours.
+# Outside CI, `auto` therefore means at most LOCAL_AUTO_WORKER_CAP workers.
+# CI runners are dedicated, so there `auto` keeps xdist's own answer (CI set
+# to anything but empty, "0" or "false"). An explicit `-n 8` is never touched.
+
+LOCAL_AUTO_WORKER_CAP = 4
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_xdist_auto_num_workers(config):
+    if os.environ.get("CI", "").strip().lower() not in ("", "0", "false"):
+        return None
+    override = os.environ.get("CWNG_PYTEST_AUTO_WORKERS", "").strip()
+    if override.isdigit() and int(override) > 0:
+        return int(override)
+    return min(LOCAL_AUTO_WORKER_CAP, os.cpu_count() or 1)
+
+
+# ---------------------------------------------------------------------------
 # CI lane assignment (#1105)
 # ---------------------------------------------------------------------------
 #
@@ -707,6 +730,7 @@ from tests.quarantine import QUARANTINED  # noqa: E402
 LANE_BY_DIRECTORY = {
     "unit": "unit",
     "smoke": "smoke",
+    "fitness": "unit",
 }
 
 #: A test declaring one of these has already chosen its lane; the directory

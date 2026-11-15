@@ -12,6 +12,7 @@ local Json = require("json")
 local NetworkMgr = require("ui/network/manager")
 local PairingScreen = require("cwng_pairing_screen")
 local Setup = require("cwng_setup")
+local ServerCapabilities = require("server_capabilities")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -100,15 +101,27 @@ end
 function SetupFlow:connectWith(config, how, on_done)
     local client = newClient(self, config.server)
     Device:setIgnoreInput(true)
-    local called, authorized, _body, reason = pcall(client.authorize, client, config.username, config.password)
+    local called, authorized, body, reason = pcall(client.authorize, client, config.username, config.password)
     Device:setIgnoreInput(false)
     if not called or not authorized then
+        if called and reason == nil and self.settings.server == config.server then
+            ServerCapabilities.remember(self.settings, body)
+            G_reader_settings:saveSetting(self.settings_key, self.settings)
+            if self.checkBuiltinProgressSync then self:checkBuiltinProgressSync() end
+        end
         local why = (called and reason == nil) and "rejected" or "unreachable"
         logger.warn("CWNGSync: connection check failed", how, why, called and reason or authorized)
         if on_done then on_done(false, why) end
         return
     end
+    if (self.settings.server ~= config.server or self.settings.username ~= config.username)
+        and self.restoreSleepScreen and not self:restoreSleepScreen() then
+        if on_done then on_done(false, "unreachable") end
+        return
+    end
     self.settings.server = config.server
+    ServerCapabilities.remember(self.settings, body)
+    if self.checkBuiltinProgressSync then self:checkBuiltinProgressSync() end
     self.settings.username = config.username
     self.settings.password = config.password
     self.settings.library_enabled = true
@@ -125,6 +138,7 @@ function SetupFlow:connectWith(config, how, on_done)
     logger.info("CWNGSync: connected via", how, "to", hostOf(config.server))
     self:syncLibrary({
         force = true,
+        after_setup = true,
         on_done = function()
             self:syncDeviceCapabilities(false, false)
             self:collectDeliveries(false, false)
@@ -275,6 +289,7 @@ function SetupFlow:askServer(continue)
                         })
                         return
                     end
+                    if self.settings.server ~= server and self.restoreSleepScreen and not self:restoreSleepScreen() then return end
                     UIManager:close(dialog)
                     self.settings.server = server
                     continue(server, Setup.secureAlternative(typed))
@@ -397,6 +412,10 @@ end
 -- Forget this device's connection. The library folder and every downloaded
 -- book stay; only the sign-in goes.
 function SetupFlow:disconnect()
+    if self.restoreSleepScreen and not self:restoreSleepScreen() then
+        UIManager:show(InfoMessage:new{ text = _("Could not restore your previous sleep screen. Try again."), timeout = 5 })
+        return false
+    end
     self.settings.password = nil
     self.settings.username = nil
     G_reader_settings:saveSetting(self.settings_key, self.settings)
@@ -406,6 +425,7 @@ function SetupFlow:disconnect()
         text = _("This device is disconnected from CWNG. Your downloaded books stay on it."),
         timeout = 4,
     })
+    return true
 end
 
 return SetupFlow

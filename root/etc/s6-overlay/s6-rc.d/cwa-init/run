@@ -47,14 +47,9 @@ if [[ -f /usr/bin/kepubify ]] && [[ ! -x /usr/bin/kepubify ]]; then
     fi
 fi
 
-# Pre-stage some files & directories for permissions purposes
-if [ "$(id -u)" = "0" ]; then
-  mkdir -p /app/calibre-web-automated/cps/cache
-else
-  echo "[cwa-init] running as uid $(id -u) (not root); skipping cache directory creation in the read-only app tree"
-fi
+# Writable cache is created by the runtime user under /config, or CACHE_DIR.
 
-# permissions (skip chown on network shares for bind mounts, but still fix /app)
+# Config ownership (skip chown on network-share bind mounts).
 #
 # When the container is started as an arbitrary non-root user (`--user`,
 # `--userns=keep-id`), LSIO's init-adduser is skipped, `abc` keeps its
@@ -66,11 +61,8 @@ if [ "$(id -u)" != "0" ]; then
   echo "[cwa-init] running as uid $(id -u) (not root); skipping chown — files keep their current owner"
 elif [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
   echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping initial chown of /config"
-  chown -R abc:abc /app/calibre-web-automated/cps/cache
 else
-  chown -R abc:abc \
-    /config \
-    /app/calibre-web-automated/cps/cache
+  chown -R abc:abc /config
 fi
 
 export CALIBRE_DBPATH=/config
@@ -132,12 +124,24 @@ ensure_runtime_dirs() {
   fi
 }
 
+# CWA_PROCESSED_BOOKS_DIR can put the retained originals on another disk (#1883).
+CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
+if ! PROCESSED_BOOKS_DIR="$(python3 "${CWA_APP_PATHS}" processed_books_dir)"; then
+  echo "[cwa-init] ERROR: processed books path resolver failed; refusing to prepare an unknown path"
+  exit 1
+fi
+case "$PROCESSED_BOOKS_DIR" in
+  ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..|[!/]*)
+    echo "[cwa-init] ERROR: processed books path resolver returned an unsafe path; refusing to continue"
+    exit 1 ;;
+esac
+
 ensure_runtime_dirs \
-  /config/processed_books/converted \
-  /config/processed_books/imported \
-  /config/processed_books/failed \
-  /config/processed_books/fixed_originals \
-  /config/processed_books/duplicate_resolutions \
+  "$PROCESSED_BOOKS_DIR/converted" \
+  "$PROCESSED_BOOKS_DIR/imported" \
+  "$PROCESSED_BOOKS_DIR/failed" \
+  "$PROCESSED_BOOKS_DIR/fixed_originals" \
+  "$PROCESSED_BOOKS_DIR/duplicate_resolutions" \
   /config/log_archive \
   /config/.cwa_conversion_tmp
 
@@ -192,7 +196,6 @@ fi
 # cwa-init:ingest-directory:block-begin
 # Ensure the resolved ingest directory exists and is writable. app_paths keeps
 # the environment -> dirs.json -> default precedence identical to Python.
-CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
 if ! INGEST_DIR="$(python3 "${CWA_APP_PATHS}" ingest_folder)"; then
   echo "[cwa-init] ERROR: runtime ingest path resolver failed; refusing to prepare an unknown path"
   exit 1
@@ -211,8 +214,32 @@ esac
 mkdir -p "$INGEST_DIR" 2>/dev/null || true
 # A network share is exempt regardless of which supported configuration layer
 # supplied its mount point.
+#
+# NETWORK_SHARE_MODE is one switch for every path, and it is often on because
+# the LIBRARY is on a share while the ingest folder is not mounted at all. Then
+# /cwa-book-ingest is the image's own local volume, created owned by the
+# build-time uid 911, and a fresh one comes back on every update. Skipping it
+# left `abc` (moved to PUID) unable to write it, so uploads failed with
+# "Ingest directory not writable" until someone chowned it by hand (#2936).
+# So on a local filesystem, re-own the folder itself (not recursively: one
+# inode, enough for uploads and for the ingest service to move files out) when
+# the app user cannot write it. A share, or a type we cannot read, is left
+# alone as before.
+ingest_is_local_fs() {
+  case "$(stat -f -c %T -- "$1" 2>/dev/null)" in
+    ext2/ext3|ext4|xfs|btrfs|zfs|overlayfs|tmpfs|f2fs|jfs|reiserfs|bcachefs) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
-  echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping chown of $INGEST_DIR"
+  # A symlink is refused: chown without -h would re-own whatever it points at.
+  if [ ! -L "$INGEST_DIR" ] && ingest_is_local_fs "$INGEST_DIR" && ! cwa-as-abc test -w "$INGEST_DIR" -a -x "$INGEST_DIR" 2>/dev/null; then
+    echo "[cwa-init] NETWORK_SHARE_MODE=true, but $INGEST_DIR is on a local filesystem the app user cannot write; setting its owner to abc:abc"
+    chown abc:abc "$INGEST_DIR" 2>/dev/null \
+      || echo "[cwa-init] WARN: could not change the owner of $INGEST_DIR; uploads will fail until it is writable by PUID/PGID"
+  else
+    echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping chown of $INGEST_DIR"
+  fi
 else
   chown -R abc:abc "$INGEST_DIR" 2>/dev/null || true
 fi

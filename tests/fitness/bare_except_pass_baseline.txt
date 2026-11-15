@@ -1,0 +1,2 @@
+# Bare except: pass handlers per file in cps/ and scripts/ (fork #2644). Counts may only go down.
+# Regenerate: python -m tests.fitness.test_no_new_bare_except_pass --write-baseline

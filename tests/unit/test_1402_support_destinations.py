@@ -115,7 +115,7 @@ def _prepare_admin_save(monkeypatch):
     monkeypatch.setattr(admin, "flash", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(admin, "_", lambda value, **kwargs: value % kwargs if kwargs else value)
     monkeypatch.setattr(admin, "before_request", lambda: None)
-    monkeypatch.setattr(admin, "view_configuration", lambda: "rendered-config")
+    monkeypatch.setattr(admin, "view_configuration", lambda **kwargs: "rendered-config")
     return admin, settings, saved
 
 

@@ -4737,6 +4737,14 @@ msgstr "Actualiser la bibliothèque"
 msgid "Could not preview the resolution."
 msgstr "Impossible d’afficher l’aperçu de la résolution."
 
+#: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr "Demande de résolution invalide"
+
+#: cps/duplicates.py
+msgid "Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr "Les groupes de doublons ont changé. Affichez à nouveau l’aperçu de la résolution avant de supprimer."
+
 #: cps/spa_strings.py
 msgid "Could not resolve duplicates."
 msgstr "Impossible de résoudre les doublons."

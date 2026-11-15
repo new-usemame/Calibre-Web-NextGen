@@ -56,7 +56,6 @@ def mixed_library(monkeypatch):
         connection.execute(Finished.__table__.insert(), [{"id": 1, "book": 1, "value": 1}])
 
     monkeypatch.setattr(db, "cc_classes", {2: Subjects, 3: Pages, 4: Finished})
-    monkeypatch.setattr(db.CalibreDB, "_hier_cache", None, raising=False)
     calibre = db.CalibreDB.__new__(db.CalibreDB)
     session = sessionmaker(bind=engine)()
     calibre.session = session
@@ -173,3 +172,52 @@ def test_the_tree_page_shows_every_level_with_its_distinct_book_count():
     assert counts == {"Computers": "2", "Computers.DB": "1", "Computers.DB.SQL": "1",
                       "Fiction": "1", "Fiction.&lt;b&gt;": "1"}
     assert "<b>" not in html
+
+
+def test_configured_empty_hierarchy_and_atomic_dewey_do_not_depend_on_values(mixed_library):
+    session = mixed_library.session
+    session.execute(text("CREATE TABLE preferences (key TEXT PRIMARY KEY, val TEXT)"))
+    session.execute(text("INSERT INTO preferences VALUES ('categories_using_hierarchy', '[\"#subjects\"]')"))
+    session.execute(text("DELETE FROM custom_column_2"))
+    session.commit()
+    assert mixed_library.get_hierarchical_column_ids(ttl=0) == {2}
+    session.execute(text("INSERT INTO custom_column_2 (id,value) VALUES (1,'778'),(2,'778.3')"))
+    session.execute(text("UPDATE preferences SET val='[]' WHERE key='categories_using_hierarchy'"))
+    session.commit()
+    assert mixed_library.get_hierarchical_column_ids(ttl=0) == set()
+    assert mixed_library.is_flat_cc_column(2)
+
+
+def test_missing_calibre_hierarchy_preference_defaults_flat(mixed_library):
+    mixed_library.session.execute(text("CREATE TABLE preferences (key TEXT PRIMARY KEY, val TEXT)"))
+    mixed_library.session.commit()
+    assert mixed_library.get_hierarchical_column_ids(ttl=0) == set()
+
+
+def test_calibre_hierarchy_setting_change_is_visible_without_cache_expiry(mixed_library):
+    session = mixed_library.session
+    session.execute(text("CREATE TABLE preferences (key TEXT PRIMARY KEY, val TEXT)"))
+    session.execute(text("INSERT INTO preferences VALUES ('categories_using_hierarchy', '[]')"))
+    session.commit()
+    assert mixed_library.get_hierarchical_column_ids() == set()
+    session.execute(text("UPDATE preferences SET val='[\"#subjects\"]' WHERE key='categories_using_hierarchy'"))
+    session.commit()
+    assert mixed_library.get_hierarchical_column_ids() == {2}
+
+
+def test_hierarchy_preference_comes_from_attached_calibre_library(mixed_library):
+    session = mixed_library.session
+    session.execute(text("ATTACH DATABASE ':memory:' AS calibre"))
+    session.execute(text("CREATE TABLE calibre.preferences (key TEXT PRIMARY KEY, val TEXT)"))
+    session.execute(text("INSERT INTO calibre.preferences VALUES ('categories_using_hierarchy', '[\"#subjects\"]')"))
+    session.execute(text("DELETE FROM custom_column_2"))
+    session.commit()
+    assert mixed_library.get_hierarchical_column_ids() == {2}
+
+
+def test_unreadable_preference_is_not_an_invented_hierarchy(mixed_library, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    def unavailable(*args, **kwargs):
+        raise OperationalError('SELECT preference', {}, Exception('unavailable'))
+    monkeypatch.setattr(mixed_library.session, 'execute', unavailable)
+    assert mixed_library.get_hierarchical_column_ids() == set()

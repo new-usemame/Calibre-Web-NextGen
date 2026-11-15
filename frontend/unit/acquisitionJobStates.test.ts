@@ -48,7 +48,7 @@ test('cancel is offered only where the server accepts it', () => {
   // elsewhere produces a 409 the user never asked for.
   assert.deepEqual(
     [...ACQUISITION_CANCELLABLE_STATES].sort(),
-    ['awaiting_approval', 'downloading', 'queued', 'resolving', 'staged'],
+    ['awaiting_approval', 'awaiting_selection', 'downloading', 'queued', 'resolving', 'staged'],
   );
   for (const state of ['publishing', 'importing', 'imported', 'failed', 'cancelled']) {
     assert.equal(ACQUISITION_CANCELLABLE_STATES.has(state), false,

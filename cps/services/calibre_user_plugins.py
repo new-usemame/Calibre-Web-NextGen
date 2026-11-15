@@ -50,6 +50,8 @@ from typing import Mapping
 
 _ENV_VAR = "CWA_CALIBRE_USER_PLUGINS"
 _HOME = "/config"
+_PLUGINS_SUBPATH = ".config/calibre/plugins"
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
 def _home() -> str:
@@ -58,8 +60,6 @@ def _home() -> str:
     if not configured:
         return _HOME
     return os.path.dirname(configured) if configured.endswith(".db") else configured
-_PLUGINS_SUBPATH = ".config/calibre/plugins"
-_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
 def is_enabled() -> bool:
@@ -135,8 +135,13 @@ def ensure_plugins_dir() -> Path | None:
 
 
 def _customize_json() -> Path:
-    """Calibre's plugin registry under our HOME, read to skip re-registering on every boot."""
-    return Path(_home()) / ".config" / "calibre" / "customize.py.json"
+    """The calibre plugin registry. When a plugin is added via
+    `calibre-customize -a`, calibre records it under the "plugins" key of
+    `$CALIBRE_CONFIG_DIRECTORY/customize.py.json`. Registration runs with
+    that variable set to ``config_dir()`` (see ``apply_to_env``), so the
+    reader derives its path from the same function rather than from a
+    second literal: #2798 was the writer and the reader disagreeing."""
+    return config_dir() / "customize.py.json"
 
 
 def _registered_plugin_names() -> set[str]:
@@ -144,11 +149,11 @@ def _registered_plugin_names() -> set[str]:
     calibre. Empty set if customize.py.json doesn't exist or can't be
     parsed."""
     import json
-    customize_json = _customize_json()
-    if not customize_json.is_file():
+    registry = _customize_json()
+    if not registry.is_file():
         return set()
     try:
-        data = json.loads(customize_json.read_text())
+        data = json.loads(registry.read_text())
     except (json.JSONDecodeError, OSError):
         return set()
     plugins = data.get("plugins", {})
@@ -161,7 +166,7 @@ def auto_register_plugins(
     calibre_customize_binary: str = "calibre-customize",
 ) -> list[str]:
     """If enabled, scan the plugins dir for ``*.zip`` files and call
-    ``calibre-customize -a`` on each one with HOME=/config so calibre
+    ``calibre-customize -a`` on each one with the ingest env so calibre
     records it in customize.py.json. Returns the list of plugin names
     successfully registered this call (could be empty if nothing new).
 
@@ -194,14 +199,13 @@ def auto_register_plugins(
         return []
 
     # Inherit the ambient environment so `calibre-customize` resolves off
-    # the real PATH, but keep HOME pinned to the config tree: calibre
-    # writes its plugin registry under `$HOME/.config/calibre/`, which is
-    # exactly where `_customize_json()` above reads it back from. Letting
-    # HOME default to the service's own (`/root`) would write the registry
-    # somewhere nothing reads, so the short-circuit never fires and the
-    # running calibre never sees the plugins.
-    env = os.environ.copy()
-    env["HOME"] = _home()
+    # the real PATH, but pin the config dir the same way ingest does: calibre
+    # writes its plugin registry under `$CALIBRE_CONFIG_DIRECTORY`, which
+    # must be where `_customize_json()` above reads it back from. Letting the
+    # service's own value (the `/tmp` dir cwa-auto-library exports) through
+    # would write the registry somewhere nothing reads, so the short-circuit
+    # never fires and the running calibre never sees the plugins.
+    env = apply_to_env(os.environ.copy())
 
     registered: list[str] = []
     # `calibre-customize -a` copies the source .zip into

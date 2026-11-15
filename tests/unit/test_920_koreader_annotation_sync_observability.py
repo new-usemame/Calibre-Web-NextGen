@@ -264,7 +264,7 @@ def test_unmatched_count_does_not_miscount_a_non_array(wire, logs):
     ({"document": DIGEST, "annotations": [], "deleted": ["a"],
       "delete_source": "kobo"},
      {"error": "invalid_delete_source",
-      "message": "delete_source must be one of: koreader"}),
+      "message": "delete_source must be one of: koreader, textquote"}),
     ({"document": DIGEST,
       "annotations": [{"annotation_id": "x", "highlighted_text": 5}]},
      {"error": "invalid_annotation",

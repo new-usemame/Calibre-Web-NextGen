@@ -383,6 +383,7 @@ def _annotation_snapshot_or_503(
         )
         rendered = load_last_served_complete_set(
             user_id=user_id, book_id=book_id, log=log,
+            device_id=getattr(g, "annotation_origin_device_id", None),
         )
     except Exception:
         rendered = None
@@ -899,6 +900,7 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
                     user_id=current_user.id,
                     book_id=ownership.id,
                     log=log,
+                    device_id=getattr(g, "annotation_origin_device_id", None),
                 )
                 if rendered is None:
                     log.critical(
@@ -1020,6 +1022,7 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
                 user_id=current_user.id,
                 book_id=ownership.id,
                 log=log,
+                device_id=getattr(g, "annotation_origin_device_id", None),
             )
             emergency_limit = sticky_render_page_limit(
                 current_user.id, ownership.id, page_limit,
@@ -1349,6 +1352,9 @@ def _persist_owned_patch_atomically(
                 current_user.id, book.id, log=log, commit=False,
             ):
                 raise _AtomicOwnedPatchRefused("authority watermark refused")
+            from .services.kobo_removal import record_upload
+            if not deterministic_update_rejection:
+                record_upload(dispatch_kwargs.get('origin_device_id'), book.id)
             ub.session.flush()
         if ub.session_commit() is False:
             raise _AtomicOwnedPatchRefused("combined request commit failed")
@@ -1595,6 +1601,11 @@ def handle_annotations(entitlement_id):
                                 jsonify({"error": "Annotation capture temporarily unavailable"}),
                                 503,
                             )
+            if book is not None and not local_authority and not deterministic_update_rejection:
+                from .services.kobo_removal import record_upload
+                record_upload(dispatch_kwargs.get('origin_device_id'), book.id)
+                if not ub.session_commit():
+                    return make_response(jsonify({'error': 'Annotation capture temporarily unavailable'}), 503)
             patch_spool_outcome = "dispatch_completed"
             if book is not None and local_authority:
                 return _owned_annotation_patch_ack(

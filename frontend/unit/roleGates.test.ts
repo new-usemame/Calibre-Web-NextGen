@@ -85,8 +85,7 @@ test('the cover editor is offered only where some cover can be saved', () => {
 });
 
 test('a shelf is offered for adding or removing exactly where the server allows the change', () => {
-  // cps/shelf.py::check_shelf_edit_permissions: a private shelf by its owner
-  // only, a public shelf only with "Edit public shelves", its owner included.
+  // Owners may edit their own shelves; the role grants cross-account public edits.
   const shelves: [string, { is_public: boolean; is_owner: boolean }][] = [
     ['own private shelf', { is_public: false, is_owner: true }],
     ["another reader's private shelf", { is_public: false, is_owner: false }],
@@ -98,8 +97,8 @@ test('a shelf is offered for adding or removing exactly where the server allows 
 
   assert.deepEqual(offered(account({ edit_shelfs: true })),
     ['own private shelf', 'own public shelf', "another reader's public shelf"]);
-  // The role taken away after the reader made a shelf public: the server
-  // refuses that shelf to its owner as well.
-  assert.deepEqual(offered(account({ edit_shelfs: false })), ['own private shelf']);
-  assert.deepEqual(offered(undefined), ['own private shelf']);
+  assert.deepEqual(offered(account({ edit_shelfs: false })),
+    ['own private shelf', 'own public shelf']);
+  assert.deepEqual(offered(account({ edit_shelfs: true, anonymous: true })), []);
+  assert.deepEqual(offered(undefined), []);
 });

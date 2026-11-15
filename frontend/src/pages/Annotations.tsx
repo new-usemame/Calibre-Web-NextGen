@@ -202,7 +202,7 @@ export function Annotations({ id }: { id: string }) {
     ? ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue'),
          pink: t('Pink'), grey: t('Grey') } as Record<string, string>)[color] || t('Unknown color')
     : t('Unknown color'));
-  const sourceLabel = (source: string | null) => source === 'kobo' ? t('Kobo') : source === 'koreader' ? t('KOReader') : source === 'webreader' ? t('Web reader') : t('Unknown source');
+  const sourceLabel = (source: string | null) => source === 'kobo' ? t('Kobo') : source === 'koreader' ? t('KOReader') : source === 'webreader' ? t('Web reader') : source === 'textquote' ? t('Reading app') : t('Unknown source');
   const toggle = (annotationId: string) => setSelected((current) => {
     const next = new Set(current); if (next.has(annotationId)) next.delete(annotationId); else next.add(annotationId); return next;
   });

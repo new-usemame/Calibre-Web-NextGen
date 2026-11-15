@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Smartphone } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useT } from '../lib/i18n';
 import { annotationDeviceLabel } from '../lib/annotationDevices';
 import { DeviceInventory, type Device } from '../components/DeviceInventory';
 import { DeviceSummary } from '../components/DeviceSummary';
+import { DeviceSleepScreen } from '../components/DeviceSleepScreen';
 import { EmptyState } from '../components/EmptyState';
 import { SpinnerCentered } from '../components/Spinner';
 import styles from './DeviceDetail.module.css';
@@ -199,6 +200,13 @@ function PositionList({ data, loading, error, publicId }: {
 export function DeviceDetail({ publicId }: { publicId: string }) {
   const t = useT();
   const [tab, setTab] = useState<Tab>('all');
+  const [sleepDevice, setSleepDevice] = useState<Device | null>(null);
+  const sleepInvokerRef = useRef<HTMLButtonElement>(null);
+  const closeSleepScreen = useCallback(() => {
+    setSleepDevice(null);
+    requestAnimationFrame(() => sleepInvokerRef.current?.focus());
+  }, []);
+  useEffect(() => { setSleepDevice(null); }, [publicId]);
   const [role, setRole] = useState<'origin' | 'assigned'>('origin');
   const [page, setPage] = useState(1);
   const [positionOffset, setPositionOffset] = useState(0);
@@ -206,7 +214,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     publicId: string;
     device: Device;
   } | null>(null);
-  const registry = useQuery<{ devices: Device[] }>({
+  const registry = useQuery<{ devices: Device[]; share_place_gates?: boolean }>({
     queryKey: ['annotation-devices'],
     queryFn: () => apiGet('/api/annotations/devices'),
   });
@@ -290,6 +298,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     );
   }
   const activePanelId = `device-panel-${tab}`;
+  const browserName = registry.data?.share_place_gates === true ? t('Web reader') : t('Browser');
   return (
     <main className={styles.container}>
       <Link href="/account/devices" className={styles.back}>
@@ -297,8 +306,10 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </Link>
       <header className={styles.header}>
         <Smartphone aria-hidden="true" focusable={false} />
-        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</h1><p>{device.type === 'webreader' ? t('Browser reading source') : device.kind_label || device.type}</p></div>
+        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? browserName : device.label}</h1><p>{device.type === 'webreader' ? (registry.data?.share_place_gates === true ? browserName : t('Browser reading source')) : device.kind_label || device.type}</p></div>
       </header>
+      {device.type === 'koreader' && device.active && <button ref={sleepInvokerRef} type="button" className={styles.sleepScreenAction}
+        onClick={() => setSleepDevice({ ...device })}>{t('Sleep screen')}</button>}
       <section className={styles.summary} aria-label={t('Device summary')}>
         <DeviceSummary device={{
           ...device,
@@ -390,6 +401,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
           </nav>
         )}
       </section>
+      {sleepDevice && <DeviceSleepScreen key={sleepDevice.public_id} device={sleepDevice} onClose={closeSleepScreen} />}
     </main>
   );
 }

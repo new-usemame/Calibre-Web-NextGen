@@ -297,6 +297,8 @@ def test_system_shelf_template_names_are_lazy_translatable_but_canonical_names_a
         "recently_added": "Recently Added",
         "highly_rated": "Highly Rated",
         "currently_reading": "Currently Reading",
+        "did_not_finish": "Did not finish",
+        "on_hold": "On hold",
         "yet_to_read": "Yet to Read",
         "recent_publications": "Recent Publications",
     }

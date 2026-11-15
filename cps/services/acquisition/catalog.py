@@ -7,11 +7,11 @@ URLs and credentials stay server-side; this service never submits a download.
 import ipaddress
 import re
 import json
-from urllib.parse import quote
+from urllib.parse import quote, urldefrag
 
-from .contracts import Link, Search
+from .contracts import Link, Search, DIRECT_FORMATS, direct_format_allowed
 from .http import HTTPPolicy, TransportError, authorization, normalized_url, origin, run_transfer
-from .opds import CATALOG_TYPES, parse_catalog, parse_search_description
+from .opds import ACQUISITION, CATALOG_TYPES, PUBLICATION_TYPE, RELATIONS, parse_catalog, parse_search_description
 from .storage import NotFound
 
 
@@ -83,7 +83,7 @@ def connection_config(value):
     """Validate administrator-supplied OPDS configuration, without a probe."""
     if not isinstance(value, dict) or set(value) - {
             'endpoint', 'auth_kind', 'username', 'secret', 'credential_origins',
-            'private_origins', 'private_networks', 'allow_private_network'}:
+            'private_origins', 'private_networks', 'allow_private_network', 'allow_mobi'}:
         raise CatalogError('invalid_connection')
     endpoint = normalized_url(value.get('endpoint'))
     auth_kind = value.get('auth_kind', 'none')
@@ -91,7 +91,8 @@ def connection_config(value):
     if not all(isinstance(x, str) for x in (auth_kind, secret, username)):
         raise CatalogError('invalid_authentication')
     allow_private = value.get('allow_private_network', False)
-    if not isinstance(allow_private, bool):
+    allow_mobi = value.get('allow_mobi', False)
+    if not isinstance(allow_private, bool) or not isinstance(allow_mobi, bool):
         raise CatalogError('invalid_connection')
     auth = authorization(auth_kind, secret, username)
     def strings(key, default):
@@ -122,7 +123,7 @@ def connection_config(value):
         raise CatalogError('private_origin_and_network_required')
     return dict(endpoint=endpoint, auth_kind=auth_kind, username=username,
                 secret=secret, credential_origins=list(credentials),
-                private_origins=list(private), private_networks=list(networks))
+                private_origins=list(private), private_networks=list(networks), allow_mobi=allow_mobi)
 
 
 def policy(config, *, download=False):
@@ -184,12 +185,14 @@ def expand_search(search, query):
 
 
 class CatalogService:
-    def __init__(self, repository, *, transfer=run_transfer):
+    def __init__(self, repository, *, transfer=run_transfer, preferred_language=None):
         self.repository, self.transfer = repository, transfer
+        self.preferred_language = preferred_language
 
     def _fetch(self, config, url):
         document = self.transfer(url, policy(config), max_bytes=2 * 1024 * 1024)
-        return parse_catalog(document.body, document.url, media_type=document.content_type)
+        return parse_catalog(document.body, document.url, media_type=document.content_type,
+                             preferred_language=self.preferred_language)
 
     def probe(self, config):
         config = connection_config(config)
@@ -227,18 +230,34 @@ class CatalogService:
         elif query is not None:
             raise CatalogError('search_selection_required')
         catalog = self._fetch(config, url)
-        return self._present(owner_id, connection_id, catalog, expected_revision=snapshot.revision)
+        return self._present(owner_id, connection_id, catalog, expected_revision=snapshot.revision,
+                             format_config=config)
 
-    def _present(self, owner_id, connection_id, catalog, *, expected_revision=None):
+    def _present(self, owner_id, connection_id, catalog, *, expected_revision=None, format_config=None):
         def identity(kind, value):
             return self.repository.box.display_identity(json.dumps(
                 [kind, owner_id, connection_id, value], separators=(',', ':')))
         def selection(payload):
             return self.repository.create_offer(owner_id, connection_id, payload, expected_revision=expected_revision)
-        def navigation(links):
-            return [{'title': link.title or '', 'relations': list(link.relations),
+        def readable(link):
+            relations = set(link.relations)
+            if (link.templated or any(relation in RELATIONS or relation == 'sample'
+                    or relation.startswith(ACQUISITION) for relation in relations)):
+                return False
+            if catalog.is_publication_document and ('self' in relations
+                    or urldefrag(link.href)[0] == urldefrag(catalog.source_url)[0]):
+                return False
+            if link.media_type in CATALOG_TYPES:
+                return True
+            # Publication acquisition links can initiate loans/purchases. Only
+            # explicit metadata self/alternate links become detail reads.
+            return (link.media_type == PUBLICATION_TYPE and bool(relations)
+                    and relations <= {'self', 'alternate'}
+                    and urldefrag(link.href)[0] != urldefrag(catalog.source_url)[0])
+        def navigation(links, fallback_title=''):
+            return [{'title': link.title or fallback_title, 'relations': list(link.relations),
                      'selection': selection({'kind': 'navigation', 'href': link.href})}
-                    for link in links if link.media_type in CATALOG_TYPES and not link.templated]
+                    for link in links if readable(link)]
         def publications(values):
             result = []
             for publication in values:
@@ -246,10 +265,11 @@ class CatalogService:
                 seen = set()
                 for offer in publication.offers:
                     key = (offer.link.href, offer.link.media_type)
-                    if not offer.is_direct_download or key in seen:
+                    if (not offer.is_direct_download or key in seen
+                            or not direct_format_allowed(offer.link.media_type, format_config or {})):
                         continue
                     seen.add(key)
-                    offers.append({'format': 'EPUB' if offer.link.media_type == 'application/epub+zip' else 'PDF',
+                    offers.append({'format': DIRECT_FORMATS[offer.link.media_type][0],
                         'label': offer.link.title or None,
                         'identity': identity('file', [offer.link.href, offer.link.media_type]),
                         'relation': offer.relation, 'offer_id': selection({
@@ -260,7 +280,7 @@ class CatalogService:
                         [publication.title, sorted(item['identity'] for item in offers)]),
                     'authors': [person.name for person in publication.contributors if person.role == 'author'],
                     'languages': list(publication.languages), 'description': publication.description,
-                    'offers': offers, 'navigation': navigation(publication.links)})
+                    'offers': offers, 'navigation': navigation(publication.links, publication.title)})
             return result
         searches = []
         for search in catalog.searches:
@@ -284,8 +304,10 @@ class CatalogService:
             'facets': [{'title': facet.title, 'navigation': navigation(facet.navigation + facet.links)} for facet in catalog.facets]}
 
     def request(self, owner_id, connection_id, offer_id, idempotency_key, *, requires_approval=True, add_to_my_library=True):
+        config = self.repository.connection_config(connection_id).config
         def validate(payload):
-            if payload.get('kind') != 'acquisition' or payload.get('media_type') not in ('application/epub+zip', 'application/pdf'):
+            if (payload.get('kind') != 'acquisition'
+                    or not direct_format_allowed(payload.get('media_type'), config)):
                 raise NotFound('Download selection is unavailable')
         return self.repository.create_job(owner_id, offer_id, idempotency_key,
             requires_approval=requires_approval, add_to_my_library=add_to_my_library,

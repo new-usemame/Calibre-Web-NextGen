@@ -14,7 +14,7 @@ from . import api_v1
 from .. import ub, config, calibre_db, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
-from ..helper import send_mail, valid_email
+from ..helper import reset_reading_position, send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
 from ..cover_picker import designer_state
 from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
@@ -22,6 +22,7 @@ from ..services.ereader_send import (
     ereader_addresses, other_users_with_ereader, record_email_activity,
     send_includes_own_address,
 )
+from ..services.read_status import record_reader_open, stop_reading as stop_reading_status
 
 BATCH_MEMBERSHIP_LIMIT = 200
 
@@ -78,6 +79,120 @@ def _my_cover_payload(book, row):
         # book folder.
         "designer": designer_state(),
     }
+
+
+@api_v1.route("/books/<int:book_id>/stop-reading", methods=["POST"])
+@login_required_if_no_ano
+def stop_reading_book(book_id):
+    """Clear only the caller's active marker, preserving every position carrier."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+
+    # Match book detail's visibility boundary, including the caller's own
+    # hidden/archived books and books available through a public shelf.
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    result = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
+    )
+    if result is None:
+        return _err("not_found", "Book not found", 404)
+    _, custom_read, _ = result
+    if config.config_read_column and custom_read:
+        return _err("finished", "Finished books cannot be removed from Currently Reading", 409)
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == int(current_user.id),
+        ub.ReadBook.book_id == int(book_id),
+    ).one_or_none()
+    if row is not None and row.read_status == ub.ReadBook.STATUS_FINISHED:
+        return _err("finished", "Finished books cannot be removed from Currently Reading", 409)
+
+    changed = stop_reading_status(ub.session, current_user.id, book_id, ub.ReadBook)
+    if changed:
+        if not ub.session_commit("Stopped reading book {} for user {}".format(
+                book_id, current_user.id)):
+            return _err("update_failed", "Could not update reading status", 500)
+    return jsonify({"ok": True, "changed": changed})
+
+
+@api_v1.route("/books/<int:book_id>/clear-position", methods=["POST"])
+@login_required_if_no_ano
+def clear_book_reading_position(book_id):
+    """Clear the caller's saved reading position for one book, everywhere (#2831).
+
+    Removes the web-reader bookmark, the Kobo bookmark, the KOSync rows and
+    every device's own journal row for this user and book, so web, Kobo and
+    KOReader stop disagreeing. The read status is left alone (a finished book
+    stays read); "Mark as unread" is the call that changes status. A device
+    still holding its own place can push it back on its next sync.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+
+    # Same visibility boundary as the other per-user book actions.
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    if calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
+    ) is None:
+        return _err("not_found", "Book not found", 404)
+
+    cleared = reset_reading_position(
+        ub.session, current_user.id, book_id, keep_read_status=True)
+    if cleared:
+        if not ub.session_commit("Cleared reading position of book {} for user {}".format(
+                book_id, current_user.id)):
+            return _err("update_failed", "Could not clear the reading position", 500)
+    return jsonify({"ok": True, "cleared": cleared})
+
+
+@api_v1.route("/books/<int:book_id>/reader-open", methods=["POST"])
+@login_required_if_no_ano
+def reader_open_book(book_id):
+    """Record an open in the new UI reader, as the classic ``/read`` route does (#2750).
+
+    The SPA posts this once per open outside lookup mode. A refresh is not a
+    new session and a finished book stays finished (``record_reader_open``).
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    if calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
+    ) is None:
+        return _err("not_found", "Book not found", 404)
+
+    record_reader_open(current_user, int(book_id))
+    if not ub.session_commit("Reader open of book {} for user {}".format(
+            book_id, current_user.id)):
+        return _err("update_failed", "Could not update reading status", 500)
+    return jsonify({"ok": True})
 
 
 @api_v1.route("/books/<int:book_id>/my-cover", methods=["GET"])

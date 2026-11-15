@@ -7,6 +7,7 @@ import {
   useCreateAppPassword, useRevokeAppPassword,
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
   useUpdateLibraryMode,
+  useUpdateNamedPreferences,
 } from '../lib/queries';
 import type { Device } from '../components/DeviceInventory';
 import { Avatar } from '../components/Avatar';
@@ -52,6 +53,7 @@ export function Account() {
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
   const updateLibraryMode = useUpdateLibraryMode();
+  const updateNamedPreferences = useUpdateNamedPreferences();
   const [libraryModeError, setLibraryModeError] = useState('');
 
   // Kobo two-way annotation sync (Stage 0 — a preference surface over a
@@ -191,6 +193,7 @@ export function Account() {
 
   const activeRoles = Object.entries(account.role).filter(([, v]) => v);
   const selectedTheme = THEMES.find((o) => o.slug === theme);
+  const showOriginalFilename = me?.preferences?.show_original_filename !== false;
 
   /* Non-optimistic on purpose: this preference guards a feature that can
    * destroy device-side annotations once it goes live, so the control shows
@@ -303,6 +306,38 @@ export function Account() {
           ) : <p className={styles.muted}>{t('Your library contents are managed by an administrator.')}</p>}
         </fieldset>
         <span className={libraryModeError ? styles.msgErr : undefined} role="alert">{libraryModeError}</span>
+      </section>
+
+      <section className={styles.card} aria-labelledby="book-details-title">
+        <fieldset className={styles.scopeGroup}>
+          <legend id="book-details-title" className={styles.cardTitle}>{t('Book details')}</legend>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={showOriginalFilename}
+              disabled={updateNamedPreferences.isPending}
+              onChange={(event) => updateNamedPreferences.mutate({
+                show_original_filename: event.currentTarget.checked,
+              })} />
+            <span className={styles.scopeText}><strong>{t('Show original filename')}</strong>
+              <small>{t('Keep the imported file name visible on book detail pages.')}</small></span>
+          </label>
+          {updateNamedPreferences.isError && (
+            <p className={styles.msgErr} role="alert">{t('Could not save.')}</p>
+          )}
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.show_library_rating !== false}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ show_library_rating: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Show library rating')}</strong>
+              <small>{t('Show the labelled Calibre score alongside your own rating.')}</small></span>
+          </label>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={me?.preferences?.share_book_ratings === true}
+              disabled={updateNamedPreferences.isPending}
+              onChange={event => updateNamedPreferences.mutate({ share_book_ratings: event.currentTarget.checked })} />
+            <span className={styles.scopeText}><strong>{t('Share my ratings in the household average')}</strong>
+              <small>{t('Off by default. Only opted-in ratings count, and names are never shown. If you are the only person sharing a rating for a book, the average is your score.')}</small></span>
+          </label>
+        </fieldset>
       </section>
 
       {/* Kobo two-way annotation sync — Stage 0 (BETA). Both server gates stay
@@ -491,11 +526,14 @@ export function Account() {
 
         <div className={styles.field}>
           <label className={styles.toggle}>
-            <input type="checkbox" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
+            <input type="checkbox" aria-describedby="acc-kobo-sync-help" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
             {shelfMarkAudience(me?.features) === 'ereader'
               ? t('Sync only selected shelves to e-readers (Kobo and KOReader)')
               : t('Sync only selected shelves to Kobo')}
           </label>
+          <p id="acc-kobo-sync-help" className={styles.hint}>
+            {t('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')}
+          </p>
           <label className={styles.toggle}>
             <input type="checkbox" checked={opdsSync} onChange={(e) => setOpdsSync(e.target.checked)} />
             {t('Expose only selected shelves over OPDS')}

@@ -171,7 +171,7 @@ def bump_last_modified(metadata_db, book_id, *, dry_run):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--host", default="10.0.20.250",
+    parser.add_argument("--host", default="192.0.2.250",
                         help="the Kobo's current address (DHCP moves it; sweep for dropbear on :22)")
     parser.add_argument("--book-id", type=int, required=True,
                         help="a DISPOSABLE book already synced to the device")

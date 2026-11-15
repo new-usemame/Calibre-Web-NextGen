@@ -119,12 +119,15 @@ def test_sigterm_stops_ingest_service_and_its_watcher_tree(
     cwa_as_abc = bin_dir / "cwa-as-abc"
     cwa_as_abc.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s\\n' \"$*\" > \"$WATCHER_READY_FILE\"\n"
         "printf '%s\\n' \"$*\" >> \"$WATCHER_INVOCATIONS_FILE\"\n"
         "printf '%s\\n' \"$BASHPID\" >> \"$WATCHER_PID_FILE\"\n"
         "if [ \"${WATCHER_IGNORE_TERM:-0}\" = 1 ]; then trap '' TERM; fi\n"
         "sleep 30 &\n"
         "printf '%s\\n' \"$!\" >> \"$WATCHER_PID_FILE\"\n"
+        # Readiness must publish complete contents after both levels exist.
+        # Redirection creates an empty file before printf writes its payload.
+        "printf '%s\\n' \"$*\" > \"${WATCHER_READY_FILE}.part\"\n"
+        "mv \"${WATCHER_READY_FILE}.part\" \"$WATCHER_READY_FILE\"\n"
         "wait \"$!\"\n"
     )
     cwa_as_abc.chmod(0o755)

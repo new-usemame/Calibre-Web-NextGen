@@ -38,3 +38,30 @@ export function getReaderContentUrl(
 ): string {
   return contentUrl || `/show/${id}/${format.toLowerCase()}`;
 }
+
+/** Keep lookup mode on server-reader fallbacks, preserving source and fragments. */
+export function withLookupMode(target: string, lookup: boolean): string {
+  if (!lookup) return target;
+  const hashIndex = target.indexOf('#');
+  const pathAndQuery = hashIndex < 0 ? target : target.slice(0, hashIndex);
+  const hash = hashIndex < 0 ? '' : target.slice(hashIndex);
+  const queryIndex = pathAndQuery.indexOf('?');
+  const path = queryIndex < 0 ? pathAndQuery : pathAndQuery.slice(0, queryIndex);
+  const params = new URLSearchParams(queryIndex < 0 ? '' : pathAndQuery.slice(queryIndex + 1));
+  params.set('lookup', '1');
+  return `${path}?${params.toString()}${hash}`;
+}
+
+/**
+ * Hand the page's own fragment to the bundled pdf.js viewer (#2537).
+ *
+ * pdf.js reads its viewer options (`page`, `zoom`, `search`, `nameddest`,
+ * `pagemode`) from its own location hash, so `/app/view/7/pdf#page=12` only
+ * opens on page 12 if the iframe URL carries that same `#page=12`.
+ */
+export function withViewerHash(target: string, hash: string): string {
+  const hashIndex = target.indexOf('#');
+  const base = hashIndex < 0 ? target : target.slice(0, hashIndex);
+  const fragment = hash.startsWith('#') ? hash.slice(1) : hash;
+  return fragment ? `${base}#${fragment}` : base;
+}

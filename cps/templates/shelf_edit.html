@@ -8,14 +8,15 @@
       <label for="title">{{_('Title')}}</label>
       <input type="text" class="form-control" name="title" id="title" value="{{ shelf.name if shelf.name != None }}">
     </div>
-    {% if current_user.role_edit_shelfs() %}
+    {% if current_user.role_share_shelfs() or (shelf_id and shelf.is_public and (shelf.user_id == current_user.id or current_user.role_edit_shelfs())) %}
+      <input type="hidden" name="_visibility_present" value="1">
       <div class="checkbox">
         <label>
           <input type="checkbox" name="is_public" {% if shelf.is_public == 1 %}checked{% endif %}> {{_('Share with Everyone')}}
         </label>
       </div>
     {% endif %}
-    {% if kobo_sync_enabled and sync_only_selected_shelves %}
+    {% if kobo_sync_enabled and sync_only_selected_shelves and (not shelf_id or shelf.user_id == current_user.id) %}
       <div class="checkbox">
           <label> <input type="checkbox" name="kobo_sync" {% if shelf.kobo_sync == 1 %}checked{% endif %}>
               {{ _('Sync this shelf with Kobo device') }}

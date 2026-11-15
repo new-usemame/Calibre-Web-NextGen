@@ -1,0 +1,8 @@
+.box { margin: var(--sp-3) 0; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.controls { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.controls label { font-weight: 600; }
+.controls select { min-height: 44px; min-width: 160px; max-width: 100%; flex: 1; padding: 8px 12px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-md); font: inherit; }
+.controls button { min-height: 44px; }
+.hint, .status { font-size: var(--fs-sm); color: var(--text-muted); margin: var(--sp-2) 0 0; }
+.warning, .error { color: var(--danger-text); margin: var(--sp-2) 0 0; }
+@media (max-width: 480px) { .controls { align-items: stretch; } .controls label { width: 100%; } .controls select, .controls button { width: 100%; } }

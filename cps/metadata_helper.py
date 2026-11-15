@@ -7,6 +7,7 @@
 
 import json
 import re
+import copy
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -79,6 +80,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
             
         # Try each provider in order
         metadata_found = False
+        series_fill = _NOT_ASKED
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
@@ -123,6 +125,16 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 # rather than the book we changed (fork #1164).
                 searched_title = book.title
 
+                # A matched record without a series takes one from a provider
+                # that carries series, applied with the rest of the record.
+                if not (getattr(metadata, "series", None) or "").strip():
+                    if series_fill is _NOT_ASKED:
+                        series_fill = _find_missing_series(book, search_query, provider_id,
+                                                           provider_hierarchy, enabled_map)
+                    if series_fill:
+                        metadata = copy.copy(metadata)
+                        metadata.series, metadata.series_index = series_fill
+
                 # Apply metadata to book
                 if _apply_metadata_to_book(book, metadata, calibre_db_instance):
                     log.info(f"Successfully applied metadata from {provider.__name__} for book: {searched_title}")
@@ -131,6 +143,9 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                     
             except Exception as e:
                 log.warning(f"Error fetching metadata from provider {provider_id}: {e}")
+                # Each provider must start on a usable session: one that failed
+                # mid-flush would otherwise fail every provider after it (#2435).
+                calibre_db_instance.session.rollback()
                 continue
                 
         calibre_db_instance.session.close()
@@ -154,6 +169,9 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         bool: True if metadata was successfully applied
     """
     cover_stage = None
+    # Read before any flush can fail: afterwards the session refuses to load
+    # expired attributes until it is rolled back.
+    book_id = getattr(book, 'id', 'unknown')
     previous_cover_metadata = (
         getattr(book, 'has_cover', 0),
         getattr(book, 'last_modified', None),
@@ -167,11 +185,13 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         
         updated = False
         
-        # Update title - only if enabled in settings
+        # Update title - only if enabled in settings. Smart mode only fills a
+        # missing title. It used to take the longer one, and a summary or study
+        # guide's title is nearly always longer than the book's.
         if (cwa_settings.get('auto_metadata_update_title', True) and 
             metadata.title and metadata.title.strip()):
             if use_smart_application:
-                if len(metadata.title.strip()) > len(book.title.strip()):
+                if not _has_meaningful_title(book):
                     book.title = metadata.title.strip()
                     updated = True
             else:
@@ -199,8 +219,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_description', True) and 
             metadata.description and metadata.description.strip()):
             current_description = book.comments[0].text if book.comments else ""
+            # Smart mode only fills a missing description, for the same reason as
+            # the title: the longer text is often a summary's disclaimer.
             if use_smart_application:
-                if len(metadata.description.strip()) > len(current_description):
+                if not _has_meaningful_description(current_description):
                     if book.comments:
                         book.comments[0].text = metadata.description.strip()
                     else:
@@ -247,14 +269,17 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         calibre_db_instance.session.add(tag)
                     if tag not in book.tags:
                         book.tags.append(tag)
-            updated = True
+                        # Only a tag the book lacked is a change: a recorded
+                        # change rewrites the file and re-sends it to a Kobo.
+                        updated = True
             
         # Update series if available and enabled in settings. Smart mode keeps an
         # existing series rather than overwriting it (fork #403).
         if (cwa_settings.get('auto_metadata_update_series', True) and
             hasattr(metadata, 'series') and metadata.series and metadata.series.strip() and
             not (use_smart_application and book.series)):
-            series = calibre_db_instance.get_series_by_name(metadata.series.strip())
+            series = (calibre_db_instance.get_series_by_name(metadata.series.strip())
+                      or _library_series_like(calibre_db_instance, metadata.series.strip(), book))
             if not series:
                 series = db.Series(metadata.series.strip(), metadata.series.strip())
                 calibre_db_instance.session.add(series)
@@ -300,13 +325,12 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             not (use_smart_application and book.ratings)):
             try:
                 rating_value = float(metadata.rating)
-                if 0 <= rating_value <= 10:  # Calibre uses 0-10 scale
-                    if book.ratings:
-                        book.ratings[0].rating = int(rating_value * 2)  # Convert to Calibre's 0-10 scale
-                    else:
-                        rating = db.Ratings(rating=int(rating_value * 2))
-                        calibre_db_instance.session.add(rating)
-                        book.ratings = [rating]
+                # MetaRecord.rating is 0-5 stars; calibre stores half-stars, 0-10.
+                if 0 < rating_value <= 5:
+                    # ratings is a shared lookup table (one row per value), so link
+                    # the book to the row for its value rather than inserting a
+                    # duplicate or rewriting a row other books point at (#2435).
+                    book.ratings = [_rating_row(calibre_db_instance.session, int(rating_value * 2))]
                     updated = True
             except (ValueError, TypeError):
                 pass
@@ -333,6 +357,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         book.identifiers.append(new_identifier)
                         updated = True
         
+        # Text fields changed above. Recorded before the cover step, which also
+        # sets ``updated``, so the enforcement record below can tell them apart.
+        text_updated = updated
+
         # Cover image (fork #404): download and apply through the same
         # validated path the manual editor uses. Smart mode only fills a
         # missing cover; the per-book cover lock is honored in both modes.
@@ -346,7 +374,11 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 cover_updated = True
                 book.has_cover = 1
 
-        if cover_updated:
+        if updated:
+            # Any applied field is a book change and has to be recorded as one,
+            # so Kobo sync (``last_modified > sync_token``) picks up a fetched
+            # description or publisher too, not only a cover.
+            #
             # A replaced cover IS a book change and has to be recorded as one.
             # Writing cover.jpg alone leaves Books.last_modified untouched, and
             # that column is the version token every cover URL carries — so an
@@ -373,7 +405,11 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 if not published:
                     cover_stage.discard()
                     cover_stage = None
-                    book.has_cover, book.last_modified = previous_cover_metadata
+                    if text_updated:
+                        # The text fields did change, so keep their timestamp.
+                        book.has_cover = previous_cover_metadata[0]
+                    else:
+                        book.has_cover, book.last_modified = previous_cover_metadata
                     try:
                         calibre_db_instance.session.commit()
                     except Exception as compensation_error:
@@ -382,6 +418,8 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                             f"after publish failure {publish_error}: {compensation_error}"
                         )
                         calibre_db_instance.session.rollback()
+                    if text_updated:
+                        _queue_metadata_enforcement(book, {'metadata': True})
                     return updated_without_cover
                 cover_stage = None
                 # #707: the new cover must also be embedded into the book file,
@@ -390,10 +428,10 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 # AFTER the commit: the enforcer reads the book back out of
                 # metadata.db, so a record published ahead of the transaction
                 # can be consumed against the pre-commit row.
-                try:
-                    helper.log_metadata_change(book, {'cover': True})
-                except Exception as e:
-                    log.warning(f"Cover enforcement record failed for book {book.id}: {e}")
+                changed = {'cover': True}
+                if text_updated:
+                    changed['metadata'] = True
+                _queue_metadata_enforcement(book, changed)
                 # Regenerate the cached thumbnails so the new cover shows in
                 # the grid, same as a manual cover edit.
                 try:
@@ -402,16 +440,38 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                         last_modified=getattr(book, 'last_modified', None))
                 except Exception as e:
                     log.warning(f"Cover thumbnail refresh failed for book {book.id}: {e}")
+            elif text_updated:
+                # Text-only fetch: queue the same file embed a manual edit gets,
+                # after the commit for the same reason as the cover above.
+                _queue_metadata_enforcement(book, {'metadata': True})
 
         return updated
         
     except Exception as e:
-        log.error(f"Error applying metadata to book {getattr(book, 'id', 'unknown')}: {e}")
+        calibre_db_instance.session.rollback()
+        log.error(f"Error applying metadata to book {book_id}: {e}")
         if cover_stage is not None:
             cover_stage.discard()
-        calibre_db_instance.session.rollback()
         book.has_cover, book.last_modified = previous_cover_metadata
         return False
+
+
+def _queue_metadata_enforcement(book, changed):
+    """Queue the file-level embed for ``book`` (#707). Best-effort, never raises."""
+    try:
+        from cps import helper
+        helper.log_metadata_change(book, changed)
+    except Exception as e:
+        log.warning(f"Metadata enforcement record failed for book {getattr(book, 'id', '?')}: {e}")
+
+
+def _rating_row(session, value):
+    """Return the shared ``ratings`` row for ``value``, creating it if the library has none."""
+    rating = session.query(db.Ratings).filter(db.Ratings.rating == value).first()
+    if rating is None:
+        rating = db.Ratings(rating=value)
+        session.add(rating)
+    return rating
 
 
 def _apply_cover_from_metadata(book, metadata):
@@ -449,6 +509,160 @@ def _apply_cover_from_metadata(book, metadata):
 def _normalize_isbn(value):
     """Strip separators and upper-case so ISBNs compare regardless of formatting."""
     return "".join(ch for ch in str(value) if ch.isalnum()).upper()
+
+
+# Trailing words that name the kind of series rather than the series itself:
+# "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
+_SERIES_KIND_WORDS = frozenset({
+    "series", "saga", "trilogy", "chronicles", "cycle", "sequence", "novels",
+    "duology", "dilogy", "dylogy", "quartet", "quintet",
+})
+
+# How many series-capable providers the fill step may ask per book.
+_SERIES_FILL_LIMIT = 3
+
+# Series-capable providers the fill asks even when the configured order leaves
+# them out: both carry series data of their own. Any other provider (Amazon,
+# Goodreads and the rest scrape pages that throttle bots) is asked only when
+# the administrator put it in the order.
+_SERIES_FILL_EXTRAS = ("hardcover", "kobo")
+
+# The fill has not run yet for this book (None means it ran and found nothing).
+_NOT_ASKED = object()
+
+# A trailing note in brackets: "(Publication Order)", "[Legends]".
+_SERIES_NOTE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]\s*$")
+
+
+def _series_key(name):
+    """A series name folded for comparison: case, Latin accents, punctuation, a
+    leading "The", trailing kind words (``_SERIES_KIND_WORDS``) and a trailing
+    note in brackets ("(Publication Order)") ignored. Letters of every script
+    are kept, so two Japanese titles never fold to the same bare number."""
+    text = _SERIES_NOTE.sub("", name or "")
+    folded = []
+    for ch in unicodedata.normalize("NFC", text):
+        base = unicodedata.normalize("NFD", ch)[0]
+        folded.append(base if base.isascii() else ch)
+    words = re.findall(r"[^\W_]+", "".join(folded).casefold())
+    if words[:1] == ["the"] and len(words) > 1:
+        words = words[1:]
+    while len(words) > 1 and words[-1] in _SERIES_KIND_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _series_note(name):
+    """The trailing bracketed note of a series name, folded, or ""."""
+    found = _SERIES_NOTE.search(name or "")
+    return found.group(0).strip(" ()[]").casefold() if found else ""
+
+
+def _library_series_like(calibre_db_instance, name, book=None):
+    """The library's existing series that ``name`` is another spelling of, or None.
+
+    Sources disagree on what to call a series (Open Library's "Dune Chronicles",
+    Hardcover's "The Chronicles of Narnia (Publication Order)"), and every new
+    spelling became a second series beside the first. Only an exact key match counts, and only when it is unique.
+    """
+    wanted = _series_key(name)
+    if not wanted:
+        return None
+    try:
+        rows = calibre_db_instance.session.query(db.Series).all()
+    except Exception:
+        return None
+    note = _series_note(name)
+
+    def same_series(row):
+        # Two different notes name two different series: "Star Wars (Legends)"
+        # is not "Star Wars (Canon)", and a publication-order position is
+        # wrong inside a chronological-order series.
+        row_name = getattr(row, "name", "")
+        row_note = _series_note(row_name)
+        return (_series_key(row_name) == wanted
+                and not (note and row_note and note != row_note)
+                and _shares_an_author(row, book))
+
+    matches = [row for row in rows if same_series(row)]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _shares_an_author(series_row, book):
+    """False when the library series holds books and none is by one of the
+    book's authors: a stem shared across authors ("Inheritance Cycle",
+    "Inheritance Trilogy") is two series, not two spellings of one."""
+    if book is None:
+        return True
+    shelved = list(getattr(series_row, "books", None) or [])
+    if not shelved:
+        return True
+    wanted = {getattr(a, "name", "").casefold() for a in getattr(book, "authors", None) or []}
+    wanted.discard("")
+    return any(getattr(a, "name", "").casefold() in wanted
+               for other in shelved for a in (getattr(other, "authors", None) or []))
+
+
+def _find_missing_series(book, search_query, applied_provider_id, provider_hierarchy,
+                         enabled_map):
+    """Ask series-capable providers for the series a matched record left empty.
+
+    Auto-fetch applies the first provider whose result passes the match gate
+    and stops. When that provider carries no series (Google Books, Open Library
+    and IBDb never do), a provider further down that has one was never asked.
+    This asks the providers marked ``FILLS_SERIES``: those in the configured
+    order first, then ``_SERIES_FILL_EXTRAS`` if the order leaves them out, at
+    most ``_SERIES_FILL_LIMIT`` of them, and returns ``(series, position)``
+    from the first result that passes the same gate, or None.
+
+    The caller folds the answer into the record it is about to apply, so the
+    book gets one commit and one file-embed record. Never raises: the caller
+    is inside its provider loop, and an exception there would send the loop on
+    to the next provider's whole record.
+    """
+    try:
+        return _find_missing_series_unguarded(book, search_query, applied_provider_id,
+                                              provider_hierarchy, enabled_map)
+    except Exception as e:
+        log.warning(f"Series fill failed for book {getattr(book, 'id', 'unknown')}: {e}")
+        return None
+
+
+def _find_missing_series_unguarded(book, search_query, applied_provider_id, provider_hierarchy,
+                                   enabled_map):
+    try:
+        cwa_settings = CWA_DB().get_cwa_settings()
+    except Exception:
+        return None
+    if not cwa_settings.get('auto_metadata_update_series', True) or getattr(book, "series", None):
+        return None
+    from cps.metadata_constants import metadata_provider_enabled
+    by_id = {p.__id__: p for p in metadata_providers}
+    ordered = [pid for pid in provider_hierarchy if pid in by_id]
+    ordered += [pid for pid in _SERIES_FILL_EXTRAS if pid in by_id and pid not in ordered]
+    asked = 0
+    for provider_id in ordered:
+        provider = by_id[provider_id]
+        if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+            continue
+        if asked >= _SERIES_FILL_LIMIT:
+            break
+        asked += 1
+        try:
+            results = provider.search(search_query, "", "en") or []
+        except Exception as e:
+            log.info(f"Series fill: {provider.__name__} failed for book {book.id}: {e}")
+            continue
+        chosen = _select_metadata_result(results, _book_isbn(book),
+                                         book_title=book.title, book_authors=book.authors) if results else None
+        series = (getattr(chosen, "series", None) or "") if chosen is not None else ""
+        if not isinstance(series, str) or not series.strip():
+            continue
+        position = getattr(chosen, "series_index", None)
+        log.info(f"Series fill: {series.strip()} #{position or ''} from {provider.__name__} for book {book.id}")
+        return series.strip(), position
+    return None
 
 
 def _book_isbn(book):
@@ -518,12 +732,86 @@ def _normalize_title(value):
     return text
 
 
+# Words that announce a volume number, with the spelling each one compares as,
+# so "Vol. 2", "Volume 2" and "Vol 2" are the same words (fork #2479). A roman
+# numeral or number word only counts as a number straight after one of these
+# ("Part II", "Book Two"), because "I" and "one" are ordinary words elsewhere.
+_VOLUME_MARKERS = {
+    "vol": "vol", "vols": "vol", "volume": "vol", "part": "part", "pt": "part",
+    "book": "book", "bk": "book", "no": "no", "number": "no", "issue": "issue",
+    "episode": "episode", "season": "season", "chapter": "chapter",
+    "tome": "tome",
+}
+
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+}
+
+_ROMAN_NUMERALS = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8,
+    "ix": 9, "x": 10, "xi": 11, "xii": 12, "xiii": 13, "xiv": 14, "xv": 15,
+    "xvi": 16, "xvii": 17, "xviii": 18, "xix": 19, "xx": 20,
+}
+
+# A marker written straight onto its number: "Vol12", "Pt3".
+_GLUED_VOLUME_RE = re.compile(r"^(" + "|".join(
+    sorted(_VOLUME_MARKERS, key=len, reverse=True)) + r")(\d+)$")
+
+
+def _title_tokens(value):
+    """Normalized title words with volume markers and the numbers after them
+    in one spelling: "Volume Two" and "Vol. 2" both become ``vol 2``
+    (fork #2479)."""
+    tokens = []
+    for word in _normalize_title(value).split():
+        glued = _GLUED_VOLUME_RE.match(word)
+        if glued:
+            tokens.extend((_VOLUME_MARKERS[glued.group(1)], str(int(glued.group(2)))))
+            continue
+        if word.isdecimal():
+            tokens.append(str(int(word)))
+            continue
+        # "no" is too common a word ("No One Lives Forever") to turn the word
+        # after it into a number; "No. 5" is still read through its digits.
+        if tokens and tokens[-1] in _VOLUME_MARKERS.values() and tokens[-1] != "no":
+            number = _NUMBER_WORDS.get(word) or _ROMAN_NUMERALS.get(word)
+            if number:
+                tokens.append(str(number))
+                continue
+        tokens.append(_VOLUME_MARKERS.get(word, word))
+    return tokens
+
+
 def _title_content_words(value):
     """The identifying words of a title, in order, with joining words removed
     (fork #1164). Order is kept so "Blood and Iron" doesn't match "Iron and
-    Blood"."""
-    return tuple(w for w in _normalize_title(value).split()
-                 if w not in _TITLE_STOPWORDS)
+    Blood". A volume marker right before its number is dropped, so "One
+    Piece, Vol. 12" and "ONE PIECE 12" are the same words (fork #2479)."""
+    tokens = _title_tokens(value)
+    return tuple(
+        w for i, w in enumerate(tokens)
+        if w not in _TITLE_STOPWORDS
+        and not (w in _VOLUME_MARKERS.values()
+                 and i + 1 < len(tokens) and tokens[i + 1].isdecimal()))
+
+
+def _title_numbers(value):
+    """The numbers in a title that tell one volume from another: every bare
+    number (so years count too) plus a number word or roman numeral after a
+    volume marker. An ordinal such as "60th" is not one (fork #2479)."""
+    return {int(w) for w in _title_tokens(value) if w.isdecimal()}
+
+
+def _volume_numbers_conflict(left, right):
+    """True when both titles carry numbers and they differ, as in "One Piece,
+    Vol. 12" against "Vol. 13": 0.94 similar as text, same author, different
+    book. A title with a number on one side only is left to the other checks
+    (fork #2479)."""
+    a, b = _title_numbers(left), _title_numbers(right)
+    return bool(a and b and a != b)
 
 
 def _title_similarity(left, right):
@@ -542,7 +830,12 @@ def _title_similarity(left, right):
     words_a, words_b = _title_content_words(left), _title_content_words(right)
     if words_a and words_a == words_b:
         return 1.0
+    if _volume_numbers_conflict(left, right):
+        return 0.0
     return SequenceMatcher(None, a, b).ratio()
+
+
+_PLACEHOLDER_AUTHORS = frozenset(("", "unknown"))
 
 
 def _author_name_tokens(authors):
@@ -564,6 +857,11 @@ def _author_name_tokens(authors):
     tokens = set()
     for author in (authors or []):
         name = author if isinstance(author, str) else getattr(author, "name", "")
+        # Calibre's "Unknown" placeholder is not a name (same rule as
+        # _has_meaningful_authors). Counted as one, it disagreed with every
+        # candidate, so a book with no author could never be filled in.
+        if (name or "").strip().lower() in _PLACEHOLDER_AUTHORS:
+            continue
         tokens.update(w for w in _normalize_title(name).split() if len(w) > 2)
     return tokens
 
@@ -642,11 +940,25 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
     return best
 
 
+def _has_meaningful_title(book):
+    """True if the book has a title other than empty or Calibre's 'Unknown'."""
+    title = (getattr(book, "title", "") or "").strip().lower()
+    return title not in ("", "unknown")
+
+
+def _has_meaningful_description(text):
+    """True if the description has visible text. Markup with no text in it
+    (``<p></p>``, ``&nbsp;``) counts as missing, so smart mode can fill it."""
+    visible = re.sub(r"<[^>]*>", " ", text or "")
+    visible = re.sub(r"&nbsp;|&#160;|\u00a0", " ", visible)
+    return bool(visible.strip())
+
+
 def _has_meaningful_authors(book):
     """True if the book already has a real author (not empty / not the Calibre
     'Unknown' placeholder), so smart mode won't overwrite it (fork #403)."""
     authors = getattr(book, "authors", None) or []
-    return any((getattr(a, "name", "") or "").strip().lower() not in ("", "unknown")
+    return any((getattr(a, "name", "") or "").strip().lower() not in _PLACEHOLDER_AUTHORS
                for a in authors)
 
 

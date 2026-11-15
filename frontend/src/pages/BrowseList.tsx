@@ -1,7 +1,7 @@
-import { useMemo, useState, useDeferredValue } from 'react';
+import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import { Link } from 'wouter';
 import { LayoutGrid, List, Search, Pencil, Trash2, Check, X, Merge } from 'lucide-react';
-import { useEntityList, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
+import { useEntityList, usePagedEntityList, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import { ApiError } from '../lib/api';
 import { SpinnerCentered } from '../components/Spinner';
@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState';
 import { useI18n } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { usePersistentBool } from '../lib/usePersistentBool';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import styles from './BrowseList.module.css';
 
 interface BrowseListProps {
@@ -156,12 +157,28 @@ function TagRow({ id, name, count, href }: { id: number | string; name: string; 
   );
 }
 
-export function BrowseList({ plural, title }: BrowseListProps) {
+export function BrowseList(props: BrowseListProps) {
+  // Wouter renders the same component type for Authors, Series, Tags, etc. Key
+  // the view by its route scope so list-specific filters reset on navigation.
+  return <BrowseListContent key={props.plural} {...props} />;
+}
+
+function BrowseListContent({ plural, title }: BrowseListProps) {
   const { t, locale } = useI18n();
-  const { data, isLoading, error } = useEntityList(plural);
+  const paged = plural === 'authors' || plural === 'series' || plural === 'publishers';
+  const fullList = useEntityList(paged ? '' : plural);
+  const me = useMe().data;
   // Tag maintenance is an editor action; everyone else sees the plain list.
-  const canEditTags = plural === 'tags' && !!useMe().data?.role?.edit;
+  const canEditTags = plural === 'tags' && !!me?.role?.edit;
   const [q, setQ] = useState('');
+  const minimumScope: 'authors' | 'series' | null = plural === 'authors' || plural === 'series' ? plural : null;
+  const hasBookCountFilter = minimumScope !== null;
+  const [minimumBooks, setMinimumBooks] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [q]);
   const [compact, setCompact] = usePersistentBool('cwng:browse-list-compact', false);
   const translatedItems = useMemo(() => {
     const translated = t(title);
@@ -186,19 +203,33 @@ export function BrowseList({ plural, title }: BrowseListProps) {
   // Typing stays responsive on 10k-entity libraries: the filter re-runs at
   // deferred priority instead of on every keystroke (#1813 item 6).
   const deferredQ = useDeferredValue(q);
+  const parsedMinimum = !hasBookCountFilter || minimumBooks.trim() === '' ? null : Number(minimumBooks);
+  const minimumInvalid = hasBookCountFilter && minimumBooks.trim() !== '' &&
+    (!/^\d+$/.test(minimumBooks.trim()) || !Number.isSafeInteger(parsedMinimum) || (parsedMinimum ?? 0) < 1);
+  const pages = usePagedEntityList(plural, debouncedQ, minimumInvalid ? null : parsedMinimum, paged && !minimumInvalid);
+  const data = paged ? pages.data?.pages[0] : fullList.data;
+  const isLoading = paged ? pages.isLoading : fullList.isLoading;
+  const error = paged ? pages.error : fullList.error;
   const items = useMemo(() => {
-    const all = data?.items ?? [];
-    if (!deferredQ.trim()) return all;
+    if (minimumInvalid) return [];
+    if (paged) return pages.data?.pages.flatMap((page) => page.items) ?? [];
     const needle = deferredQ.trim().toLowerCase();
-    return all.filter((e) => e.name.toLowerCase().includes(needle));
-  }, [data, deferredQ]);
+    return (fullList.data?.items ?? []).filter((e) => !needle || e.name.toLowerCase().includes(needle));
+  }, [paged, pages.data, fullList.data, deferredQ, minimumInvalid]);
+  const totalItems = paged ? pages.data?.pages[0]?.unfiltered_total ?? 0 : data?.items.length ?? 0;
+  const shownItems = minimumInvalid ? 0 : paged ? pages.data?.pages[0]?.total ?? 0 : items.length;
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => { void pages.fetchNextPage(); },
+    enabled: paged && !minimumInvalid && q.trim() === debouncedQ &&
+      !!pages.hasNextPage && !pages.isFetching && !pages.isPlaceholderData && !pages.error,
+  });
 
   return (
     <main className={styles.container}>
       <div className={styles.header}>
         <div className={styles.heading}>
           <h1 className={styles.title}>{t(title)}</h1>
-          {data && <span className={styles.count}>{data.items.length}</span>}
+          {data && <span className={styles.count}>{totalItems}</span>}
         </div>
         <div className={styles.viewToggle} role="group" aria-label={t('View')}>
           <button type="button" onClick={() => setCompact(false)} aria-pressed={!compact} aria-label={t('Grid view')}>
@@ -210,27 +241,50 @@ export function BrowseList({ plural, title }: BrowseListProps) {
         </div>
       </div>
 
-      {data && data.items.length > 8 && (
-        <div className={styles.searchWrap}>
-          <Search size={15} className={styles.searchIcon} />
-          <input
-            type="search"
-            className={styles.searchInput}
-            placeholder={t('Filter {items}…', { items: translatedItems })}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label={t('Filter {items}', { items: translatedItems })}
-          />
+      {data && (hasBookCountFilter || data.items.length > 8) && (
+        <div className={styles.filters}>
+          <div className={styles.searchWrap}>
+            <Search size={15} className={styles.searchIcon} aria-hidden="true" />
+            <input
+              type="search"
+              className={styles.searchInput}
+              placeholder={t('Filter {items}…', { items: translatedItems })}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label={t('Filter {items}', { items: translatedItems })}
+            />
+          </div>
+          {hasBookCountFilter && (
+            <div className={styles.minimumWrap}>
+              <label htmlFor="minimum-books">{t('Minimum books')}</label>
+              <input
+                id="minimum-books"
+                type="text"
+                inputMode="numeric"
+                className={styles.minimumInput}
+                value={minimumBooks}
+                onChange={(e) => setMinimumBooks(e.target.value)}
+                aria-invalid={minimumInvalid || undefined}
+                aria-describedby={minimumInvalid ? 'minimum-books-error' : 'minimum-books-help'}
+              />
+              <span id="minimum-books-help" className={styles.filterHelp}>{t('Leave blank to show any number of books. The minimum is inclusive.')}</span>
+              {minimumInvalid && <span id="minimum-books-error" className={styles.filterError} role="alert">{t('Enter a whole number of at least 1.')}</span>}
+            </div>
+          )}
         </div>
       )}
+
+      {hasBookCountFilter && data && <p className={styles.resultStatus} role="status" aria-live="polite">
+        {t('Showing {shown} of {total} {items}.', { shown: shownItems, total: totalItems, items: translatedItems })}
+      </p>}
 
       {isLoading ? (
         <SpinnerCentered size={36} />
       ) : error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load.')} />
       ) : items.length === 0 ? (
-        <EmptyState message={q
-          ? t('No matching {items} for "{query}".', { items: translatedItems, query: q })
+        <EmptyState message={minimumInvalid ? t('Correct the minimum books value to see results.') : (q || parsedMinimum !== null)
+          ? t('No matching {items} for the selected filters.', { items: translatedItems })
           : t('No {items} yet.', { items: translatedItems })} />
       ) : (
         <ul className={compact ? styles.list : gridClass} role="list">
@@ -249,6 +303,10 @@ export function BrowseList({ plural, title }: BrowseListProps) {
           })}
         </ul>
       )}
+      {paged && items.length > 0 && pages.hasNextPage && (
+        <div ref={sentinelRef} style={{ height: 1 }} aria-hidden="true" />
+      )}
+      {paged && pages.isFetchingNextPage && <SpinnerCentered size={24} />}
     </main>
   );
 }

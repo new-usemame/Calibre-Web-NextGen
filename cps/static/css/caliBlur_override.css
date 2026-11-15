@@ -49,9 +49,11 @@ input[type=checkbox] {accent-color: #cc7b19;}
   }
 }
 
+/* The localized mirror is decoration. Reveal the canonical value while typing. */
 input.datepicker {color: transparent}
-input.datepicker:focus {color: transparent}
-input.datepicker:focus + input {color: #555}
+input.datepicker:focus {color: inherit}
+input.datepicker:has(+ input.fake-input.hidden) {color: inherit}
+input.datepicker:focus + input.fake-input {visibility: hidden}
 
 @media only screen and (max-width: 767px) {
         .row-fluid > .col-sm-2 {
@@ -346,4 +348,11 @@ body:not(.admin) > div.container-fluid > div > div.col-sm-10 > div.discover.rand
     color: #fff !important;
     white-space: normal !important;
     overflow: visible !important;
+}
+
+/* #1511: the Classic desktop theme paints a second tag-list heading. Use
+   the escaped localized page title instead of its hard-coded English copy.
+   Keep the theme's positioning and mobile hidden-heading rule unchanged. */
+body.catlist > div.container-fluid > div > div.col-sm-10 > div.container[data-heading]:before {
+    content: attr(data-heading);
 }

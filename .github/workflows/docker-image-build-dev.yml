@@ -9,8 +9,8 @@ name: Build & Push - Dev - Split Strategy
 
 on:
   # Dev channel (release-train policy, 2026-06-06): every merge to main builds
-  # and pushes :dev + :dev-<n> to GHCR. teenyverse (the operator's household
-  # instance) tracks :dev as the canary; public releases batch via the daily
+  # and pushes :dev + :dev-<n> to GHCR. The household host
+  # tracks :dev as the canary; public releases batch via the daily
   # release train (see LOOP.md / CLAUDE.md "Release policy"). Docs- and
   # tests-only changes skip the build — they can't change the image behavior.
   push:

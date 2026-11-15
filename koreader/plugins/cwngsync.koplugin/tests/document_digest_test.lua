@@ -43,7 +43,8 @@ local function loadProductionFunction(env)
     local header = "function CWNGSync:getDocumentDigest(file_path)"
     local start = source:find(header, 1, true)
     assert(start, "getDocumentDigest not found in main.lua")
-    local stop = source:find("\nend\n", start, true)
+    local content_start = assert(source:find("function CWNGSync:getDocumentContentDigest(file_path)", start, true))
+    local stop = source:find("\nend\n", content_start, true)
     assert(stop, "getDocumentDigest is unterminated")
 
     local body = source:sub(start, stop + 4)
@@ -167,6 +168,7 @@ local function digest(opts, file_path)
     local env, self_stub, calls = newEnv(opts)
     local CWNGSync = loadProductionFunction(env)
     self_stub.getDocumentDigest = CWNGSync.getDocumentDigest
+    self_stub.getDocumentContentDigest = CWNGSync.getDocumentContentDigest
     return CWNGSync.getDocumentDigest(self_stub, file_path), calls
 end
 

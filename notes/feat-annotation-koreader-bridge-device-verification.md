@@ -23,7 +23,7 @@ Until this passes, keep the plugin's "Sync highlights" toggle default **off**.
   `koreader/plugins/`).
 - The Kobo also has a CW-synced **kepub** of a test book (so it has KoboSpans +
   a `Bookmark`-compatible VolumeID).
-- CWNG (`cwn-local` or teenyverse) reachable from the device, with **KOReader
+- CWNG (`cwn-local` or the household host) reachable from the device, with **KOReader
   sync enabled** (`cwa_settings.koreader_sync_enabled = 1`).
 - In the plugin: Set NextGen Server, Login, then enable **Sync highlights
   (experimental, Kobo only)**.

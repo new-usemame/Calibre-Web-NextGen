@@ -205,14 +205,15 @@ def make_link_rewriter(current_page, owner, docroot, repo_dir):
         attr, target = m.group(1), m.group(2)
         if is_external(target):
             return m.group(0)
-        return f'{attr}="{abs_url(target, image=(attr == "src"))}"'
+        return f'{attr}="{abs_url(target, image=(attr in ("src", "srcset")))}"'
 
     def rewrite(text):
         # Markdown anchor links first, then markdown links/images, then raw HTML
-        # attributes (the README masthead uses <img src=...>).
+        # attributes (the README masthead uses <img src=...>; the progress
+        # tracker's <picture> uses <source srcset=...> for its dark charts).
         text = re.sub(r"\[([^\]]+)\]\(#([\w-]+)\)", anchor_sub, text)
         text = re.sub(r"(?<!\])(!?)\[([^\]]+)\]\(([^)]+)\)", md_sub, text)
-        text = re.sub(r'\b(src|href)="([^"]+)"', attr_sub, text)
+        text = re.sub(r'\b(src|srcset|href)="([^"]+)"', attr_sub, text)
         return text
     return rewrite
 

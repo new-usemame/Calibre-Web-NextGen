@@ -12,6 +12,7 @@ import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
+import { FileIsbnSuggestions } from '../components/FileIsbnSuggestions';
 import { RichTextEditor } from '../components/RichTextEditor';
 import type { MetadataUpdate, MetaResult, EditableCustomColumn } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
@@ -98,6 +99,7 @@ function stripTags(s: string) { return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g
 export function EditBook({ id }: { id: string }) {
   const t = useT();
   const { data: meta, isLoading, error } = useBookMetadata(id);
+  const { data: book } = useBook(id);
   const update = useUpdateMetadata(id);
   const setCover = useSetCover(id);
   const me = useMe().data;
@@ -255,6 +257,9 @@ export function EditBook({ id }: { id: string }) {
           </Button>
         )}
       </div>
+      {book?.original_filename && (
+        <p className={styles.hint}>{t('Imported as')}: {book.original_filename}</p>
+      )}
       {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
       <CoverManager id={id} />
@@ -344,6 +349,11 @@ export function EditBook({ id }: { id: string }) {
             <Plus size={14} /> {t('Add identifier')}
           </button>
           <span className={styles.hint}>{t('Each type (isbn, amazon, google, doi…) may appear once.')}</span>
+          <FileIsbnSuggestions key={id} bookId={id} disabled={update.isPending} onUse={isbn => setForm(current => current ? {
+            ...current,
+            identifiers: [...current.identifiers.filter(identifier =>
+              !['isbn', 'isbn10', 'isbn_10', 'isbn13', 'isbn_13'].includes(identifier.type.trim().toLowerCase())), { type: 'isbn', val: isbn }],
+          } : current)} />
         </div>
 
         {/* Custom columns — the library's own fields (#pages, #status, …). The

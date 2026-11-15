@@ -13,7 +13,7 @@ page to collect anonymous feedback about the redesign. Maximally anonymous —
   free tier, IP terminates at Cloudflare, never reaches any of our servers). Railway
   acceptable fallback if a Worker token isn't created (then front it with Cloudflare
   for the same IP-edge privacy).
-- **Domain:** `calibrewebnextgen.com` (Porkbun, LLC `legitimateapps`, free WHOIS
+- **Domain:** `calibrewebnextgen.com` (Porkbun, free WHOIS
   privacy). Available @ **$11.08/yr** (checked 2026-06-30).
   - **apex `calibrewebnextgen.com`** → a WIP homepage (frontend-design, CWNG dark+amber
     look) that just links to the GitHub repo.

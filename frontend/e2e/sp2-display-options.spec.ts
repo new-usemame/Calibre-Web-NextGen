@@ -108,15 +108,36 @@ test('View settings radios use the active theme accent', async ({ page }) => {
   // The row-count change refetches the list, which briefly disables Export in
   // this menu (#2475). Grade the settled colours, not a frame of the fade back.
   await expect(menu.getByRole('button', { name: 'Export CSV' })).toBeEnabled();
+  // The keyboard checks above scroll the page to reveal the last option, and
+  // how far depends on what sits above the toolbar (a help announcement, the
+  // intro card, state other lanes change on the shared server). At some
+  // offsets the sticky top bar covers half of the read-status filter row, and
+  // axe reports Unread and Read as partially obscured 20.7px targets (#2654,
+  // CI run 43248923191). That is the page mid-scroll, not a control that is
+  // too small, so the scan grades the toolbar and the open menu from the top.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  await expect(menu).toBeVisible();
   await menu.evaluate(element => Promise.all(element.getAnimations({ subtree: true })
     .filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime))
     .map(animation => animation.finished)));
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
+  // Report every failing node, not just the rule id: #2654 has failed this
+  // scan intermittently with only "target-size" in the log, which cannot name
+  // the element or its measured size. axe's failureSummary carries the size.
   expect(results.violations
     .filter((violation) => ['critical', 'serious'].includes(violation.impact ?? ''))
-    .map((violation) => violation.id)).toEqual([]);
+    .flatMap((violation) => violation.nodes.map((node) => [
+      violation.id,
+      JSON.stringify(node.target),
+      (node.failureSummary ?? '').replace(/\s+/g, ' ').trim(),
+      node.html.slice(0, 200),
+    ].join(' | ')))).toEqual([]);
 });
 
 test('library density control persists and produces a denser mobile grid', async ({ page }) => {

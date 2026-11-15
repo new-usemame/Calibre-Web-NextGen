@@ -818,3 +818,49 @@ def test_checked_echo_ten_minutes_old_loses_to_a_stock_push(world, checked_a):
 
     assert _shared_percent(world) == pytest.approx(40.0)
     assert _get_json(world)["percentage"] == pytest.approx(0.40)
+
+
+# == #2843: the PUT reply says whether the push was kept ======================
+# Additive fields: ``accepted`` (this push is now the place kept for it),
+# ``shared`` (that place is the account's shared one) and, when not accepted,
+# ``kept_percentage`` (the fraction kept instead). Stock plugins ignore them.
+
+def test_reply_says_a_checked_push_was_kept_and_shared(world, two_checked):
+    reply = _put(world, 70, device_id="kindle-a", name="Kindle A")
+
+    assert reply["accepted"] is True
+    assert reply["shared"] is True
+    assert "kept_percentage" not in reply
+
+
+def test_reply_says_a_stale_checked_echo_was_not_kept(world, two_checked):
+    now = time.time()
+    _put(world, 70, device_id="kindle-a", name="Kindle A", client_at=now - 300)
+    _put(world, 30, device_id="kindle-b", name="Kindle B", client_at=now - 200)
+
+    reply = _put(world, 70, device_id="kindle-a", name="Kindle A", client_at=now - 300)
+
+    assert reply["accepted"] is False
+    assert reply["shared"] is True
+    assert reply["kept_percentage"] == pytest.approx(0.30)
+
+
+def test_reply_says_an_unchecked_push_is_kept_but_not_shared(world):
+    _stock_reader_sets_shared(world, 70)
+
+    reply = _put(world, 90, device_id="kindle-a", name="Kindle A")
+
+    assert reply["accepted"] is True
+    assert reply["shared"] is False
+    assert "kept_percentage" not in reply
+
+
+def test_reply_says_an_older_unchecked_report_was_not_kept(world):
+    now = time.time()
+    _put(world, 50, device_id="kindle-a", name="Kindle A", client_at=now - 60)
+
+    reply = _put(world, 20, device_id="kindle-a", name="Kindle A", client_at=now - 300)
+
+    assert reply["accepted"] is False
+    assert reply["shared"] is False
+    assert reply["kept_percentage"] == pytest.approx(0.50)

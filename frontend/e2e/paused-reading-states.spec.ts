@@ -72,7 +72,12 @@ test('Classic pause and explicit resume are reflected in the New UI', async ({ s
   const book = await firstBook(page);
   await page.goto(`/book/${book.id}`);
   await page.locator('#read-status-select').selectOption('did_not_finish');
+  // A successful Classic save reloads the page. The badge can render before
+  // that reload's load event, and a goto during it is an interrupted
+  // navigation (WebKit: "internal error"), so wait for the reload to finish (#2940).
+  const reloaded = page.waitForEvent('load');
   await page.locator('#read-status-form button[type=submit]').click();
+  await reloaded;
   await expect(page.locator('#did-not-finish-badge')).toBeVisible();
   await page.goto(`/app/book/${book.id}`);
   const status = page.getByRole('combobox', { name: 'Reading status', exact: true });
@@ -159,6 +164,10 @@ test('a wrapped cover-action error stays inside the viewport after content growt
     // A shorter desktop viewport puts the last real grid row below the fold,
     // so native scrolling can expose its entire trigger at the lower edge.
     await page.setViewportSize({ width: page.viewportSize()!.width, height: 600 });
+    // Shelves follow the Library's density (#980), and the default Compact fits
+    // all seven cards in one row. Comfortable keeps a second row below the fold.
+    await page.goto('/app');
+    await page.evaluate(() => localStorage.setItem('cwng:catalog-density-v1', 'comfortable'));
     await page.goto(`/app/shelf/${shelf.id}`);
     const cards = page.locator('main [data-book-id]');
     await expect(cards.first()).toBeVisible();

@@ -98,13 +98,15 @@ def _stop_spool_retention_threads_after_test():
 
 def _hold_advisory_lock(lock_path, ready, release):
     """Hold the real cross-process spool lock until the parent releases it."""
+    from cps.services import file_lock
+
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        assert file_lock.acquire(fd)
         ready.send(True)
         release.recv()
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        file_lock.release(fd)
         os.close(fd)
 
 
@@ -610,7 +612,7 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
     """A busy peer must not block this gevent worker's entire request hub."""
     spool, root = _root(monkeypatch, tmp_path)
     root.mkdir(parents=True)
-    context = multiprocessing.get_context("fork")
+    context = multiprocessing.get_context("spawn")
     ready_parent, ready_child = context.Pipe(duplex=False)
     release_child, release_parent = context.Pipe(duplex=False)
     holder = context.Process(

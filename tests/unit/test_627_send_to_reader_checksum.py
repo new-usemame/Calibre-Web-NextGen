@@ -172,6 +172,22 @@ def test_filename_digest_uses_the_attachment_name_not_the_temp_export(mail_env):
         "file, and it maps a meaningless name onto this book")
 
 
+def test_colon_in_the_attachment_name_registers_the_name_a_device_can_store(mail_env):
+    """#2755 keeps ':' in the e-mailed attachment name so the recipient sees the
+    real title. A reader's storage (FAT, Android shared storage) cannot hold
+    ':', so the file KOReader hashes by name is not called that. The filename
+    digest keeps the colon-free name the send path registered before #2755.
+    """
+    from cps.progress_syncing.checksums.koreader import calculate_koreader_filename_md5
+
+    mail_env["task"].attachment_name = "Dune: Messiah.epub"
+    mail_env["task"]._get_attachment(mail_env["book_path"], ATTACHMENT)
+
+    digests = _digests(mail_env["stored"])
+    assert calculate_koreader_filename_md5("Dune_ Messiah.epub") in digests
+    assert calculate_koreader_filename_md5("Dune: Messiah.epub") not in digests
+
+
 def test_raw_library_file_is_registered_when_metadata_embedding_is_off(mail_env, monkeypatch):
     """RED on main. The common configuration must work too.
 

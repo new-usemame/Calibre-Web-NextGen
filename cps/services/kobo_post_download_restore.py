@@ -41,6 +41,37 @@ RESTORE_SERVED = "served"
 RESTORE_EMPTY = "empty"
 RESTORE_OPEN_STATES = (RESTORE_ARMED, RESTORE_PENDING)
 
+# Nickel's book file GET carries the auth token in its URL but no x-kobo-*
+# headers, so on an account with two or more Kobos the download route cannot
+# tell which one is fetching (#2724). The URL itself comes from that Kobo's own
+# library/sync, which does carry the header, so sync names the device in it.
+DOWNLOAD_DEVICE_PARAM = "device"
+
+
+def download_url_device_tag(device_id):
+    """The public id a download URL handed to Kobo ``device_id`` carries."""
+    if device_id is None:
+        return None
+    device = ub.session.query(ub.Device).filter_by(id=int(device_id)).one_or_none()
+    if device is None or device.kind != "kobo":
+        return None
+    return device.public_id
+
+
+def tagged_download_device(user_id, public_id):
+    """The account's active Kobo a download URL names, or None.
+
+    Only the account's own active Kobos count: a URL edited to name any other
+    device attributes nothing, and the download falls back to the heuristic.
+    """
+    if user_id is None or not public_id:
+        return None
+    device = ub.session.query(ub.Device).filter_by(
+        public_id=str(public_id), user_id=int(user_id), kind="kobo", active=True,
+    ).one_or_none()
+    return device.id if device is not None else None
+
+
 
 def _now():
     return datetime.now(timezone.utc)
@@ -207,12 +238,29 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
         if row is None:
             row = ub.KoboDeviceBookDownload(device_id=device_id, book_id=book_id)
             ub.session.add(row)
-        row.book_format = (book_format or "")[:16] or None
+        # A guess says nothing about the file the guessed Kobo holds: the
+        # fetcher may be another Kobo using a link from before downloads named
+        # their Kobo (#2724). It may arm the restore, but proof this Kobo
+        # already earned stays (the gate still checks it against the file).
+        # A guess in another format may mean this Kobo now holds that format,
+        # so it falls through to the clear below.
+        keeps_proof = (not unambiguous and row.completed_at is not None
+                       and bool(row.kepub_file_identity)
+                       and (book_format or "").lower() == (row.book_format or "").lower())
+        if keeps_proof:
+            log.info(
+                "Kobo download of book %s: the guess cannot prove device_id=%s's "
+                "copy, so its proof from %s is kept", book_id, device_id,
+                row.completed_at,
+            )
+        else:
+            row.book_format = (book_format or "")[:16] or None
         row.downloaded_at = _now()
-        row.completed_at = row.downloaded_at if completed and unambiguous else None
-        # An ambiguous restore attribution must never become exact-place proof,
-        # even when the guessed device successfully receives the whole file.
-        row.kepub_file_identity = None if unambiguous else ""
+        if not keeps_proof:
+            row.completed_at = row.downloaded_at if completed and unambiguous else None
+            # An ambiguous restore attribution must never become exact-place proof,
+            # even when the guessed device successfully receives the whole file.
+            row.kepub_file_identity = None if unambiguous else ""
         if unambiguous and (book_format or "").lower() == "kepub":
             # Best-effort file proof is independent of annotation restoration.
             # Failure to prove it must not prevent the pending row being saved.
@@ -250,7 +298,7 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
 
 
 def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
-                     session, log):
+                     session, log, book_id=None):
     """Confirm this attempt's file proof without changing annotation restore.
 
     A failed or incomplete stream never reaches this seam. A replacement file, another
@@ -258,9 +306,14 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
     the earlier attempt's identity. No content/hash work runs on the request.
     """
     if not file_identity:
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "no readable library KEPUB was identified when the download began",
+                  book_id, download_id)
         return False
     from .kobo_place_gate import _readable_kepub_identity
     if file_identity != _readable_kepub_identity(kepub_path):
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "the library KEPUB changed during the download", book_id, download_id)
         return False
     table = ub.KoboDeviceBookDownload.__table__
     try:
@@ -279,7 +332,13 @@ def confirm_download(*, download_id, downloaded_at, file_identity, kepub_path,
                     download_id, exc_info=True)
         return False
     if confirmed:
+        log.debug("Kobo download of book %s (attempt %s): completion recorded",
+                  book_id, download_id)
         _re_send_shared_place(download_id, session=session, log=log)
+    else:
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                  "the download was superseded (a newer download of the book, or the "
+                  "book was sent to this Kobo again)", book_id, download_id)
     return confirmed
 
 
@@ -305,7 +364,8 @@ def _re_send_shared_place(download_id, *, session, log):
 
 
 def completed_download_body(body, *, application, bind, download_id,
-                            downloaded_at, file_identity, kepub_path, headers, log):
+                            downloaded_at, file_identity, kepub_path, headers, log,
+                            book_id=None):
     """Confirm only natural exhaustion matching the declared byte count.
 
     No context or session is held while yielding bytes. The independent
@@ -316,20 +376,37 @@ def completed_download_body(body, *, application, bind, download_id,
     if (content_length is None or content_length <= 0
             or "X-Sendfile" in headers or "X-Accel-Redirect" in headers):
         # Delegated transfers and lengthless streams cannot prove a full file.
+        log.debug("Kobo download of book %s (attempt %s): completion not recorded: %s",
+                  book_id, download_id,
+                  "the file was handed to the front-end server (X-Sendfile)"
+                  if ("X-Sendfile" in headers or "X-Accel-Redirect" in headers)
+                  else "the response declared no length")
         return body
 
     def stream():
         yielded = 0
-        for chunk in body:
-            yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
-            yield chunk
+        try:
+            for chunk in body:
+                yielded += len(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
+                yield chunk
+        except BaseException as stopped:
+            # A dropped connection closes this generator (GeneratorExit); a
+            # failing file raises. Either way the Kobo did not get the file.
+            log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                      "the transfer stopped after %s of %s bytes (%s)",
+                      book_id, download_id, yielded, content_length,
+                      type(stopped).__name__)
+            raise
         if yielded != content_length:
+            log.debug("Kobo download of book %s (attempt %s): completion not recorded: "
+                      "the response ended after %s of %s bytes",
+                      book_id, download_id, yielded, content_length)
             return
         try:
             with application.app_context(), sessionmaker(bind=bind)() as owned:
                 confirm_download(download_id=download_id, downloaded_at=downloaded_at,
                                  file_identity=file_identity, kepub_path=kepub_path,
-                                 session=owned, log=log)
+                                 session=owned, log=log, book_id=book_id)
         except Exception:
             # Proof is best effort; a persistence failure must not fail a body
             # already delivered. The owned session is rolled back and closed.

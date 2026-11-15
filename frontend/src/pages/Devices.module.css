@@ -60,7 +60,7 @@
 .cardHead { display: flex; align-items: flex-start; gap: var(--sp-3); }
 .cardIcon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 .cardTitleWrap { min-width: 0; flex: 1; }
-.cardName { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); }
+.cardName { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .cardName a { color: var(--text); overflow-wrap: anywhere; transition: color var(--dur-fast) var(--ease); }
 .cardName a:hover { color: var(--accent-text); }
 

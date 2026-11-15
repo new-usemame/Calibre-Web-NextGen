@@ -145,6 +145,11 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
       <div className={styles.pairingColumns}>
         <div>
           <h3>{t('Stock Kobo')}</h3>
+          {token.data?.download_allowed === false && (
+            <p role="alert" className={styles.pairingAlert}>
+              {t("This account can't download books, so its Kobo will be refused when it syncs. An administrator can fix this by turning on Allow Downloads for the account.")}
+            </p>
+          )}
           {token.isLoading ? (
             <p role="status" className={styles.pairingStatus}>{t('Loading pairing details…')}</p>
           ) : token.error && !token.data ? (

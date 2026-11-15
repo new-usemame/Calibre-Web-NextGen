@@ -46,23 +46,29 @@ test('library select-all uses complete server result and bulk changes books beyo
   // select_all requests still go unchanged to the server's full-view query.
   let ordinaryPageItems = 0;
   let heldLaterPage = false;
+  let cardHandlersInFlight = 0;
   let releaseLaterPages!: () => void;
   const laterPages = new Promise<void>(resolve => { releaseLaterPages = resolve; });
   await page.route('**/api/v1/books?*', async route => {
     const url = new URL(route.request().url());
     if (!url.searchParams.has('select_all')) {
-      // Infinite scrolling can auto-fill a small CI seed before selection.
-      // Hold later real page responses until this scenario has proved that
-      // bulk selection reaches beyond the first loaded page.
-      if (Number(url.searchParams.get('page') || '1') > 1) {
-        heldLaterPage = true;
-        await laterPages;
+      cardHandlersInFlight += 1;
+      try {
+        // Infinite scrolling can auto-fill a small CI seed before selection.
+        // Hold later real page responses until this scenario has proved that
+        // bulk selection reaches beyond the first loaded page.
+        if (Number(url.searchParams.get('page') || '1') > 1) {
+          heldLaterPage = true;
+          await laterPages;
+        }
+        url.searchParams.set('per_page', '3');
+        const response = await route.fetch({ url: url.toString() });
+        const body = await response.json().catch(() => null) as { items?: unknown[] } | null;
+        if (body?.items) ordinaryPageItems = Math.max(ordinaryPageItems, body.items.length);
+        await route.fulfill({ response, body: body ? JSON.stringify(body) : undefined });
+      } finally {
+        cardHandlersInFlight -= 1;
       }
-      url.searchParams.set('per_page', '3');
-      const response = await route.fetch({ url: url.toString() });
-      const body = await response.json().catch(() => null) as { items?: unknown[] } | null;
-      if (body?.items) ordinaryPageItems = Math.max(ordinaryPageItems, body.items.length);
-      await route.fulfill({ response, body: body ? JSON.stringify(body) : undefined });
     } else {
       await route.continue();
     }
@@ -140,7 +146,13 @@ test('library select-all uses complete server result and bulk changes books beyo
       quality: 75,
     });
   } finally {
+    // Several card-page requests can be held here (the Load more page and the
+    // refetch after Mark read). Let every released handler finish while the
+    // route is still registered. If unrouteAll runs with two handlers in flight,
+    // the first to finish sees no routes left and turns interception off, and
+    // the other's fulfill then throws "Route is already handled!" (#2940).
     releaseLaterPages();
+    await expect.poll(() => cardHandlersInFlight).toBe(0);
     await page.unrouteAll({ behavior: 'wait' });
   }
 });

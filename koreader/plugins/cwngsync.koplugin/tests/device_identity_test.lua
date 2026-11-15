@@ -208,10 +208,74 @@ local function testAFreshInstallStillGetsAnId()
         "a first start creates the ID, as before")
 end
 
+-- #2952: a Kindle's koreader folder restored onto a Tolino with a backup
+-- plugin. KOReader runs there as its Android build, which exposes no serial
+-- the plugin can read, so the Tolino kept the Kindle's ID and the server
+-- showed both as "my Kindle". A settings file that arrives on a different
+-- kind of e-reader is a copy, whether or not the new one has a serial.
+local tolino = { isKindle = function() return false end, isKobo = function() return false end, model = "tolino_vision5" }
+
+local function testAKindleSetupRestoredOnAnAndroidReaderGetsItsOwnId()
+    local kindle_settings = newSettings()
+    local k = loadPlugin(kindle_settings, kindle, KINDLE_A)
+
+    local restored = copyOf(kindle_settings)
+    local t, shown = loadPlugin(restored, tolino, {})
+    assert(t.device_id ~= k.device_id,
+        "the Tolino must not keep the Kindle's ID: " .. tostring(t.device_id))
+    assertEqual(restored:readSetting("device_id"), t.device_id, "the new ID is saved")
+    assertEqual(#shown, 1, "the reader is told once why the device changed")
+
+    local again, shown_again = loadPlugin(restored, tolino, {})
+    assertEqual(again.device_id, t.device_id, "the Tolino keeps its new ID after a restart")
+    assertEqual(#shown_again, 0, "and is not told again")
+
+    local k_again, shown_k = loadPlugin(kindle_settings, kindle, KINDLE_A)
+    assertEqual(k_again.device_id, k.device_id, "the Kindle keeps its ID")
+    assertEqual(#shown_k, 0, "the Kindle shows nothing")
+end
+
+-- The other way round: an Android reader's setup copied onto a Kindle.
+local function testAnAndroidSetupCopiedOntoAKindleGetsItsOwnId()
+    local tolino_settings = newSettings()
+    local t = loadPlugin(tolino_settings, tolino, {})
+    local copied = copyOf(tolino_settings)
+    local k = loadPlugin(copied, kindle, KINDLE_A)
+    assert(k.device_id ~= t.device_id, "the Kindle must not keep the Tolino's ID")
+end
+
+-- Android readers already syncing when this update arrives have an ID and no
+-- recorded fingerprint, or have one for their own model. They stay the
+-- device the server knows.
+local function testAnAndroidReaderKeepsItsIdOnUpdate()
+    local settings = newSettings({ device_id = "already-syncing" })
+    local plugin, shown = loadPlugin(settings, tolino, {})
+    assertEqual(plugin.device_id, "already-syncing", "updating the plugin must not re-key it")
+    assertEqual(#shown, 0, "and must not tell it that it was copied")
+    local again = loadPlugin(settings, tolino, {})
+    assertEqual(again.device_id, "already-syncing", "nor on the next start")
+end
+
+-- A Kindle that cannot read its serial on one start is still that Kindle; it
+-- must not be judged by its model name against a serial it recorded earlier.
+local function testAKindleWithAnUnreadableSerialKeepsItsRecordedId()
+    local settings = newSettings()
+    local first = loadPlugin(settings, kindle, KINDLE_A)
+    local blank, shown = loadPlugin(settings, kindle, {})
+    assertEqual(blank.device_id, first.device_id, "an unreadable serial is not a different device")
+    assertEqual(#shown, 0, "and shows nothing")
+    local later = loadPlugin(settings, kindle, KINDLE_A)
+    assertEqual(later.device_id, first.device_id, "the serial reads again: same device")
+end
+
 testACopiedKindleGetsItsOwnId()
 testTheSerialIsNotWrittenToSettings()
 testAKoboIsToldApartByItsSerial()
 testWithoutASerialTheIdIsLeftAlone()
 testAnExistingKindleKeepsItsIdOnUpdate()
 testAFreshInstallStillGetsAnId()
+testAKindleSetupRestoredOnAnAndroidReaderGetsItsOwnId()
+testAnAndroidSetupCopiedOntoAKindleGetsItsOwnId()
+testAnAndroidReaderKeepsItsIdOnUpdate()
+testAKindleWithAnUnreadableSerialKeepsItsRecordedId()
 print("device identity: all tests passed")

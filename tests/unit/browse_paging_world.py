@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Shared real-SQLite catalog for the #2720 Authors/Series paging tests.
+"""Shared real-SQLite catalog for the #2720 Authors/Series/Publishers paging tests.
 
 One Flask app for every test that browses this catalog, kept out of the
 ``test_*.py`` files per the Flask-app ratchet (tests/fitness/test_no_new_flask_apps.py).
@@ -29,7 +29,8 @@ def catalog(monkeypatch):
     engine = create_engine('sqlite://', execution_options={'schema_translate_map': {'calibre': None}})
     event.listen(engine, 'connect', db._register_sqlite_udfs)
     for table in (db.Books.__table__, db.Authors.__table__, db.books_authors_link,
-                  db.Series.__table__, db.books_series_link):
+                  db.Series.__table__, db.books_series_link,
+                  db.Publishers.__table__, db.books_publishers_link):
         table.create(engine)
     session = sessionmaker(bind=engine)()
     monkeypatch.setattr(browse.calibre_db, 'session', session)
@@ -39,11 +40,14 @@ def catalog(monkeypatch):
     monkeypatch.setattr(cw_babel, 'current_user', SimpleNamespace(name='reader', locale='en'))
     app.add_url_rule('/authors', view_func=inspect.unwrap(browse.list_authors))
     app.add_url_rule('/series', view_func=inspect.unwrap(browse.list_series))
+    app.add_url_rule('/publishers', view_func=inspect.unwrap(browse.list_publishers))
     book_id = 0
     with engine.begin() as conn:
         for entity_id, (name, books) in enumerate(AUTHORS, 1):
             conn.execute(db.Authors.__table__.insert().values(id=entity_id, name=name, sort=name, link=''))
             conn.execute(db.Series.__table__.insert().values(id=entity_id, name=name, sort=name))
+            # Calibre leaves publishers.sort empty, so publishers order by name.
+            conn.execute(db.Publishers.__table__.insert().values(id=entity_id, name=name, sort=None))
             for _ in range(books):
                 book_id += 1
                 conn.execute(text(
@@ -52,6 +56,7 @@ def catalog(monkeypatch):
                     "1,'2026-01-01','.',0,:u)"), {'i': book_id, 'n': name, 'u': 'u%d' % book_id})
                 conn.execute(db.books_authors_link.insert().values(book=book_id, author=entity_id))
                 conn.execute(db.books_series_link.insert().values(book=book_id, series=entity_id))
+                conn.execute(db.books_publishers_link.insert().values(book=book_id, publisher=entity_id))
     try:
         yield app.test_client()
     finally:

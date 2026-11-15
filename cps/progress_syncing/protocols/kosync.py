@@ -41,6 +41,7 @@ import base64
 import math
 import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Tuple
 from urllib.parse import quote
@@ -509,6 +510,91 @@ def handle_sync_error(error: KOSyncError) -> tuple:
     }, status)
 
 
+# Issue #1190: a device stuck on an unknown checksum polls repeatedly, and one
+# inventory PUT can carry thousands of unmatched files, so the extra detail on
+# a lookup miss is budgeted per interval: each checksum is diagnosed at most
+# once per window, at most _MISS_DIAG_MAX_TRACKED checksums are diagnosed per
+# window, and the library-wide count is taken once per window. The plain
+# "No book found" line is still logged every time.
+_MISS_DIAG_INTERVAL = 300.0
+_MISS_DIAG_MAX_TRACKED = 256
+_miss_diag_last: Dict[str, float] = {}
+_miss_diag_window = {"start": None, "total": None}
+
+
+def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
+    """Say why a checksum lookup missed, or return "" when not diagnosing.
+
+    Three different causes produce the same miss and need different answers
+    from the admin (#1190):
+
+    * a ``book_format_checksums`` row exists but its book id is not in
+      ``books`` (stale id, e.g. after a Calibre database rebuild);
+    * no checksums are registered at all (the backfill never ran, or
+      registration is failing);
+    * checksums exist but not this one (the device holds a file the server
+      never served, or whose bytes changed after it was registered).
+
+    Read-only, and never raises: diagnostics must not turn a clean miss into
+    an error.
+    """
+    now = time.monotonic()
+    started = _miss_diag_window["start"]
+    if started is None or now - started >= _MISS_DIAG_INTERVAL:
+        _miss_diag_last.clear()
+        _miss_diag_window["start"] = now
+        _miss_diag_window["total"] = None
+    if document_checksum in _miss_diag_last:
+        return ""
+    if len(_miss_diag_last) >= _MISS_DIAG_MAX_TRACKED:
+        return ""
+    _miss_diag_last[document_checksum] = now
+
+    try:
+        from ... import calibre_db
+        from ...db import BookFormatChecksum, Books
+
+        stale = calibre_db.session.query(
+            BookFormatChecksum.book, BookFormatChecksum.format
+        ).outerjoin(
+            Books, BookFormatChecksum.book == Books.id
+        ).filter(
+            BookFormatChecksum.checksum == document_checksum,
+            Books.id.is_(None),
+        )
+        if version is not None:
+            stale = stale.filter(BookFormatChecksum.version == version)
+        stale = stale.order_by(
+            BookFormatChecksum.created.desc(), BookFormatChecksum.version.desc()
+        ).first()
+        if stale:
+            return (
+                "a checksum row exists for book id %s (%s) but that book is not "
+                "in the library; the id is stale, e.g. after a Calibre database "
+                "rebuild" % (stale[0], stale[1])
+            )
+        total = _miss_diag_window["total"]
+        if total is None:
+            total = calibre_db.session.query(
+                func.count(BookFormatChecksum.id)
+            ).scalar() or 0
+            if total:
+                # An empty table may be a backfill still running; recount.
+                _miss_diag_window["total"] = total
+        if total == 0:
+            return (
+                "no checksums are registered library-wide; the checksum "
+                "backfill has not run or registration is failing"
+            )
+        return (
+            "%d checksums are registered library-wide but not this one; the "
+            "device holds a file this server never served, or one whose bytes "
+            "changed after it was registered" % total
+        )
+    except Exception as e:  # noqa: BLE001 - diagnostics only
+        return "diagnostics unavailable (%s)" % type(e).__name__
+
+
 def get_book_by_checksum(document_checksum: str, version: str = None):
     """
     Lookup a book in the Calibre library by its partial MD5 checksum.
@@ -567,7 +653,11 @@ def get_book_by_checksum(document_checksum: str, version: str = None):
         # CWA, my device pushes a checksum, nothing happens" — the
         # checksum is in the message so the admin can grep the
         # book_format_checksums table for it.
-        log.info("KOReader sync: No book found for checksum: %s", document_checksum)
+        detail = _describe_checksum_miss(document_checksum, version)
+        log.info(
+            "KOReader sync: No book found for checksum: %s%s",
+            document_checksum, " (%s)" % detail if detail else "",
+        )
         return None, None, None, None, None
 
     except SQLAlchemyError as e:
@@ -677,7 +767,8 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
                             shared_accepted=False, client_at=None,
                             source_document=None, source_progress=None,
                             web_report=False, source_cfi=None, source_format="epub",
-                            report_received_at=None, web_status_accepted=True):
+                            report_received_at=None, web_status_accepted=True,
+                            unidentified_place=False):
     """
     Update the user's ReadBook status based on reading progress percentage.
 
@@ -776,9 +867,23 @@ def update_book_read_status(user, book_id: int, percentage: float, *,
             ub.session.expire(reading_state)
         _hold_feed_clock(bookmark.kobo_reading_state_id, moved=outcome.accepted)
     else:
+        # ``unidentified_place``: an accepted report from a KOSync app that
+        # sends no CWNG device header (#2783). It stays forward-only, but its
+        # XPointer goes onto the bookmark as the library KEPUB span in the
+        # same conditional write, so a Kobo opens at the app's place rather
+        # than its own old Location with the app's percentage.
+        location, identity = None, None
+        if unidentified_place:
+            from ...services.kobo_place_gate import koreader_span
+            location, identity = koreader_span(book_id, source_document, source_progress)
         outcome = device_positions.advance_kobo_bookmark(
             bookmark,
             percentage,
+            location_source=(location or {}).get("Source"),
+            location_type=(location or {}).get("Type"),
+            location_value=(location or {}).get("Value"),
+            location_supplied=location is not None,
+            converted_span_identity=identity if location is not None else None,
             clock_accepts=False,
             session=ub.session,
         )
@@ -2679,7 +2784,17 @@ def update_progress():
             try:
                 resolved_percentage = percentage_float
                 if not gated:
-                    bookmark_outcome = update_book_read_status(user, book_id, percentage_float)
+                    # With the gates on, an unidentified requester is a
+                    # shared reader (share-my-place spec section 8), so its
+                    # accepted place also reaches the Kobo exactly (#2783).
+                    # The rollout switch off keeps the percentage-only bridge.
+                    unidentified_place = (bool(push_accepted) and not identified
+                                          and gates_enforced(user.id))
+                    bookmark_outcome = update_book_read_status(
+                        user, book_id, percentage_float,
+                        source_document=journal_document if unidentified_place else None,
+                        source_progress=journal_progress if unidentified_place else None,
+                        unidentified_place=unidentified_place)
                     if bookmark_outcome is not None and bookmark_outcome.percentage is not None:
                         resolved_percentage = bookmark_outcome.percentage
                 ub.session.commit()

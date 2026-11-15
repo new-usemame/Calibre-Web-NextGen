@@ -544,11 +544,12 @@ def test_spa_percentage_is_not_sticky_across_relocations():
         r"lastCfiRef\.current\s*=\s*cfi;.*?lastPercentRef\.current\s*=\s*valid;",
         persist, re.S), \
         "cfi and its percentage must be written as a pair, so any reader of both matches"
-    writers = re.findall(r"lastCfiRef\.current\s*=", tsx)
+    # An assignment, not a comparison: `== null` reads the ref (#2783).
+    writers = re.findall(r"lastCfiRef\.current\s*=(?!=)", tsx)
     assert len(writers) == 1, \
         "a second writer of lastCfiRef could desynchronise it from lastPercentRef"
-    assert re.search(r"lastPercentRef\.current\s*=", tsx) and \
-        len(re.findall(r"lastPercentRef\.current\s*=", tsx)) == 1, \
+    assert re.search(r"lastPercentRef\.current\s*=(?!=)", tsx) and \
+        len(re.findall(r"lastPercentRef\.current\s*=(?!=)", tsx)) == 1, \
         "likewise for lastPercentRef"
 
     # And the send path must take BOTH from the refs — never one ref plus one

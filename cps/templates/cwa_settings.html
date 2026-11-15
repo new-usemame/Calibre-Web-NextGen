@@ -170,6 +170,16 @@
         or AZW3 format.')}}
       </p>
 
+      {% if cwa_settings.get('cover_keep_aspect_ratio') %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% else %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% endif %}
+      <label for="cover_keep_aspect_ratio" style="padding-left: 10px;">{{_('Preserve cover aspect ratio in EPUBs')}}</label><br>
+      <p class="cwa-settings-tooltip">
+        {{_("When the enforcement service writes a new cover into an EPUB, its cover page keeps the image's proportions instead of stretching it to fill the screen. This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to covers written from now on; KEPUB files are not changed.")}}
+      </p>
+
       {% if cwa_settings['kindle_epub_fixer'] %}
       <input type="checkbox" id="kindle_epub_fixer" name="kindle_epub_fixer" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
       {% else %}

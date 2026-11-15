@@ -165,7 +165,7 @@ export function BrowseList(props: BrowseListProps) {
 
 function BrowseListContent({ plural, title }: BrowseListProps) {
   const { t, locale } = useI18n();
-  const paged = plural === 'authors' || plural === 'series';
+  const paged = plural === 'authors' || plural === 'series' || plural === 'publishers';
   const fullList = useEntityList(paged ? '' : plural);
   const me = useMe().data;
   // Tag maintenance is an editor action; everyone else sees the plain list.

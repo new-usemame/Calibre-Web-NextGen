@@ -56,7 +56,15 @@ def test_reload_restats_every_real_format_before_one_commit(tmp_path):
 
 def test_display_preferences_have_one_persistence_key_each():
     catalog = source("frontend/src/pages/Catalog.tsx")
-    assert catalog.count("cwng:catalog-density-v1") == 1
+    # Density is read by the Library, Global Library, shelves and Smart shelves
+    # (#980), so its key lives once in the whole frontend, in useCatalogDensity().
+    frontend = [p.read_text(encoding="utf-8") for p in (ROOT / "frontend/src").rglob("*.ts*")]
+    assert sum(text.count("cwng:catalog-density-v1") for text in frontend) == 1
+    assert "useCatalogDensity()" in catalog
+    # Rows per load is read by the Library and shelves (#980), so its key also
+    # lives once, in useCatalogRowsPerLoad().
+    assert sum(text.count("cwng:catalog-rows-v1") for text in frontend) == 1
+    assert "useCatalogRowsPerLoad()" in catalog
     assert catalog.count("cwng:series-presentation-v1") == 1
     assert "cwng:browse-list-compact" in source("frontend/src/pages/BrowseList.tsx")
 

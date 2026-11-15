@@ -2,9 +2,9 @@ import { BookReview } from '../components/BookReview';
 import { PersonalRating } from '../components/PersonalRating';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, RotateCcw, Glasses, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
-  useBook, useToggleRead, useStopReading, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
+  useBook, useToggleRead, useStopReading, useClearReadingPosition, useSetReadingStatus, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
@@ -421,6 +421,7 @@ export function BookDetail() {
   const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
   const stopReading = useStopReading(id);
+  const clearPosition = useClearReadingPosition(id);
   const setReadingStatus = useSetReadingStatus(id);
   const resetReadingStatus = setReadingStatus.reset;
   useEffect(() => { resetReadingStatus(); }, [id, resetReadingStatus]);
@@ -577,6 +578,19 @@ export function BookDetail() {
         onSuccess: () => announce(t('Removed from Currently Reading.')),
         onError: () => announce(t('Could not remove this book from Currently Reading.'), { assertive: true }),
       }), testId: 'menu-stop-reading',
+    });
+  }
+  if (canAccessBook && !me?.role?.anonymous) {
+    menuItems.push({
+      id: 'clear-position', label: t('Clear reading position'),
+      icon: <RotateCcw size={15} />, disabled: clearPosition.isPending,
+      onSelect: () => {
+        if (!window.confirm(t('Clear your saved reading position for "{title}" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs.', { title: book.title }))) return;
+        clearPosition.mutate(undefined, {
+          onSuccess: () => announce(t('Reading position cleared.')),
+          onError: () => announce(t('Could not clear the reading position.'), { assertive: true }),
+        });
+      }, testId: 'menu-clear-position',
     });
   }
   if (inLibrary) {

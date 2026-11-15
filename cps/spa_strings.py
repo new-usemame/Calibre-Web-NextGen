@@ -676,6 +676,12 @@ _("Account setting: {scope}")
 _("Could not save the book choice. Try again.")
 _("Saved.")
 
+# #2831: clear a book's saved reading position (More actions menu).
+_("Clear reading position")
+_("Clear your saved reading position for \"{title}\" in the web reader, on your Kobo and in KOReader? Your read status is not changed. A device that still holds its own position can send it back the next time it syncs.")
+_("Reading position cleared.")
+_("Could not clear the reading position.")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that

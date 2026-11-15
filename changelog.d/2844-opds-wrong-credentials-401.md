@@ -1,3 +1,0 @@
-### Fixed
-
-- **OPDS no longer accepts a wrong password as the guest.** With anonymous browsing on, a reader app that sent a username with the wrong password got the guest catalog with 200, so its connection test passed and your own shelves, read status and download rights were silently missing. Wrong credentials now get 401, as KOSync and the sign-in page already answer them. A client that sends no credentials, or an empty username, still gets the guest catalog. If a reverse proxy in front of CWNG adds its own Basic login and passes it through to `/opds`, either use matching CWNG credentials there or have the proxy drop the `Authorization` header for `/opds`. (#2844)

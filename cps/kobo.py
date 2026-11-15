@@ -18,7 +18,7 @@ import uuid
 import zipfile
 from time import gmtime, monotonic, strftime
 import json
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlencode, urlsplit
 
 from flask import (
     Blueprint,
@@ -3950,6 +3950,22 @@ def HandleMetadataRequest(book_uuid):
 
 
 def get_download_url_for_book(book_id, book_format):
+    from .services.kobo_post_download_restore import (
+        DOWNLOAD_DEVICE_PARAM, download_url_device_tag,
+    )
+    # One sync builds a URL per book; the device is the same for all of them.
+    device_id = getattr(g, "annotation_origin_device_id", None)
+    cached = g.get("_kobo_download_device_tag")
+    if cached is not None and cached[0] == device_id:
+        device_tag = cached[1]
+    else:
+        device_tag = None
+        try:
+            device_tag = download_url_device_tag(device_id)
+        except Exception:
+            log.debug("Could not name the Kobo in its download URL", exc_info=True)
+        g._kobo_download_device_tag = (device_id, device_tag)
+    device_query = {DOWNLOAD_DEVICE_PARAM: device_tag} if device_tag else {}
     endpoint_name = "kobo.download_book"
     endpoint_path = "download"
     if request.headers.get("x-kobo-deviceos") == "Android":
@@ -3970,13 +3986,14 @@ def get_download_url_for_book(book_id, book_format):
             endpoint_path=endpoint_path,
             book_id=book_id,
             book_format=book_format.lower()
-        )
+        ) + ("?" + urlencode(device_query) if device_query else "")
     return url_for(
         endpoint_name,
         auth_token=kobo_auth.get_auth_token(),
         book_id=book_id,
         book_format=book_format.lower(),
         _external=True,
+        **device_query,
     )
 
 
@@ -4750,6 +4767,20 @@ def HandleStateRequest(book_uuid):
             inexact_echo = bool(checked and request_bookmark and
                                 kobo_place_gate.is_inexact_echo(
                                     device_id, book, request_bookmark))
+            # #2783: the Kobo repeated the place it last reported while
+            # another reader moved the shared place on. Acknowledge it, move
+            # nothing, and leave its journal place clock alone so its next
+            # sync is not told its own old place is the newer one.
+            unmoved = bool(checked and request_bookmark and not inexact_echo
+                           and kobo_reading_state.current_bookmark.id is not None
+                           and kobo_place_gate.is_unmoved_report(
+                               device_id, book.id, request_bookmark,
+                               kobo_reading_state.current_bookmark.id,
+                               client_at=client_lm))
+            if unmoved:
+                log.info("Kobo report for book %s device %s repeats its last place; "
+                         "the newer shared place from another reader is kept",
+                         book.id, device_id)
             if checked:
                 # The device's own journal hears every report it makes,
                 # status-only ones included, so turning the box off later
@@ -4762,7 +4793,7 @@ def HandleStateRequest(book_uuid):
                         book_id=book.id,
                         client_at=client_lm,
                         place=(_journal_place(request_bookmark)
-                               if request_bookmark else None),
+                               if request_bookmark and not unmoved else None),
                         status=own_status[1],
                         status_supplied=own_status[0],
                     )
@@ -4789,7 +4820,7 @@ def HandleStateRequest(book_uuid):
                 if checked:
                     if current_bookmark.id is None:
                         ub.session.flush()
-                    if inexact_echo:
+                    if inexact_echo or unmoved:
                         bookmark_outcome = kobo_place_gate.SharedWriteOutcome(
                             False, current_bookmark.progress_percent,
                             current_bookmark.last_modified)
@@ -6121,12 +6152,15 @@ def download_book(book_id, book_format):
 @requires_kobo_auth
 @download_required
 def redirect_download_book(book_id, book_format):
+    from .services.kobo_post_download_restore import DOWNLOAD_DEVICE_PARAM
+    device_tag = request.args.get(DOWNLOAD_DEVICE_PARAM)
     return redirect(url_for(
         "kobo.download_book",
         auth_token=kobo_auth.get_auth_token(),
         book_id=book_id,
         book_format=book_format.lower(),
         _external=True,
+        **({DOWNLOAD_DEVICE_PARAM: device_tag} if device_tag else {}),
     ))
 
 

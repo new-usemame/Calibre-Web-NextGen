@@ -286,6 +286,9 @@ Rootless Podman remaps user IDs, so if the container can't write to your volumes
 
 ## NixOS
 
+The NixOS channel is community-maintained: the Docker image is the supported
+install, and @BeatLink is the contact for NixOS questions and issues.
+
 The repository is a Nix flake with a package and a NixOS module that runs the
 web app and its background services as systemd units:
 

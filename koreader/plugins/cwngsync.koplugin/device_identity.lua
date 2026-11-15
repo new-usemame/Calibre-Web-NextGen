@@ -55,7 +55,7 @@ function DeviceIdentity.fingerprint(device, hash, read_line)
         return hash("cwngsync-hardware:" .. serial)
     end
     local model = type(device.model) == "string" and device.model:match("^%s*(.-)%s*$")
-    if model == nil or model == "" then return nil end
+    if not model or model == "" then return nil end
     return hash("cwngsync-model:" .. model)
 end
 

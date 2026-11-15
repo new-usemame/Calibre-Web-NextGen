@@ -85,7 +85,10 @@ def test_cwa_run_as_argv_works_under_timeout(tmp_path):
     assert bare.stdout.strip() == "direct"
 
     subprocess.run(
-        ["bash", "-c", snippet], env={**os.environ, "CWA_RUN_AS": str(prefix)},
+        ["bash", "-c", snippet],
+        # A command name on PATH, as the image sets cwa-as-abc: CWA_RUN_AS is
+        # split into words, so a prefix path containing a space would not work.
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "CWA_RUN_AS": prefix.name},
         capture_output=True, text=True, check=True,
     )
     assert marker.read_text().strip() == "echo direct"
@@ -105,7 +108,10 @@ def test_cwa_run_as_runs_the_prefix_or_the_bare_command(tmp_path):
     assert bare.stdout.strip() == "direct"
 
     subprocess.run(
-        ["bash", "-c", snippet], env={**os.environ, "CWA_RUN_AS": str(prefix)},
+        ["bash", "-c", snippet],
+        # A command name on PATH, as the image sets cwa-as-abc: CWA_RUN_AS is
+        # split into words, so a prefix path containing a space would not work.
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "CWA_RUN_AS": prefix.name},
         capture_output=True, text=True, check=True,
     )
     assert marker.read_text().strip() == "echo direct"

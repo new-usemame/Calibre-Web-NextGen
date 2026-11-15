@@ -103,7 +103,7 @@ def test_checksum_service_polls_and_backfills_nested_library(tmp_path):
         "BACKFILL_ARGS": str(invocation),
         "SQLITE_ARGS": str(sqlite_invocation),
         "PATH": f"{bin_dir}:{env['PATH']}",
-        "CWA_RUN_AS": str(wrapper),
+        "CWA_RUN_AS": wrapper.name,
     })
 
     result = subprocess.run(

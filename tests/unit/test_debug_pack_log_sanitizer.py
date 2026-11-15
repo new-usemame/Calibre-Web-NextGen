@@ -185,3 +185,14 @@ class TestSanitizerRedactsInstallPaths:
 
     def test_root_and_relative_dirs_ignored(self, monkeypatch):
         assert self._patterns(monkeypatch, "/", "relative/lib") == ()
+
+    def test_sanitized_pack_scrubber_redacts_install_paths(self, monkeypatch):
+        # The sanitized debug pack runs every log through _LogScrubber, not the
+        # bare line sanitiser, so the install's own dirs must be hidden there.
+        from cps import debug_info
+
+        self._patterns(monkeypatch, "/srv/jane/cwng", "/home/jane/Books")
+        raw = b"Opening /srv/jane/cwng/app.db\nScanning /home/jane/Books/A/b.epub\n"
+        out = debug_info._sanitize_log_bytes(raw, debug_info._LogScrubber())
+        assert b"jane" not in out
+        assert out == b"Opening <config>/app.db\nScanning <library>/A/b.epub\n"

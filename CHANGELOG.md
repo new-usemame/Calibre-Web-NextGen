@@ -16,6 +16,80 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.70] - 2026-11-15
+
+### Changed
+
+- **"No book found for checksum" now says why it missed.** The same log line used to cover a checksum row whose book no longer exists (for example after a Calibre database rebuild), a library with no checksums registered at all, and a checksum the server never registered. The line now names which of the three it is. Each checksum gets that detail at most once every five minutes, and at most 256 checksums get it in that time, so a device that keeps retrying, or reports thousands of unmatched files at once, neither floods the log nor slows the sync. Sync behaviour is unchanged. (#1190)
+
+### Fixed
+
+- **KOReader Library mode no longer rewrites every book's record on each save.** CWNGSync kept one record per library book in `cwngsync_library.lua` and wrote the whole file, on KOReader's main thread, every 10 steps of a sync, at its end, and each time a book was opened or sent. For 2000 books that was about 800 KB per save, even when nothing had changed. The records now live in small files under `koreader/settings/cwngsync_library/`, and a save rewrites only the files holding a record that changed: about 20 KB when one book changes, nothing when none did. Records saved by an earlier version are kept and move on the first save. (#2329)
+
+- **A Kobo's queued report no longer undoes a newer place from the web reader or KOReader.** A Kobo that had been sent another reader's newer place could then send a report it had queued before that, repeating its old place, and the server took it as a deliberate move back. The Kobo then stayed behind, and the web reader reopened at the Kobo's old place. A report the Kobo clocked before it was sent the newer place now keeps that place; going back to an old place after receiving the new one still counts as a move. (#2783)
+
+- **The "Session protection triggered" debug line is logged once instead of on every request.** After a browser update changed the User-Agent, a "Remember me" session kept its old identifier, so each request logged the same mismatch and one page load could print dozens of lines. Each distinct mismatch is now reported once; sign-in and session-protection behaviour are unchanged. (#2882)
+
+- **Uploads no longer fail with "Ingest directory not writable" after an update when `NETWORK_SHARE_MODE` is on and the ingest folder is not mounted.** That switch skipped every ownership fix on `/cwa-book-ingest`, even when the folder was the image's own local volume, which is created owned by uid 911 and comes back that way on each update. With `PUID` set, the app user could not write it until someone ran `chown` by hand. On start, the container now sets that folder's owner to `PUID`/`PGID` when it is on a local filesystem and the app user cannot write it. A folder on a network share is still left alone. (#2936)
+
+## [v4.1.69] - 2026-11-14
+
+### Added
+
+- **You can now clear a book's saved reading position without changing its read status.** The new "Clear reading position" entry in a book's More actions menu removes your place in the web reader, on your Kobo and in KOReader together, so a finished book can be reset for a re-read and stay marked read. A device that still holds its own position can send it back the next time it syncs (#2831).
+
+### Fixed
+
+- **"Mark as unread" now also resets the position KOReader keeps for you.** A KOReader that had reported a place was handed that place straight back after the book was marked unread, because each device's own saved position was never cleared. Marking a book unread now removes those too, for KOReader and Kobo devices (#2831).
+
+- **Smart shelves now load the number of rows you choose in the Library's "Rows per load" setting.** Smart shelves already follow the Library's density, but their paging still used the server's fixed page size. They now measure their own columns and ask for whole rows, like the Library and regular shelves, so 1 row per load loads one row at a time there too. The Smart shelf endpoint also keeps a requested page size between 1 and 200, as the author and series lists do (#980).
+
+- **Uploading a Calibre-exported `.fb2.zip` book no longer fails with "File
+  type not allowed".** The upload gate read only the last dotted segment, so
+  the double extension was rejected as "zip" even with FB2 uploads enabled.
+  It is now normalized to Calibre's canonical `.fbz` before validation and
+  ingest staging; allowlists that already accept `fb2` inherit `fbz` once on
+  upgrade, and `.fbz` files validate as `application/zip` instead of logging
+  an unknown-mimetype error.
+
+- **Uploading a `.docx`, `.odt` or `.flac` file is no longer refused in the
+  Docker image when "Check if file extensions match file content" is on.**
+  The image's MIME table has no entry for those three default formats, so the
+  check had nothing to match the file against. Each upload also logged one
+  "Unkown mimetype for Extension" ERROR line per format; those lines are gone.
+
+- **The "strings still need translating" banner counts what users actually see
+  in English.** It used to count every entry with plural forms (for example
+  zh_Hans_CN "Last %(count)s day") as missing even when translated, and it
+  skipped fuzzy entries, which are left out of the compiled translations. It
+  now uses the same count as the translation table in the README.
+
+- **Changing a book's author or title no longer fails with "[Errno 524]" on an
+  NFSv4 library share (#2921).** Moving a book to an author that had no folder
+  yet copied every file instead of renaming the folder, and the copy tried to
+  write back the share's `system.nfs4_acl` attribute, which NFSv4 refuses. The
+  folder is now renamed in place. When a move really has to copy (another
+  filesystem), times, permissions and every extended attribute the destination
+  accepts are kept, a refused one is skipped instead of failing the edit, and a
+  copy that fails part way is removed so no half-moved folder is left behind.
+
+- **Ingesting a book onto an NFSv4 share no longer fails with "[Errno 524]"
+  (#2921).** Staging a book or format for import, and the EPUB fixer's backup of
+  the original to `processed_books/fixed_originals`, copied the file and then
+  tried to write back the share's `system.nfs4_acl` attribute, which NFSv4
+  refuses. The copy was complete, but the book was moved to the failed folder.
+  These copies now keep the times, permissions and extended attributes the
+  destination accepts and skip a refused one, the same way book folder moves do.
+
+- **An uploaded book whose file has no title of its own is now titled from its
+  file name, not from an internal upload name.** Uploads are saved for import
+  under a unique name such as `new_1_20261113_112627_417824_Rig Doc.docx`, and
+  Calibre titles a file with no embedded title from its name, so a plain
+  `.txt`, `.docx`, `.rtf` or untitled PDF uploaded from the web UI came in as
+  "new 1 20261113 112627 417824 Rig Doc". Ingest now shows Calibre the name
+  you uploaded. Files dropped into the ingest folder keep their own names as
+  before. Books already imported keep their titles; edit them to fix.
+
 ## [v4.1.68] - 2026-11-13
 
 ### Added

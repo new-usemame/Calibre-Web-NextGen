@@ -4743,7 +4743,8 @@ def HandleStateRequest(book_uuid):
                            and kobo_reading_state.current_bookmark.id is not None
                            and kobo_place_gate.is_unmoved_report(
                                device_id, book.id, request_bookmark,
-                               kobo_reading_state.current_bookmark.id))
+                               kobo_reading_state.current_bookmark.id,
+                               client_at=client_lm))
             if unmoved:
                 log.info("Kobo report for book %s device %s repeats its last place; "
                          "the newer shared place from another reader is kept",

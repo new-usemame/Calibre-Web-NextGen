@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cps import constants, db, ub, user_library
+from tests.unit.api_basic_auth_world import build_api_app
 
 pytestmark = pytest.mark.unit
 
@@ -187,11 +188,34 @@ def test_start_empty_is_meaningless_when_switching_to_monolibrary(
         )
 
 
+def test_start_empty_refuses_dormant_rows_from_an_interrupted_seed(
+        app_session, calibre_session, monkeypatch):
+    """A failed first enable can commit rows without setting the seed fence.
+
+    Empty start must not silently keep those books or erase a selection.
+    """
+    user = _fresh_user(app_session, "interrupted-seed")
+    monkeypatch.setattr(ub, "session", app_session)
+    user_library.prepare_user_library_seed(
+        user, app_session=app_session, cdb=_cdb(calibre_session))
+    assert not user.user_library_seeded
+    assert _membership(app_session, user) == [1, 2, 3]
+
+    with pytest.raises(user_library.UserLibraryError, match="already has"):
+        user_library.set_library_mode(
+            user, constants.LIBRARY_MODE_PERSONAL,
+            app_session=app_session, start_empty=True)
+
+    app_session.rollback()
+    assert user.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert not user.user_library_seeded
+    assert _membership(app_session, user) == [1, 2, 3]
+
+
 # ── Admin API ───────────────────────────────────────────────────────────────
 
 def _post_update(app_session, monkeypatch, target, body):
-    from flask import Flask
-    from cps.api import admin as api_admin
+    from cps import config
 
     administrator = ub.User(
         name="start-empty-admin", email="start-empty-admin@example.invalid",
@@ -200,15 +224,19 @@ def _post_update(app_session, monkeypatch, target, body):
     app_session.add(administrator)
     app_session.commit()
     monkeypatch.setattr(ub, "session", app_session)
-    monkeypatch.setattr(api_admin, "current_user", administrator)
-    app = Flask(__name__)
-    with app.test_request_context(
-            "/api/v1/admin/users/%d" % target.id, method="POST", json=body):
-        result = api_admin.admin_update_user.__wrapped__(target.id)
-    if isinstance(result, tuple):
-        response, status = result
-        return status, response.get_json()
-    return result.status_code, result.get_json()
+    monkeypatch.setattr(config, "config_anonbrowse", 0, raising=False)
+    monkeypatch.setattr(config, "config_allow_reverse_proxy_header_login", False,
+                        raising=False)
+    app = build_api_app(app_session)
+    client = app.test_client()
+    with client.session_transaction() as cookie:
+        cookie.update(_user_id=str(administrator.id), _random="test",
+                      _id="test", _fresh=True)
+    token = client.get("/api/v1/auth/csrf").json["csrf_token"]
+    response = client.post(
+        "/api/v1/admin/users/%d" % target.id, json=body,
+        headers={"X-CSRFToken": token})
+    return response.status_code, response.get_json()
 
 
 def test_admin_api_start_empty_creates_an_empty_personal_library(
@@ -258,6 +286,8 @@ def test_admin_api_start_empty_refused_without_global_browse(
     status, payload = _post_update(app_session, monkeypatch, target, {
         "library_mode": constants.LIBRARY_MODE_PERSONAL,
         "start_empty": True,
+        "email": "changed@example.invalid",
+        "roles": {"viewer": True},
     })
 
     assert status == 400
@@ -265,3 +295,81 @@ def test_admin_api_start_empty_refused_without_global_browse(
     app_session.expire_all()
     assert target.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
     assert target.user_library_seeded is False
+    assert target.email == "api-managed@example.invalid"
+    assert not target.role_viewer()
+
+
+@pytest.mark.parametrize("state", ["kobo", "seeded", "dormant"])
+def test_admin_api_rejected_empty_start_rolls_back_other_edits(
+        app_session, monkeypatch, state):
+    """Refusals must preserve profile fields and every existing book row."""
+    target = _fresh_user(app_session, "api-existing")
+    target.user_library_seeded = state == "seeded"
+    if state == "kobo":
+        app_session.add(ub.KoboSyncedBooks(user_id=target.id, book_id=1))
+    else:
+        app_session.add(ub.UserLibraryBook(user_id=target.id, book_id=2))
+    app_session.commit()
+    before = _membership(app_session, target)
+
+    status, payload = _post_update(app_session, monkeypatch, target, {
+        "library_mode": constants.LIBRARY_MODE_PERSONAL, "start_empty": True,
+        "email": "changed@example.invalid", "roles": {"viewer": True},
+    })
+
+    assert status == 400
+    assert payload["error"]["code"] == "library_mode_rejected"
+    app_session.expire_all()
+    assert target.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert target.user_library_seeded == (state == "seeded")
+    assert target.email == "api-existing@example.invalid"
+    assert not target.role_viewer()
+    assert _membership(app_session, target) == before
+    if state == "kobo":
+        assert app_session.query(ub.KoboSyncedBooks).filter_by(
+            user_id=target.id, book_id=1).count() == 1
+
+
+@pytest.mark.parametrize("seeded", [False, True])
+def test_classic_empty_start_is_saved_or_stale_form_is_refused(
+        app_session, monkeypatch, seeded):
+    """A stale empty-start form must reject all edits, preserving selection."""
+    from flask import get_flashed_messages
+    from cps import admin
+
+    target = _fresh_user(app_session, "classic-empty")
+    target.user_library_seeded = seeded
+    if seeded:
+        app_session.add(ub.UserLibraryBook(user_id=target.id, book_id=2))
+    administrator = ub.User(name="classic-admin", email="admin@example.invalid",
+                            password="", role=constants.ROLE_ADMIN)
+    app_session.add(administrator)
+    app_session.commit()
+    original_email = target.email
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(admin, "get_sidebar_config", lambda: ([], None))
+    monkeypatch.setattr(admin, "get_custom_column_visibility_options", lambda _u: [])
+    monkeypatch.setattr(admin, "save_cc_visibility", lambda *_a: None)
+    monkeypatch.setattr(admin, "_", lambda value, **kw: value % kw if kw else value)
+    app = build_api_app(app_session)
+    form = {"email": "changed@example.invalid", "kindle_mail": "",
+            "browse_global_role": "on", "library_mode": "personal_library",
+            "library_start_empty": "on"}
+    with app.test_request_context("/admin/user/%d" % target.id,
+                                  method="POST", data=form):
+        admin._handle_edit_user(form, target, [], [], False)
+        messages = get_flashed_messages(with_categories=True)
+
+    app_session.expire_all()
+    assert target.user_library_seeded is True
+    if seeded:
+        assert target.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+        assert target.email == original_email
+        assert _membership(app_session, target) == [2]
+        assert any(category == "error" and "first time" in text
+                   for category, text in messages), messages
+    else:
+        assert target.library_mode() == constants.LIBRARY_MODE_PERSONAL
+        assert target.email == "changed@example.invalid"
+        assert _membership(app_session, target) == []
+        assert any(category == "success" for category, _ in messages), messages

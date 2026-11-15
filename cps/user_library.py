@@ -206,6 +206,14 @@ def _validate_start_empty(user, desired, *, app_session):
             "An empty start only applies the first time My Library is "
             "enabled; this account already has its own selection."
         )
+    if membership_count(user.id, app_session):
+        # An interrupted or rejected seed can leave durable rows before the
+        # seed fence is set. Never promise an empty library while keeping them,
+        # or delete an existing selection to fulfil that promise.
+        raise UserLibraryError(
+            "An empty start is unavailable because this account already has "
+            "My Library books."
+        )
     if not user.role_browse_global():
         # Without the browse role the account cannot add anything itself, so
         # an empty set would leave it with no books at all.

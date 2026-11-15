@@ -257,11 +257,13 @@ _("Default UI display font for new users")
 _("Applies to accounts created from now on. Each user can change these fonts under Account settings.")
 
 
-# =====================================================================# Accessibility remediation (WCAG 2.2 AA sweep) — SPA-only strings introduced by
+# ============================================================================
+# Accessibility remediation (WCAG 2.2 AA sweep) — SPA-only strings introduced by
 # the a11y pass: skip link, live-region announcements, ARIA labels for icon-only
 # controls, reader/annotation color names, form/error messages. Anchored so the
 # auto-translation job keeps them (babel does not scan .tsx).
-# =====================================================================_('Add a format')
+# ============================================================================
+_('Add a format')
 _('Add rule')
 _('Add to shelf')
 _('Add your own')

@@ -3622,12 +3622,11 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if desired_library_mode not in constants.LIBRARY_MODES:
         flash(_("Invalid library mode"), category="error")
         return "", 400
-    # The checkbox is only rendered before the seed fence exists, and only
-    # means something alongside the My Library radio.
+    # The checkbox only applies alongside the My Library radio. Pass even a
+    # stale form's choice to the validator instead of silently ignoring it.
     library_start_empty = bool(
         to_save.get("library_start_empty")
         and desired_library_mode == constants.LIBRARY_MODE_PERSONAL
-        and not bool(content.user_library_seeded)
     )
     library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL

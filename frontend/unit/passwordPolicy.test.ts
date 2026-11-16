@@ -26,3 +26,10 @@ test('handles singular length and length-only policies', () => {
   const only = { ...base, min_length: 1, number: false, lower: false, upper: false, special: false };
   assert.equal(passwordRequirementsText(only, t), 'Password requirements: at least 1 character.');
 });
+
+test('does not list "a letter" when a case rule already requires one', () => {
+  const both = passwordRequirementsText({ ...base, letter: true }, t) ?? '';
+  assert.equal((both.match(/\ba letter\b/g) ?? []).length, 0);
+  const letterOnly = passwordRequirementsText({ ...base, lower: false, upper: false, letter: true }, t) ?? '';
+  assert.match(letterOnly, /including a number, a letter, a special character/);
+});

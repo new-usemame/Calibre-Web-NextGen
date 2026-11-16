@@ -15,7 +15,8 @@ export function passwordRequirementsText(
   if (policy.number) parts.push(t('a number'));
   if (policy.lower) parts.push(t('a lowercase letter'));
   if (policy.upper) parts.push(t('an uppercase letter'));
-  if (policy.letter) parts.push(t('a letter'));
+  // A lowercase or uppercase rule already requires a letter; don't list it twice.
+  if (policy.letter && !policy.lower && !policy.upper) parts.push(t('a letter'));
   if (policy.special) parts.push(t('a special character'));
   const length = policy.min_length > 0
     ? (policy.min_length === 1 ? t('at least 1 character') : t('at least {count} characters', { count: policy.min_length }))

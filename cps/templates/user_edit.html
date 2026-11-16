@@ -215,7 +215,7 @@
           {% if config.config_password_number %}{% set _r = pw_rules.append(_('a number')) %}{% endif %}
           {% if config.config_password_lower %}{% set _r = pw_rules.append(_('a lowercase letter')) %}{% endif %}
           {% if config.config_password_upper %}{% set _r = pw_rules.append(_('an uppercase letter')) %}{% endif %}
-          {% if config.config_password_character %}{% set _r = pw_rules.append(_('a letter')) %}{% endif %}
+          {% if config.config_password_character and not (config.config_password_lower or config.config_password_upper) %}{% set _r = pw_rules.append(_('a letter')) %}{% endif %}
           {% if config.config_password_special %}{% set _r = pw_rules.append(_('a special character')) %}{% endif %}
           {% set pw_min = config.config_password_min_length or 0 %}
           {% if pw_min > 0 or pw_rules %}

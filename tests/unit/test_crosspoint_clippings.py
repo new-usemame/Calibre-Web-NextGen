@@ -261,10 +261,19 @@ def test_an_upload_of_a_tombstoned_id_keeps_the_tombstone(world):
     assert annotation(world, "a" * 32).hidden is True
 
 
-def test_a_delete_of_an_unknown_id_is_counted_and_makes_no_row(world):
-    counts = upload(world, {"id": "f" * 32, "deleted": 1})
-    assert counts["accepted"] == 1 and counts["unchanged"] == 1
-    assert world.session.query(ub.Annotation).count() == 0
+def test_an_unknown_delete_blocks_a_delayed_upload_and_survives_paging(world):
+    """A delete that overtakes its upload must remain a device-scoped tombstone."""
+    headers = firmware_headers(world)
+    deleted = {"id": "f" * 32, "deleted": 1}
+    assert put(world, headers, [deleted]).get_json()["accepted"] == 1
+    tomb = get(world, headers).get_json()["items"]
+    assert len(tomb) == 1 and tomb[0]["deleted"] == 1
+    assert put(world, headers, [item("f" * 32)]).get_json()["accepted"] == 1
+    assert put(world, headers, [deleted]).get_json()["accepted"] == 1
+    assert get(world, headers).get_json()["items"] == tomb
+    assert annotation(world, "f" * 32).hidden is True
+    other = dict(headers, **{"X-CWNG-Device-ID": "other-reader"})
+    assert get(world, other).get_json()["items"] == []
 
 
 def test_a_clipping_goes_back_only_to_the_reader_that_made_it(world):
@@ -621,7 +630,7 @@ def test_the_firmware_round_trip(world):
                                    "accepted": 1, "matched": True, "calibre_book_id": BOOK}
     pulled = firmware_pull(lambda cursor: get(world, headers, cursor=cursor,
                                               limit=1).get_json())
-    assert [p["id"] for p in pulled] == ["a" * 32]
+    assert [(p["id"], p["deleted"]) for p in pulled] == [("f" * 32, 1), ("a" * 32, 0)]
     row = annotation(world, "a" * 32)
     reader = world.session.get(ub.Device, row.origin_device_id)
     assert reader.display_name == "Xteink"
@@ -630,7 +639,7 @@ def test_the_firmware_round_trip(world):
     assert get(world, other).get_json()["items"] == []
     # Basic alone, as the progress client of 2.0.0 also sends it.
     basic = dict(FIRMWARE, **world.basic("alice"))
-    assert len(get(world, basic).get_json()["items"]) == 1
+    assert get(world, basic).get_json()["items"] == pulled
 
 
 def test_a_document_hash_resolves_like_the_annotations_route(world, monkeypatch):
@@ -694,3 +703,115 @@ def test_the_auth_reply_lists_the_capability(world):
                                            headers=firmware_headers(world))
     assert response.status_code == 200
     assert "crosspoint_clippings" in response.get_json()["capabilities"]
+
+
+@pytest.mark.parametrize("identified", [False, True])
+@pytest.mark.parametrize("deleting", [False, True])
+def test_a_foreign_clipping_write_preserves_both_stored_copies(world, identified, deleting):
+    """A missing or different device identity cannot edit the annotation or layout."""
+    owner = firmware_headers(world)
+    assert put(world, owner, [item()]).status_code == 200
+    before = get(world, owner).get_json()["items"][0]
+    writer = dict(owner, **{"X-CWNG-Device-ID": "another-reader"}) if identified else world.basic("alice")
+    change = {"id": "a" * 32, "deleted": 1} if deleting else item(text="different words", layout_signature=9)
+    assert put(world, writer, [change]).status_code == 200
+    assert get(world, owner).get_json()["items"][0] == before
+    row = annotation(world, "a" * 32)
+    assert row.highlighted_text == item()["text"] and row.hidden is False
+
+
+@pytest.mark.parametrize("device_id", ["", " " * 5, "x" * 101, "capped-reader"])
+def test_an_unregistrable_device_never_creates_shared_clippings(world, monkeypatch, device_id):
+    """A supplied identity must survive registration before any clipping is saved."""
+    from cps.services import device_registry
+    if device_id == "capped-reader":
+        monkeypatch.setattr(device_registry, "MAX_KOREADER_DEVICES_PER_USER", 0)
+    headers = dict(firmware_headers(world), **{"X-CWNG-Device-ID": device_id})
+    response = put(world, headers, [item()])
+    assert response.status_code == 400, response.get_json()
+    assert world.session.query(ub.Annotation).count() == 0
+    assert world.session.query(ub.CrossPointClipping).count() == 0
+
+
+def test_a_headerless_crosspoint_pull_can_be_echoed_in_a_koreader_batch(world):
+    """A pulled CrossPoint source must not reject the other highlights in an echo."""
+    headers = world.basic("alice")
+    assert put(world, headers, [item()]).status_code == 200
+    pulled = world.client.get("/kosync/syncs/annotations/" + DOC, headers=headers)
+    assert pulled.status_code == 200
+    echoed = pulled.get_json()["annotations"]
+    assert [p["source"] for p in echoed] == ["crosspoint"]
+    response = world.client.put("/kosync/syncs/annotations", headers=headers, json={
+        "document": DOC, "annotations": echoed + [
+            {"annotation_id": "new-koreader", "highlighted_text": "other words"}]})
+    assert response.status_code == 200, response.get_json()
+    assert annotation(world, "new-koreader").highlighted_text == "other words"
+    assert annotation(world, "a" * 32).source == "crosspoint"
+    assert get(world, headers).get_json()["items"][0]["text"] == item()["text"]
+
+
+@pytest.mark.parametrize("elsewhere", ["another-account", "another-book", "another-source"])
+def test_an_echo_exception_cannot_create_crosspoint_rows_elsewhere(world, elsewhere):
+    """Only an existing CrossPoint row of this account and book can be echoed."""
+    upload(world, item())
+    row = annotation(world, "a" * 32)
+    if elsewhere == "another-account":
+        row.user_id = world.add_user("bob").id
+    elif elsewhere == "another-book":
+        row.book_id = BOOK + 1
+    else:
+        row.source = "kobo"
+    world.session.commit()
+    response = world.client.put("/kosync/syncs/annotations", headers=world.basic("alice"), json={
+        "document": DOC, "annotations": [
+            {"annotation_id": "must-not-land", "highlighted_text": "valid"},
+            {"annotation_id": "a" * 32, "source": "crosspoint", "highlighted_text": "echo"}]})
+    assert response.status_code == 400
+    assert world.session.query(ub.Annotation).filter_by(annotation_id="must-not-land").count() == 0
+
+
+def test_an_extremely_long_cursor_is_a_client_error(world):
+    """Reject before Python's integer-string limit raises an uncaught ValueError."""
+    assert get(world, firmware_headers(world), cursor="9" * 5000).status_code == 400
+
+
+@pytest.mark.parametrize("chapter, expected", [("é" * 33, "é" * 32), ("a" * 63 + "é", "a" * 63)])
+def test_a_chapter_is_truncated_at_a_utf8_boundary(world, chapter, expected):
+    """The chapter cap counts bytes, and never sends a partial UTF-8 character."""
+    headers = firmware_headers(world)
+    assert put(world, headers, [item(chapter=chapter)]).status_code == 200
+    assert get(world, headers).get_json()["items"][0]["chapter"] == expected
+
+
+def test_a_nul_in_a_chapter_rejects_the_whole_batch(world):
+    """Firmware strings cannot hold embedded NUL, even beyond the chapter cap."""
+    response = put(world, firmware_headers(world), [item(chapter="a" * 65 + "\x00")])
+    assert response.status_code == 400
+    assert world.session.query(ub.Annotation).count() == 0
+
+
+def test_an_offset_near_the_end_of_a_chapter_never_places_in_the_next(world):
+    """The 32-character tolerance must stay inside the named spine item."""
+    from tests.unit.test_koreader_xpointer import _html_book
+    path = world.book_file(BOOK, "EPUB")
+    _html_book(path.parent, ["<p>abcdefghij</p>",
+                            "<p>tiny next chapter</p>"]).replace(path)
+    upload(world, item(text="tiny", spine=0, start_offset=9, end_offset=13))
+    row = annotation(world, "a" * 32)
+    assert row.position_type == "text_quote" and row.start_xpointer is None
+
+
+def test_an_identified_koreader_pulls_shared_clippings_and_excludes_foreign_ones(world):
+    """Adding CrossPoint to legacy pulls must preserve the per-device filter."""
+    from cps.services.device_registry import register_koreader_device_best_effort
+    assert put(world, world.basic("alice"), [item()]).status_code == 200
+    assert put(world, firmware_headers(world), [item("b" * 32)]).status_code == 200
+    with world.app.test_request_context():
+        assert register_koreader_device_best_effort(
+            user_id=world.user.id, device_id="koreader-other") is not None
+    headers = dict(world.basic("alice"), **{"X-CWNG-Device-ID": "koreader-other"})
+    pulled = world.client.get("/kosync/syncs/annotations/" + DOC, headers=headers)
+    assert pulled.status_code == 200
+    body = pulled.get_json()
+    assert [p["annotation_id"] for p in body["annotations"]] == ["a" * 32]
+    assert body["foreign_annotation_ids"] == ["b" * 32]

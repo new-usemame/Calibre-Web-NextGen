@@ -61,7 +61,9 @@ def _span_book_percent(book, span):
     """
     chapter = span.get("chapterFilename")
     progress = span.get("chapterProgress")
-    if not chapter or isinstance(progress, bool) or not isinstance(progress, (int, float)):
+    if (not isinstance(chapter, str) or not chapter
+            or isinstance(progress, bool) or not isinstance(progress, (int, float))
+            or not 0 <= progress <= 1):
         return None
     from cps.readingservices import EpubProgressCalculator
     percent = EpubProgressCalculator(book).calculate(chapter, progress)
@@ -195,7 +197,10 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
                 )
             else:
                 progress_percent = None
-                span = ((payload or {}).get("location") or {}).get("span") or {}
+                location = (payload or {}).get("location")
+                span = location.get("span") if isinstance(location, dict) else {}
+                if not isinstance(span, dict):
+                    span = {}
                 try:
                     progress_percent = self._book_percent_getter(book, annotation, span)
                 except Exception as exc:  # the entry still goes without a page

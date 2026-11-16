@@ -172,9 +172,12 @@ def test_is_enabled_requires_user_token_and_global_config():
     (None, None),
 ])
 def test_push_tags_the_entry_with_the_reader_of_its_source(source, tag):
-    client = MockHardcoverClient(add_response={"id": 1})
-    _make_handler(client).push(FakeAnnotation(source=source), _book_with_isbn(), FakeUser())
-    assert client.calls[0][2]["source_tag"] == tag
+    client = _RecordingHardcoverClient()
+    result = _make_handler(client).push(
+        FakeAnnotation(source=source), _book_with_isbn(), FakeUser())
+    assert result.status == "synced", result.error_message
+    assert [t["tag"] for t in client.sent[-1]["tags"]] == (
+        ["CWA"] + ([tag] if tag else []) + ["yellow"])
 
 
 def _handler_with_percent(client, percent_getter):
@@ -278,3 +281,94 @@ def test_journal_entry_tags_name_cwa_and_only_the_given_reader():
     assert variables["metadata"]["position"]["value"] == 50
     client.add_journal_entry({"isbn": "9780000000000"}, None, highlighted_text="words")
     assert [t["tag"] for t in client.sent[-1]["tags"]] == ["CWA"]
+
+
+@pytest.fixture
+def hardcover_epub(tmp_path, monkeypatch):
+    """Two equal chapters; their halfway point is 75% of the book."""
+    from cps import readingservices
+    from tests.unit.test_koreader_xpointer import _html_book
+
+    (tmp_path / "b").mkdir()
+    path = _html_book(tmp_path / "b", ["<p>aaaa</p>", "<p>bbbb</p>"])
+    monkeypatch.setattr(readingservices.config, "get_book_path", lambda: str(tmp_path))
+    book = SimpleNamespace(id=1, path="b", data=[SimpleNamespace(format="EPUB", name="book")])
+    return book, path
+
+
+@pytest.mark.parametrize("progress", [-1, 1.01, float("inf"), float("-inf"), float("nan"),
+                                      True, "0.5", None])
+def test_invalid_chapter_progress_syncs_text_without_a_page(hardcover_epub, progress):
+    """Bad device progress must neither invent a page nor block the quote."""
+    book, _path = hardcover_epub
+    client = _RecordingHardcoverClient()
+    span = {"chapterFilename": "OEBPS/c1.html", "chapterProgress": progress}
+    result = _make_handler(client).push(
+        FakeAnnotation(), book, FakeUser(), {"location": {"span": span}})
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"] is None
+    assert "hello" in client.sent[-1]["entry"]
+
+
+@pytest.mark.parametrize("payload", [
+    {"location": "bad"}, {"location": [1]},
+    {"location": {"span": "bad"}}, {"location": {"span": [1]}},
+])
+def test_malformed_location_syncs_text_without_a_page(payload):
+    """The dispatcher preserves text with rejected location; its target must too."""
+    client = _RecordingHardcoverClient()
+    result = _make_handler(client).push(FakeAnnotation(), _book_with_isbn(), FakeUser(), payload)
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"] is None
+
+
+def test_kobo_page_uses_the_exact_chapter_not_a_filename_suffix(hardcover_epub):
+    """An earlier intro-c1.html must not steal a highlight in c1.html."""
+    import zipfile
+
+    book, path = hardcover_epub
+    with zipfile.ZipFile(path) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    files["OEBPS/intro-c1.html"] = files.pop("OEBPS/c0.html")
+    files["OEBPS/content.opf"] = files["OEBPS/content.opf"].replace(b"c0.html", b"intro-c1.html")
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    client = _RecordingHardcoverClient()
+    span = {"chapterFilename": "c1.html", "chapterProgress": 0.5}
+    result = _make_handler(client).push(
+        FakeAnnotation(), book, FakeUser(), {"location": {"span": span}})
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"]["position"] == {
+        "type": "pages", "value": 150, "percent": 75.0, "possible": 200,
+    }
+
+
+@pytest.mark.parametrize("chapter_progress, percent, page", [(0, 50, 100), (0.5, 75, 150), (1, 100, 200)])
+def test_valid_kobo_position_reaches_the_journal_request(hardcover_epub, chapter_progress, percent, page):
+    """Exercise the real EPUB calculator, handler and GraphQL client together."""
+    book, _path = hardcover_epub
+    client = _RecordingHardcoverClient()
+    span = {"chapterFilename": "OEBPS/c1.html", "chapterProgress": chapter_progress}
+    result = _make_handler(client).push(
+        FakeAnnotation(), book, FakeUser(), {"location": {"span": span}})
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"]["position"] == {
+        "type": "pages", "value": page, "percent": percent, "possible": 200,
+    }
+
+
+def test_xpointer_position_reaches_the_journal_request(hardcover_epub, monkeypatch):
+    """A payload-free KOReader highlight must get a page in the actual request."""
+    from cps import annotations
+
+    book, path = hardcover_epub
+    monkeypatch.setattr(annotations, "_book_format_path",
+                        lambda book, fmt: str(path) if fmt == "EPUB" else None)
+    client = _RecordingHardcoverClient()
+    annotation = FakeAnnotation(source="koreader", start_xpointer="/body/DocFragment[2]/body/p/text().2")
+    result = _make_handler(client).push(annotation, book, FakeUser())
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"]["position"] == {
+        "type": "pages", "value": 150, "percent": 75.0, "possible": 200,
+    }

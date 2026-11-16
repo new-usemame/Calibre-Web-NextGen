@@ -33,28 +33,7 @@ else
     fi
 fi
 
-# Sleep this long between sweeps. One hour is the canonical cadence; the
-# cache grows slowly under normal use, and rapid eviction during a burst
-# is undesirable (interactively-visible re-renders).
-SWEEP_INTERVAL_SECONDS=${CWA_PREVIEW_CACHE_SWEEP_INTERVAL:-3600}
-
-# A short startup delay so we don't compete with cwa-init / migration
-# work on a fresh container boot. The cache is empty on first boot
-# anyway; nothing to evict.
-INITIAL_DELAY_SECONDS=${CWA_PREVIEW_CACHE_INITIAL_DELAY:-120}
-
-echo "[cwa-preview-cache-cleanup] Initial delay: ${INITIAL_DELAY_SECONDS}s; sweep interval: ${SWEEP_INTERVAL_SECONDS}s; cap (MB): ${CWA_PREVIEW_CACHE_MAX_MB:-1024}"
-sleep "$INITIAL_DELAY_SECONDS"
-
-# Python's `-m` only adds CWD to sys.path; cd so `cps` is importable.
-cd /app/calibre-web-automated || { echo "[cwa-preview-cache-cleanup] FATAL: /app/calibre-web-automated missing"; exit 1; }
-
-while true; do
-    # Run as the abc service user so unlink permissions match what the
-    # Flask endpoint wrote (write_to_cache runs in the gunicorn worker
-    # which is also abc).
-    cwa-as-abc python3 -m cps.services.cover_preview_cache_sweeper \
-        || echo "[cwa-preview-cache-cleanup] WARNING: sweeper exited non-zero; continuing schedule"
-
-    sleep "$SWEEP_INTERVAL_SECONDS"
-done
+# The service body lives in scripts/services so it can run outside s6 (#2094).
+# Sweeps run as abc so unlink permissions match what the web app wrote.
+export CWA_RUN_AS=cwa-as-abc
+exec /app/calibre-web-automated/scripts/services/cwa-preview-cache-cleanup.sh

@@ -5116,8 +5116,15 @@ msgid "Only these shelves"
 msgstr "Alleen deze planken"
 
 #: cps/spa_strings.py
-msgid "Smart shelves are not synced to e-readers on this server, so a smart shelf ticked here adds no books. An administrator can turn on Sync smart shelves in the settings."
-msgstr "Slimme boekenplanken worden op deze server niet met e-readers gesynchroniseerd, dus een slimme boekenplank die je hier aanvinkt voegt geen boeken toe. Een beheerder kan Slimme boekenplanken synchroniseren inschakelen in de instellingen."
+msgid ""
+"Smart shelves are not synced to e-readers on this server, so a smart shelf "
+"ticked here adds no books. An administrator can turn on Sync smart shelves "
+"in the settings."
+msgstr ""
+"Slimme boekenplanken worden op deze server niet met e-readers "
+"gesynchroniseerd, dus een slimme boekenplank die je hier aanvinkt voegt geen "
+"boeken toe. Een beheerder kan Slimme boekenplanken synchroniseren "
+"inschakelen in de instellingen."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8689,6 +8696,10 @@ msgid "Recipient(s)"
 msgstr "Ontvanger(s)"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr "Opgeslagen e-readeradressen:"
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Redirect host (volledige URL)"
 
@@ -12021,6 +12032,36 @@ msgid "Could not change image fit. Try again."
 msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+"Geldt wanneer Mijn bibliotheek wordt gekozen. De gebruiker voegt zelf boeken "
+"uit de globale bibliotheek toe. Niet beschikbaar zodra een account al boeken "
+"met een Kobo synchroniseert."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+"Een lege Mijn bibliotheek geven aan {name}? Er staan geen boeken in; de "
+"gebruiker voegt zelf boeken uit de globale bibliotheek toe."
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+"Vereist de rol voor globaal bladeren: zonder die rol kan de gebruiker geen "
+"boeken toevoegen."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr "Mijn bibliotheek leeg starten"
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr "Dit exemplaar behouden"
 
@@ -12058,6 +12099,16 @@ msgstr "Samengevoegd in ‘{title}’."
 #: cps/spa_strings.py
 msgid "Could not merge these books."
 msgstr "Kan deze boeken niet samenvoegen."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr "{done} van {total} geïmporteerd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr "Er zijn al een tijdje geen nieuwe boeken verschenen; {count} nog niet geïmporteerd."
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -19124,6 +19175,13 @@ msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
 
 #: cps/templates/user_edit.html

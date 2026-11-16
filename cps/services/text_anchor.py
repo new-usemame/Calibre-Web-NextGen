@@ -334,9 +334,14 @@ def place_near_solid_index(epub_path, member: str, index: int, text: str,
     book = _book(epub_path)
     if book is None or member not in book.members:
         return None
-    base = book.starts[book.members.index(member)]
+    member_index = book.members.index(member)
+    base = book.starts[member_index]
+    size = len(book.solids[member_index])
+    if not 0 <= index < size:
+        return None
     return place_in_text_range(
-        epub_path, (base + max(index - slack, 0), base + index + slack + 1), text)
+        epub_path, (base + max(index - slack, 0),
+                    base + min(index + slack + 1, size)), text)
 
 
 def _range(epub_path, book: _Folded, at: int, exact: str):

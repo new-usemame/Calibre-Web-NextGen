@@ -62,7 +62,7 @@ MAX_PUT_ITEMS = 50
 MAX_PUT_BYTES = MAX_INVENTORY_BYTES
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 100
-MAX_CHAPTER_CHARS = 64
+MAX_CHAPTER_BYTES = 64
 # The firmware's own limits (ClippingSync.cpp, ClippingStore.h).
 MAX_ID_CHARS = 64
 MAX_TEXT_BYTES = 4096
@@ -168,9 +168,10 @@ def parse_item(raw):
     chapter = raw.get("chapter")
     if chapter is None:
         chapter = ""
-    if not isinstance(chapter, str) or _utf8_bytes(chapter) is None:
-        return None, "chapter must be a string"
-    item["chapter"] = chapter[:MAX_CHAPTER_CHARS]
+    if (not isinstance(chapter, str) or _utf8_bytes(chapter) is None
+            or "\x00" in chapter):
+        return None, "chapter must be a UTF-8 string with no NUL"
+    item["chapter"] = chapter.encode("utf-8")[:MAX_CHAPTER_BYTES].decode("utf-8", errors="ignore")
     return item, None
 
 
@@ -353,7 +354,8 @@ def _portable(item, epub_path=None) -> dict:
 def _apply_upload(item, *, user, book, document, device_id, session, epub_path,
                   counts):
     row = _find_row(session, user.id, book.id, item["id"])
-    if row is not None and row.source != SOURCE:
+    if row is not None and (row.source != SOURCE or (
+            row.origin_device_id is not None and row.origin_device_id != device_id)):
         log.warning(
             "CrossPoint clippings push: user=%s book=%s id=%s belongs to source=%s "
             "device=%s - not changed",
@@ -372,7 +374,7 @@ def _apply_upload(item, *, user, book, document, device_id, session, epub_path,
                  "server - not restored", user.id, book.id, _loggable(item["id"]))
         counts["unchanged"] += 1
         return
-    if (device_id is not None and row.origin_device_id is not None
+    if (row.origin_device_id is not None
             and row.origin_device_id != device_id):
         log.warning(
             "CrossPoint clippings push: user=%s book=%s id=%s belongs to source=%s "
@@ -406,7 +408,34 @@ def _apply_upload(item, *, user, book, document, device_id, session, epub_path,
         raise RuntimeError("database commit did not land")
 
 
-def _apply_delete(item, *, user, book, device_id, session, counts):
+def _apply_delete(item, *, user, book, document, device_id, session, counts):
+    row = _find_row(session, user.id, book.id, item["id"])
+    if row is None:
+        # A delete may overtake an upload. Retain the identity so that delayed
+        # upload cannot bring the clipping back. Tombstones need no layout.
+        revision = next_revision(session, user.id)
+        row = ub.Annotation(user_id=user.id, book_id=book.id,
+                            annotation_id=item["id"], source=SOURCE, hidden=True,
+                            origin_device_id=device_id, annotation_type="highlight")
+        row.crosspoint_clipping = ub.CrossPointClipping(
+            user_id=user.id, document=document, deleted=True,
+            sync_revision=revision, updated_at=_now(), spine=0,
+            start_page=0, end_page=0, pages=1, start_word=0, end_word=0,
+            words=0, chapter="", text="", created_epoch=0, layout_signature=0,
+        )
+        session.add(row)
+        if not ub.session_commit():
+            raise RuntimeError("database commit did not land")
+        counts["deleted"] += 1
+        return
+    if (row.source != SOURCE or (row.origin_device_id is not None
+                                and row.origin_device_id != device_id)):
+        log.warning(
+            "CrossPoint clippings delete: user=%s book=%s id=%s belongs to source=%s "
+            "device=%s - not changed",
+            user.id, book.id, _loggable(item["id"]), row.source, row.origin_device_id)
+        counts["unchanged"] += 1
+        return
     apply_push([], user=user, book=book, session=session, commit=ub.session_commit,
                deleted_ids=[item["id"]], delete_source=SOURCE,
                origin_device_id=device_id)
@@ -425,14 +454,14 @@ def apply_items(items, *, user, book, document, device_id, session, epub_path) -
     """Store parsed items one at a time; return ``accepted`` and the counts.
 
     Every valid item counts as accepted, also one that changed nothing (a
-    repeat, a tombstoned id, another reader's id, an unknown delete): a retry
+    repeat, a tombstoned id, another reader's id): a retry
     cannot change its result, and a reader that saw it refused would retry it
     on every sync and fail each time.
     """
     counts = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0}
     for item in items:
         if item["deleted"]:
-            _apply_delete(item, user=user, book=book, device_id=device_id,
+            _apply_delete(item, user=user, book=book, document=document, device_id=device_id,
                           session=session, counts=counts)
         else:
             _apply_upload(item, user=user, book=book, document=document,
@@ -477,7 +506,8 @@ def _cursor_arg():
     raw = request.args.get("cursor")
     if raw is None:
         return 0
-    if not raw.isascii() or not raw.isdigit() or int(raw) > MAX_CURSOR:
+    if (len(raw) > len(str(MAX_CURSOR)) or not raw.isascii()
+            or not raw.isdigit() or int(raw) > MAX_CURSOR):
         return None
     return int(raw)
 
@@ -574,6 +604,9 @@ def push_clippings(document: str):
 
     from ...services.kosync_place import request_device
     device, _identified, _raw_id = request_device(user.id, observe=True)
+    if request.headers.get("X-CWNG-Device-ID") is not None and device is None:
+        return _reject(user, document, "invalid_device",
+                       "X-CWNG-Device-ID could not be registered")
     epub_path = None
     if any(not item["deleted"] for item in items):
         # Placing a quote reads the book's text (see the annotations push).

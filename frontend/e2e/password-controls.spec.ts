@@ -123,3 +123,24 @@ for (const enabled of [true, false]) {
     await expect(next).toHaveAttribute('type', 'password');
   });
 }
+
+test('a shown classic password is hidden again when its form submits', async ({ page }) => {
+  await page.setContent(`<form><label for="smtp">SMTP password</label>
+    <input id="smtp" name="smtp" type="password" value="keep-this"><button type="submit">Save</button></form>`);
+  await page.evaluate(() => {
+    document.querySelector('form')!.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = document.getElementById('smtp') as HTMLInputElement;
+      document.body.dataset.typeAtSubmit = input.type;
+      document.body.dataset.saved = String(new FormData(event.target as HTMLFormElement).get('smtp'));
+    });
+  });
+  await page.addScriptTag({ path: fileURLToPath(new URL('../../cps/static/js/password-toggle.js', import.meta.url)) });
+  const input = page.getByLabel('SMTP password', { exact: true });
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(input).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-type-at-submit', 'password');
+  await expect(page.locator('body')).toHaveAttribute('data-saved', 'keep-this');
+  await expect(page.getByRole('button', { name: 'Show password' })).toHaveAttribute('aria-pressed', 'false');
+});

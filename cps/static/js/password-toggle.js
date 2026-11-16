@@ -51,7 +51,25 @@
         for (var i = 0; i < list.length; i++) { enhance(list[i]); }
     }
 
+    // Hide every shown password before a form submits, so the browser never
+    // records a visible password in its form history.
+    function hideOnSubmit(e) {
+        var form = e.target;
+        if (!form || !form.querySelectorAll) { return; }
+        var shown = form.querySelectorAll('input.cwng-pw-input[type="text"]');
+        for (var i = 0; i < shown.length; i++) {
+            shown[i].type = "password";
+            var btn = shown[i].parentNode && shown[i].parentNode.querySelector(".cwng-pw-toggle");
+            if (btn) {
+                btn.setAttribute("aria-pressed", "false");
+                btn.setAttribute("aria-label", labels().show);
+                btn.title = labels().show;
+            }
+        }
+    }
+
     function init() {
+        document.addEventListener("submit", hideOnSubmit, true);
         scan(document);
         if (window.MutationObserver) {
             new MutationObserver(function (muts) {

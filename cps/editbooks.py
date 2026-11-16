@@ -1234,6 +1234,7 @@ def do_edit_book(book_id, upload_formats=None):
         if config.config_kobo_sync and config.hardcover_sync_enabled():
             modify_date |= edit_hardcover_blacklist(book_id, to_save)
 
+        previous_pubdate = book.pubdate
         if to_save.get("pubdate"):
             try:
                 # Accept year-only ("2020") and year-month ("2020-05") in
@@ -1246,6 +1247,7 @@ def do_edit_book(book_id, upload_formats=None):
                 edit_error = True
         else:
             book.pubdate = db.Books.DEFAULT_PUBDATE
+        modify_date |= book.pubdate != previous_pubdate
 
         # Stage 3: Commit all changes to the database.
         if modify_date:

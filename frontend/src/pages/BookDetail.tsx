@@ -154,7 +154,7 @@ function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSe
                   setEmails(toggleRecipients(emails, [address], e.target.checked));
                 }}
               />
-              {address}
+              <span className={styles.sendAddress}>{address}</span>
             </label>
           ))}
         </fieldset>

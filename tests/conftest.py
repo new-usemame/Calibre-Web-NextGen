@@ -627,6 +627,11 @@ def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
 
     Never raises. Failing to tidy up is not a reason to fail someone's test run.
     """
+    # Windows kill(pid, 0) calls TerminateProcess; it is not a liveness probe.
+    # Leave these directories alone until there is a non-destructive Windows
+    # owner check. Cleanup is optional; another running suite must stay safe.
+    if os.name == "nt":
+        return
     try:
         entries = os.listdir(base)
     except OSError:
@@ -648,6 +653,8 @@ def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
             os.kill(pid, 0)
         except ProcessLookupError:
             pass          # owner is gone: reapable
+        except SystemError:
+            continue      # liveness unknown; preserve the owner's directory
         except OSError:
             continue      # e.g. EPERM -- another user's live process; leave it
         else:

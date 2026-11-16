@@ -58,6 +58,9 @@ _AUTO_RESOLVE_LOCK = threading.Lock()
 
 def duplicate_resolution_root():
     """Directory where destructive duplicate resolution retains originals."""
+    resolver = getattr(constants, "processed_books_dir", None)
+    if callable(resolver):
+        return os.path.join(resolver(), "duplicate_resolutions")
     config_root = getattr(constants, "CONFIG_DIR", None)
     if not config_root:
         configured = (os.environ.get("CALIBRE_DBPATH") or "").strip()

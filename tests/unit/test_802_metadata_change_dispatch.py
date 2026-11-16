@@ -36,6 +36,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from metadata_change_dispatch import ChangeLogDispatcher  # noqa: E402
+from tests.fixtures.service_sources import service_source
 
 
 def _recording_dispatcher(**kwargs):
@@ -170,7 +171,7 @@ def test_enforcer_missing_log_logs_single_info_not_warning_spam(capsys, tmp_path
 
 @pytest.mark.unit
 def test_detector_run_script_dispatches_through_debouncer():
-    run = (REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/metadata-change-detector/run").read_text()
+    run = service_source("metadata-change-detector")
     # Both watcher backends must feed the dispatcher.
     assert "metadata_change_dispatch.py" in run
     # The bug was invoking the enforcer once per raw event inline; that direct

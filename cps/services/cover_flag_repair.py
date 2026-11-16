@@ -22,6 +22,7 @@ looked up where covers are actually served from.
 from __future__ import annotations
 
 import os
+import re
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Callable, Iterable, Sequence
@@ -47,10 +48,15 @@ class CoverFlagRepairResult:
 
 
 def _has_usable_cover(books_root: str, book_path: str) -> bool:
-    cover = os.path.join(books_root, book_path, COVER_FILENAME)
     try:
+        if os.path.isabs(book_path):
+            return False
+        root = os.path.realpath(books_root)
+        cover = os.path.realpath(os.path.join(root, book_path, COVER_FILENAME))
+        if os.path.commonpath((root, cover)) != root:
+            return False
         return os.path.isfile(cover) and os.path.getsize(cover) > 0
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
@@ -143,7 +149,20 @@ def parse_selection(raw_ids: Iterable, preview_ids: set[int]) -> list[int]:
     ``outside_preview`` (an id the scan never listed) or ``empty``.
     """
     try:
-        selected = list(dict.fromkeys(int(book_id) for book_id in raw_ids))
+        selected = []
+        for book_id in raw_ids:
+            # JSON numbers must be integers; classic form values are decimal
+            # strings. int() alone silently accepts booleans and truncates floats.
+            if type(book_id) is int:
+                parsed = book_id
+            elif isinstance(book_id, str) and re.fullmatch(r"[1-9][0-9]*", book_id):
+                parsed = int(book_id)
+            else:
+                raise SelectionError("invalid")
+            if parsed <= 0:
+                raise SelectionError("invalid")
+            selected.append(parsed)
+        selected = list(dict.fromkeys(selected))
     except (TypeError, ValueError):
         raise SelectionError("invalid") from None
     if any(book_id not in preview_ids for book_id in selected):
@@ -164,21 +183,31 @@ def apply_selection(
 ) -> CoverFlagRepairResult:
     """Restore the flag on the selected books and commit.
 
-    The commit happens under ``write_lock``. On any failure the session is
-    rolled back, nothing is changed, and the exception propagates. ``on_fixed``
-    runs per restored book only after the commit succeeded.
+    Refresh the rows and commit under ``write_lock``. A database failure rolls
+    back the selection. ``on_fixed`` runs after commit; cache queue failures
+    are logged without misreporting a successful database write as rolled back.
     """
-    books_by_id = {
-        book.id: book for book in
-        session.query(books_model).filter(books_model.id.in_(list(selected_ids))).all()
-    }
+    from .. import helper, logger
+
     try:
         with write_lock():
+            books_by_id = {
+                book.id: book for book in session.query(books_model)
+                .filter(books_model.id.in_(list(selected_ids)))
+                .populate_existing().all()
+            }
             outcome = restore_flags(books_by_id, selected_ids, books_root)
+            for book_id in outcome.fixed:
+                helper.mark_book_modified(books_by_id[book_id])
             session.commit()
     except Exception:
         session.rollback()
         raise
     for book_id in outcome.fixed:
-        on_fixed(book_id)
+        try:
+            on_fixed(book_id)
+        except Exception as ex:
+            logger.create().warning(
+                "Cover restored for book %s, but thumbnail invalidation failed: %s",
+                book_id, ex)
     return outcome

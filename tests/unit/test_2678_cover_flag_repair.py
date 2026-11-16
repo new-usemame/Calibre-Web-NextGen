@@ -209,11 +209,18 @@ RESTORE = "/api/v1/admin/cover-flags/restore"
 def api(library, monkeypatch):
     from cps import constants
     from cps.api import cover_flags
+    from flask_wtf.csrf import CSRFProtect, generate_csrf
 
     cleared = []
     monkeypatch.setattr(cover_flags, "calibre_db", library.cdb)
     monkeypatch.setattr(cover_flags, "metadata_db_write_lock", contextlib.nullcontext)
     monkeypatch.setattr(cover_flags.helper, "clear_cover_thumbnail_cache", cleared.append)
+    CSRFProtect(library.app)
+
+    @library.app.get("/test/cover-flags-csrf")
+    def csrf_token():
+        return generate_csrf()
+
     library.enable_web()
     admin = library.add_user("root")
     admin.role |= constants.ROLE_ADMIN
@@ -299,3 +306,117 @@ def test_api_is_not_offered_for_google_drive_libraries(api, monkeypatch):
         response = api.admin.post(url, json=payload)
         assert response.status_code == 400
         assert response.get_json()["error"]["code"] == "not_available"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("book_id", [True, 1.5, 1.0, "1.0", " 1", "+1"])
+def test_api_rejects_ids_that_would_be_coerced_to_a_preview_book(api, book_id):
+    """Malformed IDs must never restore a different, valid preview ID."""
+    token = api.admin.post(SCAN).get_json()["token"]
+    response = api.admin.post(RESTORE, json={"token": token, "book_ids": [book_id]})
+    assert response.status_code == 400
+    assert _flag(api.world, 1) == 0
+
+
+@pytest.mark.unit
+def test_restore_advances_the_book_revision_for_cached_covers_and_sync(api):
+    """A repaired cover must be visible beyond a fresh uncached cover request."""
+    before = api.world.session.get(db.Books, 1).last_modified
+    token = api.admin.post(SCAN).get_json()["token"]
+    response = api.admin.post(RESTORE, json={"token": token, "book_ids": [1]})
+    assert response.status_code == 200
+    api.world.session.expire_all()
+    changed = api.world.session.query(db.Books).filter(
+        db.Books.id == 1, db.Books.last_modified > before).one_or_none()
+    assert changed is not None, "sync cursors and cover URLs use last_modified"
+
+
+@pytest.mark.unit
+def test_cache_queue_failure_does_not_report_a_committed_restore_as_rolled_back(api, monkeypatch):
+    from cps.api import cover_flags
+
+    def queue_failed(_book_id):
+        raise RuntimeError("thumbnail worker unavailable")
+
+    monkeypatch.setattr(cover_flags.helper, "clear_cover_thumbnail_cache", queue_failed)
+    token = api.admin.post(SCAN).get_json()["token"]
+    response = api.admin.post(RESTORE, json={"token": token, "book_ids": [1]})
+    assert response.status_code == 200
+    assert response.get_json() == {"fixed": 1, "skipped": 0}
+    assert _flag(api.world, 1) == 1
+
+
+@pytest.mark.unit
+def test_restore_reads_live_rows_after_acquiring_the_writer_lock(library):
+    """A writer finishing while we wait must not leave a stale path to restore."""
+    from sqlalchemy import update
+
+    # Model a different writer: its commit must not expire our identity map.
+    library.session.expire_on_commit = False
+
+    @contextlib.contextmanager
+    def another_writer_finishes():
+        library.session.execute(update(db.Books).where(db.Books.id == 1).values(
+            path="Moved/No Cover").execution_options(synchronize_session=False))
+        library.session.commit()
+        yield
+
+    outcome = cover_flag_repair.apply_selection(
+        library.session, db.Books, [1], str(library.root),
+        write_lock=another_writer_finishes, on_fixed=lambda _book_id: None)
+    assert outcome.fixed == ()
+    assert outcome.skipped == 1
+    assert _flag(library, 1) == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("escape", ["relative", "absolute", "symlink"])
+def test_scan_and_restore_refuse_cover_paths_outside_the_books_directory(tmp_path, escape):
+    """A library row cannot make an unrelated file qualify as a book cover."""
+    root = tmp_path / "books"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (outside / "cover.jpg").write_bytes(b"cover")
+    if escape == "symlink":
+        (root / "linked").symlink_to(outside, target_is_directory=True)
+        path = "linked"
+    else:
+        path = "../outside" if escape == "relative" else str(outside)
+    book = SimpleNamespace(path=path, has_cover=0)
+    assert cover_flag_repair.find_candidates([(1, "Outside", path, 0)], str(root)) == []
+    assert cover_flag_repair.restore_flags({1: book}, [1], str(root)).fixed == ()
+    assert book.has_cover == 0
+
+
+@pytest.mark.unit
+def test_commit_failure_rolls_back_all_selected_covers(library, monkeypatch):
+    def commit_failed():
+        raise RuntimeError("database write failed")
+
+    cleared = []
+    monkeypatch.setattr(library.session, "commit", commit_failed)
+    with pytest.raises(RuntimeError, match="database write failed"):
+        cover_flag_repair.apply_selection(
+            library.session, db.Books, [1, 5], str(library.root),
+            write_lock=contextlib.nullcontext, on_fixed=cleared.append)
+    assert _flag(library, 1) == 0
+    assert _flag(library, 5) is None
+    assert cleared == []
+
+
+@pytest.mark.unit
+def test_scan_and_restore_require_csrf_in_a_browser_session(api):
+    """Authenticated admin requests still need the browser session's CSRF token."""
+    api.world.app.config["WTF_CSRF_ENABLED"] = True
+    assert api.admin.post(SCAN).status_code == 400
+    csrf = api.admin.get("/test/cover-flags-csrf").get_data(as_text=True)
+    headers = {"X-CSRFToken": csrf}
+    scan = api.admin.post(SCAN, headers=headers)
+    assert scan.status_code == 200
+    payload = {"token": scan.get_json()["token"], "book_ids": [1]}
+    assert api.admin.post(RESTORE, json=payload).status_code == 400
+    assert _flag(api.world, 1) == 0
+    response = api.admin.post(RESTORE, json=payload, headers=headers)
+    assert response.status_code == 200
+    assert _flag(api.world, 1) == 1

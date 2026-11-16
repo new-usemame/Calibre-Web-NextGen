@@ -44,6 +44,7 @@ def library(monkeypatch):
 
     class Ddc(base):
         __tablename__ = "custom_column_3"
+        books = relationship(db.Books, primaryjoin=lambda: foreign(Ddc.book) == db.Books.id, uselist=True)
         id = Column(Integer, primary_key=True)
         book = Column(Integer)
         value = Column(String)
@@ -124,6 +125,7 @@ def _flat_entries(calibre, rows):
     count_query.all = lambda: rows
 
     value_query = SimpleNamespace()
+    value_query.filter = lambda *a, **kw: value_query
     value_query.distinct = lambda *a, **kw: value_query
     value_query.all = lambda: [(r[0],) for r in rows]
 
@@ -208,6 +210,7 @@ def test_the_flat_list_honours_a_book_filter(library):
     query.filter = lambda arg: (filtered.append(arg), query)[1]
     # Second query: the unfiltered distinct-value list (see _flat_entries).
     value_query = SimpleNamespace()
+    value_query.filter = lambda *a, **kw: value_query
     value_query.distinct = lambda *a, **kw: value_query
     value_query.all = lambda: [("778.3",)]
     issued = []

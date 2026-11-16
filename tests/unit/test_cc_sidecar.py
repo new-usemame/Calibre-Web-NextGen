@@ -343,7 +343,7 @@ def test_reconcile_costs_nothing_when_nothing_has_been_reordered(sidecar_library
 def test_reconcile_leaves_order_alone_when_the_value_table_cannot_be_read(
         sidecar_library, monkeypatch):
     """Pruning on a failed read would discard a user's curation because of our
-    problem, not theirs. No live paths means 'we do not know', not 'none'.
+    problem, not theirs. An unavailable read must be distinguished from a readable empty column.
     """
     cc_sidecar.ensure_tables()
     session = sidecar_library.calibre.session
@@ -351,7 +351,7 @@ def test_reconcile_leaves_order_alone_when_the_value_table_cannot_be_read(
                          "VALUES (3, '778.3', '', 0)"
                          % cc_sidecar._table("cc_value_order")))
     session.commit()
-    monkeypatch.setattr(cc_sidecar, "_live_paths", lambda _cid: set())
+    monkeypatch.setattr(cc_sidecar, "_live_paths", lambda _cid: None)
 
     summary = cc_sidecar.reconcile()
 
@@ -426,3 +426,24 @@ def test_nothing_in_phase_one_changes_how_a_column_is_rendered(sidecar_library):
 
     assert [n["path"] for n in tree] == ["775", "778"]
     assert [c["path"] for c in tree[1]["children"]] == ["778.3", "778.72"]
+
+
+def test_failed_library_read_cannot_erase_declared_modes(sidecar_library):
+    library = sidecar_library
+    assert cc_sidecar.ensure_tables()
+    assert cc_sidecar.set_hierarchy_verdict(3, True)
+    session = library.calibre.session
+    session.execute(text('DROP TABLE calibre.custom_columns'))
+    session.commit()
+    cc_sidecar.reconcile()
+    assert cc_sidecar.hierarchy_verdict(3).value is True
+
+
+def test_empty_value_table_prunes_old_positions_before_a_name_is_reused(sidecar_library):
+    assert cc_sidecar.ensure_tables()
+    session = sidecar_library.calibre.session
+    cc_sidecar.set_order_for_siblings(3, ['775', '778'])
+    session.execute(text('DELETE FROM calibre.custom_column_3'))
+    session.commit()
+    cc_sidecar.reconcile()
+    assert cc_sidecar.stored_order(3) == {}

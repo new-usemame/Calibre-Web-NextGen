@@ -1196,12 +1196,6 @@ def _save_cc_hierarchy_verdicts():
 def update_view_configuration():
     to_save = request.form.to_dict()
 
-    # Per-column hierarchy verdicts live in the app.db sidecar, not in the
-    # settings table, so they are written before anything else here -- a failure
-    # must not be able to roll back the settings save below.
-    if "cc_hierarchy_mode" in request.form:
-        _save_cc_hierarchy_verdicts()
-
     if "config_opds_filename_template" in to_save:
         try:
             validate_opds_filename_template(to_save["config_opds_filename_template"])
@@ -1322,6 +1316,7 @@ def update_view_configuration():
         config.config_support_url = support_url
         config.config_support_label = support_label
 
+    _save_cc_hierarchy_verdicts()
     config.save()
     flash(_("Calibre-Web NextGen configuration updated"), category="success")
     log.debug("Calibre-Web NextGen configuration updated")

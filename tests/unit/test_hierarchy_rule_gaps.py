@@ -23,14 +23,6 @@ def test_plan_reorder_targets_the_first_occurrence_of_a_duplicated_sibling():
     assert reordered == ["History", "Arts", "Arts"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG (found while writing this suite): plan_move/plan_rename rewrite "
-           "a raw spelling as new_path + raw[len(path):], which assumes the raw "
-           "spelling starts with the exact path. A whitespace-variant spelling "
-           "that normalises to the same node ('Arts. Fiction' -> Arts.Fiction) "
-           "does not, and the suffix slice produces garbage ('History.Fictionn'). "
-           "Remove this marker when the rewrite is prefix-safe.")
 def test_plan_move_relocates_every_stored_spelling_of_the_node():
     """A node can be spelled several ways in the database ('Arts.' and
     'Arts. DB' both normalise to Arts) and _raw_values_under's docstring
@@ -43,7 +35,7 @@ def test_plan_move_relocates_every_stored_spelling_of_the_node():
     assert error is None
     assert new_path == "History.Fiction"
     assert mapping == {"Arts.Fiction": "History.Fiction",
-                       "Arts. Fiction": "History. Fiction"}
+                       "Arts. Fiction": "History.Fiction"}
 
 
 def test_plan_rename_refuses_a_dot_only_name():

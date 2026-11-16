@@ -91,7 +91,7 @@
       {% if ccModes %}
       <div class="form-group">
         <label>{{_('Custom column hierarchy')}}</label>
-        <p class="settings-explanation">{{_('How each custom column is presented as a hierarchy. Automatic works it out from the values: a column becomes a tree as soon as one value is a prefix of another, which means adding a single book can change it. Set a column here when you want that decided once and left alone.')}}</p>
+        <p class="settings-explanation">{{_('Automatic follows the hierarchy preference in Calibre. Older libraries without that preference infer the hierarchy from their values. Choose an explicit mode to override it for this website.')}}</p>
         {% for mode in ccModes %}
         <div class="form-group" style="margin-bottom: 8px;">
           <label for="cc_hierarchy_mode_{{ mode.id }}" style="margin-bottom: 2px;">{{ mode.name }}</label>

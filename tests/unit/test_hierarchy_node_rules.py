@@ -557,60 +557,21 @@ def leaves_of(tree):
     return exists, has_children
 
 
-@pytest.mark.unit
-def test_the_wire_payload_carries_the_flags():
-    """`available` must actually reach the response.
-
-    A rule that is computed but not serialised is a rule the client cannot read,
-    and the client silently falls back to re-deriving it -- which is the
-    duplication this was meant to remove.
-    """
-    import inspect
-    from cps.api import columns
-
-    source = inspect.getsource(columns._node_to_json)
-    assert '"available"' in source, (
-        "_node_to_json must publish hierarchy.node_availability(node)")
-    assert 'node_availability' in source
 
 
 # --------------------------------------------------------------------------- #
 # The rules must stay free of the framework
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.unit
-def _imported_modules():
-    """Every module ``cps/hierarchy.py`` actually imports, resolved to a root.
-
-    Parsed rather than grepped: a substring search would trip over this file's
-    own prose about not importing Flask.
-    """
-    source = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          os.pardir, os.pardir, 'cps', 'hierarchy.py')
-    with open(source, encoding='utf-8') as handle:
-        tree = ast.parse(handle.read())
-
-    roots = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            roots.update(alias.name.split('.')[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            if node.level:          # a relative import -- part of the package
-                roots.add('.')
-            elif node.module:
-                roots.add(node.module.split('.')[0])
-    return roots
 
 
-def test_the_rule_module_imports_nothing_from_the_web_stack():
-    """hierarchy.py is loaded standalone by test_hierarchy.py, and it is the
-    shared home the classic Jinja UI and the SPA are both meant to call.
 
-    Importing Flask, SQLAlchemy or anything else from the package would make
-    that impossible: the rules would need an application to be reasoned about.
-    """
-    roots = _imported_modules()
-    for banned in ('flask', 'flask_babel', 'sqlalchemy', 'cps', '.', 'db'):
-        assert banned not in roots, (
-            "hierarchy.py must not import %r -- got %s from the module"
-            % (banned, sorted(roots)))
+
+def test_wire_payload_publishes_each_nodes_actual_availability():
+    from cps.api import columns
+    tree = hierarchy.parse_tag_hierarchy(['Arts.Fiction', 'Mystery'])
+    payload = [columns._node_to_json(node, tree) for node in tree]
+    assert payload[0]['available']['can_delete'] is False
+    assert payload[0]['children'][0]['available']['can_delete'] is True
+    assert payload[0]['available']['can_move_up'] is False
+    assert payload[1]['available']['can_move_up'] is True

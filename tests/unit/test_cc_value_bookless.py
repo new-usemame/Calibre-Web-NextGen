@@ -27,6 +27,8 @@ from cps.api import cc_values
 
 import pytest
 
+db.Base.registry.configure()
+
 pytestmark = pytest.mark.unit
 
 

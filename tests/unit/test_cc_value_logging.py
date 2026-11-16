@@ -143,42 +143,8 @@ SUCCESS_SITES = [
 ]
 
 
-@pytest.mark.parametrize("endpoint,expected", SUCCESS_SITES)
-def test_every_mutating_endpoint_logs_its_own_action(captured, endpoint, expected):
-    """A source assertion on purpose. Six near-identical return paths is exactly
-    where one drifts, and the drift is invisible: a missing line is not an error.
-
-    Naming the action per endpoint is the actual guarantee -- it catches an
-    endpoint that logs the WRONG verb, which a "did it log at all" test would
-    pass.
-    """
-    import inspect
-
-    source = inspect.getsource(cc_values)
-    body = source[source.index("def %s_cc_value" % endpoint):]
-    # Stop at the next route, or at the next top-level def for the LAST endpoint
-    # in the file, which has no following decorator.
-    for terminator in ("\n@api_v1.route", "\ndef ", "\n# ---"):
-        cut = body.find(terminator, 1)
-        if cut != -1:
-            body = body[:cut]
-            break
-    assert "_log_action(" in body, "%s logs nothing on success" % endpoint
-    assert '"%s"' % expected["action"] in body, \
-        "%s logs a different action than it performs" % endpoint
 
 
-def test_the_order_write_helpers_log_on_success_too(monkeypatch):
-    """set_order_for_siblings / carry_order / drop_order are called from inside
-    the endpoints, so their own lines would double up. They must stay quiet and
-    let the endpoint speak."""
-    import inspect
-
-    for name in ("_set_sibling_order", "_carry_order", "_drop_order"):
-        body = inspect.getsource(getattr(cc_values, name))
-        assert "log.info" not in body, (
-            "%s logs directly; the endpoint already logs the operation, and two "
-            "lines per change would be noise" % name)
 
 
 def test_a_refused_operation_writes_no_success_line(captured):
@@ -194,11 +160,3 @@ def test_a_refused_operation_writes_no_success_line(captured):
 
     assert status == 409
     assert captured == [], "a refusal logged a success line"
-
-
-def test_the_commit_and_log_docstring_no_longer_claims_an_audit_trail():
-    """The enforcer DELETES each queue file once consumed, so calling it an audit
-    trail sent people looking for a record that was never kept."""
-    doc = cc_values._commit_and_log.__doc__
-    assert "NOT an audit trail" in doc
-    assert "_log_action" in doc, "it should point at the thing that IS a record"

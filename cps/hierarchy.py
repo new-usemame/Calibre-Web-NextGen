@@ -200,6 +200,8 @@ def add_bookless_nodes(nodes, values, order=None):
                             'total_count': 0}
                 siblings.append(existing)
                 siblings.sort(key=lambda n: _order_key(order, n))
+            if i == len(parts) - 1:
+                existing['raw_values'].add(value)
             siblings = existing['children']
     return nodes
 
@@ -327,7 +329,7 @@ def plan_rename(path, new_name, raw_values_under, hierarchical):
     # would put it inside itself, and nothing in the read path prevents that.
     if new_path == path or new_path.startswith(path + SEPARATOR):
         return {}, (ERR_INTO_ITSELF, path)
-    return {raw: new_path + raw[len(path):] for raw in raw_values_under}, None
+    return {raw: join_path([new_path] + split_path(raw)[len(split_path(path)):]) for raw in raw_values_under}, None
 
 
 def plan_move(path, new_parent, raw_values_under):
@@ -352,7 +354,7 @@ def plan_move(path, new_parent, raw_values_under):
         return {}, (ERR_ALREADY_THERE, path), new_path
     if new_path.startswith(path + SEPARATOR):
         return {}, (ERR_INTO_ITSELF, path), new_path
-    return ({raw: new_path + raw[len(path):] for raw in raw_values_under},
+    return ({raw: join_path([new_path] + split_path(raw)[len(split_path(path)):]) for raw in raw_values_under},
             None, new_path)
 
 

@@ -40,6 +40,8 @@ from cps.api import cc_values
 from cps.api import columns as columns_api
 from cps.api import browse as browse_api
 
+db.Base.registry.configure()
+
 pytestmark = pytest.mark.unit
 
 COL_ID = 2411
@@ -68,6 +70,9 @@ class _Val(_Base):
     value = Column(String(collation='NOCASE'), nullable=False, unique=True)
     books = relationship(_Book, secondary=_CC_LINK,
                          backref='custom_column_%d' % COL_ID)
+
+
+_Base.registry.configure()
 
 
 @pytest.fixture()
@@ -134,21 +139,7 @@ def library(tmp_path, monkeypatch):
     calibre.is_flat_cc_column = lambda col_id: False
     calibre.set_metadata_dirty = lambda *a, **k: None
 
-    def _tree(col_id, **_k):
-        """The real read shape: book-attached rows build the tree, bookless
-        rows are merged in afterwards with zero counts."""
-        order = cc_sidecar.stored_order(col_id)
-        attached, bookless = [], []
-        for row in session.query(_Val).order_by(_Val.id).all():
-            if row.books:
-                for book in row.books:
-                    attached.append((book.id, row.value))
-            else:
-                bookless.append(row.value)
-        nodes = hierarchy.parse_tag_hierarchy(attached, order)
-        return hierarchy.add_bookless_nodes(nodes, bookless, order)
-
-    calibre.get_hierarchical_tree = _tree
+    calibre.common_filters = lambda: True
 
     def _column_row():
         return SimpleNamespace(id=COL_ID, name='Genres', datatype='text')
@@ -593,7 +584,8 @@ def test_renaming_to_an_empty_name_is_refused_with_400(client):
                  ).status_code == 400
 
 
-def test_a_non_editor_is_refused_with_403(client, library, monkeypatch):
+@pytest.mark.parametrize('action', ['rename', 'reorder', 'merge', 'delete', 'move', 'create'])
+def test_a_non_editor_is_refused_with_403(client, library, monkeypatch, action):
     """The gate is the same role check every endpoint enforces; here it is
     exercised through HTTP rather than asserted from source."""
     stranger = SimpleNamespace(
@@ -602,7 +594,180 @@ def test_a_non_editor_is_refused_with_403(client, library, monkeypatch):
     for module in (cc_values, browse_api):
         monkeypatch.setattr(module, "current_user", stranger)
 
-    response = _post(client, "delete", {"paths": ["Mystery"]})
+    response = _post(client, action, {"paths": ["Mystery"]})
 
     assert response.status_code == 403
     assert "Mystery" in _stored_values(library)
+
+
+@pytest.mark.parametrize('action', ['rename', 'reorder', 'merge', 'delete', 'move', 'create'])
+@pytest.mark.parametrize('payload', [[1], 'value', True, 42])
+def test_value_writes_reject_non_object_json(client, action, payload):
+    """Malformed JSON shapes must return 400, never an attribute-error 500."""
+    response = _post(client, action, payload)
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize('action,payload', [
+    ('delete', {'paths': ['778.3']}),
+    ('merge', {'paths': ['778.3'], 'into': '778.72'}),
+    ('reorder', {'path': '778.3', 'direction': 'down'}),
+    ('create', {'path': '823.92', 'after': '778.3'}),
+])
+def test_flat_dotted_values_are_atomic_for_all_writes(client, library, action, payload):
+    library.session.query(_Val).delete()
+    library.session.add_all([_Val(value='778.3'), _Val(value='778.72')])
+    library.session.commit()
+    library.calibre.is_flat_cc_column = lambda col_id: True
+    response = _post(client, action, payload)
+    assert response.status_code == 200, response.get_json()
+    assert '778' not in _stored_values(library)
+    if action == 'delete':
+        assert set(_stored_values(library)) == {'778.72'}
+    if action == 'create':
+        assert cc_sidecar.stored_order(COL_ID) == {'778.3': 0, '823.92': 1, '778.72': 2}
+
+
+@pytest.mark.parametrize('action', ['rename', 'move', 'delete', 'merge'])
+def test_hierarchy_writes_include_all_raw_spellings(client, library, action):
+    library.session.add_all([_Val(value='Arts. Fiction'), _Val(value='Arts..Fiction.')])
+    library.session.commit()
+    if action == 'rename':
+        response = _post(client, action, {'path': 'Arts.Fiction', 'new_name': 'Novels', 'confirm_merges': True})
+        expected = 'Arts.Novels'
+    elif action == 'move':
+        response = _post(client, action, {'path': 'Arts.Fiction', 'new_parent': 'Mystery'})
+        expected = 'Mystery.Fiction'
+    elif action == 'merge':
+        response = _post(client, action, {'paths': ['Arts.Fiction'], 'into': 'Mystery'})
+        expected = 'Mystery'
+    else:
+        response = _post(client, action, {'paths': ['Arts.Fiction']})
+        expected = None
+    assert response.status_code == 200, response.get_json()
+    values = set(_stored_values(library))
+    assert not {'Arts.Fiction', 'Arts. Fiction', 'Arts..Fiction.'} & values
+    if expected:
+        assert expected in values
+    assert set(library.queued) == {1, 2}
+
+
+def test_tree_preserves_raw_spellings_for_bookless_aliases(client, library):
+    library.session.add(_Val(value='Arts. History'))
+    library.session.commit()
+    assert _post(client, 'rename', {'path': 'Arts.History', 'new_name': 'Past', 'confirm_merges': True}).status_code == 200
+    assert 'Arts. History' not in _stored_values(library)
+
+
+def test_case_only_rename_is_not_a_merge_into_itself(client, library):
+    response = _post(client, 'rename', {'path': 'Mystery', 'new_name': 'mystery'})
+    assert response.status_code == 200, response.get_json()
+    assert 'mystery' in _stored_values(library)
+    assert library.session.execute(text('SELECT value FROM books_custom_column_2411_link WHERE book=3')).scalar() == 4
+
+
+def test_missing_rename_is_not_reported_as_success(client):
+    assert _post(client, 'rename', {'path': 'Ghost', 'new_name': 'New'}).status_code == 404
+
+
+@pytest.mark.parametrize('path,parent', [('.', 'Mystery'), ('Arts', ','), ('Arts', '.')])
+def test_move_rejects_unrepresentable_paths(client, path, parent):
+    response = _post(client, 'move', {'path': path, 'new_parent': parent})
+    assert response.status_code == 400
+
+
+def test_merge_invalid_destination_is_refused(client, library):
+    response = _post(client, 'merge', {'paths': ['Mystery'], 'into': '.'})
+    assert response.status_code == 400
+    assert 'Mystery' in _stored_values(library)
+
+
+@pytest.mark.parametrize('reader', ['get_hierarchical_tree', 'get_cc_flat_list'])
+def test_browse_keeps_bookless_values_without_exposing_restricted_books(library, reader):
+    """A restricted book's vocabulary is private; a truly unused value is visible."""
+    library.calibre.common_filters = lambda: _Book.id == 3
+    nodes = getattr(db.CalibreDB, reader)(library.calibre, COL_ID, fail_on_error=True)
+    paths = {node['path'] for node in nodes}
+    assert 'Mystery' in paths
+    assert 'Arts.History' in paths or 'Arts' in paths  # the unused History value
+    flat = {}
+    def walk(items):
+        for node in items:
+            flat[node['path']] = node
+            walk(node['children'])
+    walk(nodes)
+    assert 'Arts.Fiction' not in flat, 'only restricted books carry Fiction'
+    assert flat.get('Arts', {'count': 0})['count'] == 0
+
+
+@pytest.mark.parametrize('action,payload', [
+    ('reorder', {'path': 'Arts.Fiction', 'direction': 'up'}),
+    ('rename', {'path': 'Arts', 'new_name': 'Culture'}),
+])
+def test_failed_order_write_rolls_back_the_whole_operation(client, library, action, payload):
+    assert _post(client, 'reorder', {'path': 'Arts.Fiction', 'direction': 'down'}).status_code == 200
+    before_order = cc_sidecar.stored_order(COL_ID)
+    before_values = _stored_values(library)
+    library.session.execute(text('''CREATE TRIGGER app_settings.reject_order
+        BEFORE INSERT ON cc_value_order BEGIN SELECT RAISE(ABORT, 'test disk failure'); END'''))
+    library.session.commit()
+    response = _post(client, action, payload)
+    assert response.status_code == 500
+    assert cc_sidecar.stored_order(COL_ID) == before_order
+    assert _stored_values(library) == before_values
+
+
+@pytest.mark.parametrize('action,payload', [
+    ('rename', {'path': 'Mystery', 'new_name': 'Unlisted'}),
+    ('create', {'path': 'Unlisted'}),
+    ('merge', {'paths': ['Mystery'], 'into': 'Unlisted'}),
+    ('move', {'path': 'Mystery', 'new_parent': 'Arts'}),
+])
+def test_enumeration_writes_obey_calibres_allowed_values(client, library, monkeypatch, action, payload):
+    column = SimpleNamespace(id=COL_ID, name='Genres', datatype='enumeration',
+                             display='{"enum_values": ["Mystery", "Arts", "Arts.Fiction", "Arts.History"]}')
+    monkeypatch.setattr(columns_api, '_visible_columns', lambda: [column])
+    response = _post(client, action, payload)
+    assert response.status_code == 400
+    assert set(_stored_values(library)) == {'Arts', 'Arts.Fiction', 'Arts.History', 'Mystery'}
+
+
+def test_rename_carries_the_order_of_a_synthesised_parent(client, library):
+    library.session.delete(library.session.query(_Val).filter(_Val.value == 'Arts').one())
+    library.session.commit()
+    assert _post(client, 'reorder', {'path': 'Mystery', 'direction': 'up'}).status_code == 200
+    assert _post(client, 'reorder', {'path': 'Arts', 'direction': 'up'}).status_code == 200
+    assert _post(client, 'rename', {'path': 'Arts', 'new_name': 'Culture'}).status_code == 200
+    roots = library.calibre.get_hierarchical_tree(COL_ID)
+    assert [node['path'] for node in roots] == ['Culture', 'Mystery']
+    assert 'Arts' not in cc_sidecar.stored_order(COL_ID)
+
+
+def test_refused_case_alias_merge_cannot_leave_changes_for_the_next_commit(client, library):
+    response = _post(client, 'merge', {'paths': ['Arts.History', 'Mystery'], 'into': 'mystery'})
+    assert response.status_code == 400
+    assert _post(client, 'create', {'path': 'Later'}).status_code == 200
+    assert 'Arts.History' in _stored_values(library)
+
+
+@pytest.mark.parametrize('action,payload', [
+    ('rename', {'path': 'Mystery', 'new_name': 'Detective'}),
+    ('reorder', {'path': 'Arts.Fiction', 'direction': 'down'}),
+    ('merge', {'paths': ['Mystery'], 'into': 'Arts'}),
+    ('delete', {'paths': ['Mystery']}),
+    ('move', {'path': 'Arts.Fiction', 'new_parent': 'Mystery'}),
+    ('create', {'path': 'New'}),
+])
+def test_successful_writes_log_the_actual_column_and_action_once(client, caplog, action, payload):
+    with caplog.at_level(logging.INFO, logger='test-cc-endpoints'):
+        assert _post(client, action, payload).status_code == 200
+    messages = [r.message for r in caplog.records if '[cc-values]' in r.message]
+    assert len(messages) == 1
+    assert 'Genres column 2411: %s by editor' % action in messages[0]
+
+
+@pytest.mark.parametrize('action', ['rename', 'reorder', 'merge', 'delete', 'move', 'create'])
+def test_refused_writes_log_no_success(client, caplog, action):
+    with caplog.at_level(logging.INFO, logger='test-cc-endpoints'):
+        assert _post(client, action, {}).status_code == 400
+    assert not [r for r in caplog.records if '[cc-values]' in r.message]

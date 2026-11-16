@@ -40,7 +40,9 @@ re-checks uniqueness there, so two workers cannot both pass the check before
 either commits. Book-side bookkeeping (``mark_book_modified``) happens in the
 same transaction; ``log_metadata_change`` runs only after it commits.
 """
-from flask import jsonify, request
+import json
+
+from flask import abort, jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -62,6 +64,20 @@ log = logger.create()
 def _relation(col_id):
     """The ``Books.custom_column_<id>`` collection for this column."""
     return getattr(db.Books, 'custom_column_' + str(col_id))
+
+
+def _payload():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        abort(400, description='Expected a JSON object')
+    return payload
+
+
+def _value_tree(col_id):
+    """Plan global metadata edits using the column's actual display mode."""
+    reader = (calibre_db.get_cc_flat_list if calibre_db.is_flat_cc_column(col_id)
+              else calibre_db.get_hierarchical_tree)
+    return reader(col_id, apply_common_filters=False, fail_on_error=True)
 
 
 def _invalidate_hierarchy_cache():
@@ -96,7 +112,8 @@ def _raw_values_under(col_id, path, hierarchical):
         return set()
     if not hierarchical:
         return {path}
-    node = hierarchy.get_node_by_path(calibre_db.get_hierarchical_tree(col_id), path)
+    node = hierarchy.get_node_by_path(calibre_db.get_hierarchical_tree(
+        col_id, apply_common_filters=False, fail_on_error=True), path)
     if node is None:
         return set()
     return set(hierarchy.subtree_values(node))
@@ -109,11 +126,18 @@ def _leaves_of(tree):
     as arguments precisely so the rules do not need to know how a tree is
     fetched -- which is what lets the same rules run in the classic UI.
     """
+    by_path = {}
+    def collect(nodes):
+        for node in nodes:
+            by_path[node['path']] = node
+            collect(node['children'])
+    collect(tree)
+
     def exists(path):
-        return hierarchy.get_node_by_path(tree, path) is not None
+        return path in by_path
 
     def has_children(path):
-        node = hierarchy.get_node_by_path(tree, path)
+        node = by_path.get(path)
         return bool(node and node['children'])
 
     return exists, has_children
@@ -194,12 +218,50 @@ def _resolve_merges(col_id, mapping):
             renames[old] = new
             continue
         row = _value_row(col_id, old)
+        if row is existing:
+            renames[old] = new
+            continue
         merges.append({
             'from': old,
             'into': new,
             'books': len(row.books) if row is not None else 0,
         })
     return renames, merges
+
+
+def _apply_rewrite(col_id, mapping):
+    """Rewrite aliases together, retaining one row and every book link."""
+    groups = {}
+    for old, new in mapping.items():
+        groups.setdefault(new, []).append(old)
+    affected = {}
+    for new, sources in groups.items():
+        survivor = _value_row(col_id, new)
+        if survivor is None:
+            survivor = _value_row(col_id, sources[0])
+        if survivor is None:
+            continue
+        for book in survivor.books:
+            affected[book.id] = book
+            helper.mark_book_modified(book, set_dirty=True)
+        survivor.value = new
+        calibre_db.session.flush()
+        for old in sources:
+            row = _value_row(col_id, old)
+            if row is None or row is survivor:
+                continue
+            for book in _apply_merge(col_id, old, survivor):
+                affected[book.id] = book
+    return affected
+
+
+def _order_rewrite(col_id, path, destination, hierarchical):
+    """Include curated implicit parents that have no Calibre value row."""
+    return {
+        old: destination + old[len(path):]
+        for old in cc_sidecar.stored_order(col_id)
+        if old == path or (hierarchical and old.startswith(path + '.'))
+    }
 
 
 def _apply_merge(col_id, from_value, into_row):
@@ -293,8 +355,8 @@ def _log_action(action, col_id, **fields):
 def _column_label(col_id):
     """The column's current name, for a log line a human can read."""
     try:
-        row = calibre_db.session.query(db.CustomColumns.get(
-            col_id)).first()
+        row = calibre_db.session.query(db.CustomColumns).filter(
+            db.CustomColumns.id == col_id).first()
         return getattr(row, "name", None) or "?"
     except Exception:
         return "?"
@@ -307,6 +369,17 @@ def _bad_request(message, code='invalid_request'):
 def _conflict(message, conflicts):
     return jsonify({"error": {
         "code": "conflict", "message": message, "conflicts": conflicts}}), 409
+
+
+def _allowed_values(col, values):
+    """Enumeration edits must preserve Calibre's configured value allowlist."""
+    if col.datatype != 'enumeration':
+        return True
+    try:
+        allowed = json.loads(col.display or '{}').get('enum_values', [])
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return isinstance(allowed, list) and all(value in allowed for value in values)
 
 
 def _column_or_404(col_id):
@@ -344,7 +417,7 @@ def rename_cc_value(col_id):
     if col is None:
         return _not_found("Column not found")
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     path = payload.get("path")
     if not isinstance(path, str) or not path.strip():
         return _bad_request(_('Pick a node to rename'))
@@ -358,11 +431,14 @@ def rename_cc_value(col_id):
 
     path = hierarchy.join_path([path]) if not calibre_db.is_flat_cc_column(col_id) else path
     hierarchical = not calibre_db.is_flat_cc_column(col_id)
-    mapping, errors = _plan_rename(col_id, path, new_name, hierarchical)
-    if errors:
-        return _bad_request(errors[0])
-
     with metadata_db_write_lock():
+        mapping, errors = _plan_rename(col_id, path, new_name, hierarchical)
+        if errors:
+            return _bad_request(errors[0])
+        if not mapping or all(_value_row(col_id, old) is None for old in mapping):
+            return _not_found("Value not found")
+        if not _allowed_values(col, mapping.values()):
+            return _bad_request(_('That value cannot be changed'))
         renames, merges = _resolve_merges(col_id, mapping)
         if merges and payload.get("confirm_merges") is not True:
             return _conflict(
@@ -371,26 +447,17 @@ def rename_cc_value(col_id):
 
         affected = {}
         try:
-            for old, new in renames.items():
-                row = _value_row(col_id, old)
-                if row is None:
-                    continue
-                for book in row.books:
-                    affected[book.id] = book
-                    helper.mark_book_modified(book, set_dirty=True)
-                row.value = new
-            for merge in merges:
-                into_row = _value_row(col_id, merge['into'])
-                if into_row is None:
-                    continue
-                for book in _apply_merge(col_id, merge['from'], into_row):
-                    affected[book.id] = book
+            affected = _apply_rewrite(col_id, mapping)
             # Carry the curated order onto the new spellings, on THIS
             # transaction -- so a rename cannot succeed while losing the
             # position it held. Skipping this is invisible: every value is
             # rewritten correctly and the node has quietly jumped to the
             # alphabetical end of its siblings.
-            _carry_order(col_id, mapping)
+            destination = (hierarchy.join_path(
+                hierarchy.split_path(path)[:-1] + [new_name])
+                if hierarchical else new_name.strip())
+            _carry_order(col_id, {**mapping, **_order_rewrite(
+                col_id, path, destination, hierarchical)})
             calibre_db.session.commit()
         except IntegrityError:
             calibre_db.session.rollback()
@@ -445,7 +512,7 @@ def reorder_cc_value(col_id):
     if col is None:
         return _not_found("Column not found")
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     path = payload.get("path")
     if not isinstance(path, str) or not path.strip():
         return _bad_request(_('Pick a value to move'))
@@ -458,7 +525,7 @@ def reorder_cc_value(col_id):
         path = hierarchy.join_path([path])
 
     try:
-        tree = calibre_db.get_hierarchical_tree(col_id)
+        tree = _value_tree(col_id)
     except SQLAlchemyError:
         log.error("Could not read custom column %s to reorder it", col_id, exc_info=True)
         return jsonify({"error": {"code": "server_error",
@@ -479,7 +546,7 @@ def reorder_cc_value(col_id):
     with metadata_db_write_lock():
         # Re-read inside the lock: a rename or delete between the tree above and
         # this write would otherwise position a value that no longer exists.
-        current = calibre_db.get_hierarchical_tree(col_id)
+        current = _value_tree(col_id)
         live_siblings, live_node = _siblings_of(current, path)
         if live_node is None:
             return _not_found("Value not found")
@@ -510,6 +577,9 @@ def _siblings_of(nodes, path):
     impossible across levels: the list handed to ``plan_reorder`` is the node's
     own siblings and nothing else.
     """
+    for node in nodes:
+        if node['path'] == path:
+            return [n['path'] for n in nodes], node
     level = nodes
     parts = hierarchy.split_path(path)
     for index in range(len(parts) - 1):
@@ -524,37 +594,21 @@ def _siblings_of(nodes, path):
 
 
 def _carry_order(col_id, mapping):
-    """Carry curated positions across a value rewrite. Never raises."""
     try:
         return cc_sidecar.carry_order(col_id, mapping)
-    except Exception:
-        log.warning("Could not carry the curated order through a value rewrite",
-                    exc_info=True)
-        return 0
+    except IntegrityError as error:
+        raise SQLAlchemyError("Could not carry custom-column order") from error
 
 
 def _drop_order(col_id, paths):
-    """Forget curated positions for values that are going away. Never raises."""
-    try:
-        return cc_sidecar.drop_order(col_id, paths)
-    except Exception:
-        log.warning("Could not clear a curated order", exc_info=True)
-        return 0
+    return cc_sidecar.drop_order(col_id, paths)
 
 
 def _set_sibling_order(col_id, ordered_paths):
-    """Record a curated sibling order. Never raises.
-
-    Every path in the list gets an explicit position, not just the one that
-    moved: that is what takes the siblings the user arranged out of the
-    alphabetical fallback, since an untouched sibling between two positioned
-    ones would otherwise sort itself back by name.
-    """
-    try:
-        return cc_sidecar.set_order_for_siblings(col_id, ordered_paths)
-    except Exception:
-        log.warning("Could not record a curated order", exc_info=True)
-        return 0
+    written = cc_sidecar.set_order_for_siblings(col_id, ordered_paths)
+    if written != len(ordered_paths):
+        raise SQLAlchemyError("Custom-column order storage is unavailable")
+    return written
 
 
 # --------------------------------------------------------------------------- #
@@ -585,7 +639,7 @@ def merge_cc_values(col_id):
     if col is None:
         return _not_found("Column not found")
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     paths = payload.get("paths")
     into = payload.get("into")
     if not isinstance(paths, list) or len(paths) < 1:
@@ -595,22 +649,38 @@ def merge_cc_values(col_id):
     if any(not isinstance(p, str) or not p.strip() for p in paths):
         return _bad_request(_('Pick valid values to merge'))
 
+    hierarchical = not calibre_db.is_flat_cc_column(col_id)
+    if ',' in into or any(',' in path for path in paths):
+        return _bad_request(_('A node name cannot contain a comma'))
+    if hierarchical:
+        into = hierarchy.join_path([into])
+    if not into:
+        return _bad_request(_('Name cannot be empty'))
+
     with metadata_db_write_lock():
-        tree = calibre_db.get_hierarchical_tree(col_id)
+        tree = _value_tree(col_id)
         keep, error = hierarchy.plan_merge(paths, into, *_leaves_of(tree))
         if error is not None:
             return _bad_request(_explain(error))
 
+        if not _allowed_values(col, [into]):
+            return _bad_request(_('That value cannot be changed'))
+        raw_sources = list(dict.fromkeys(
+            raw for path in keep for raw in sorted(
+                _raw_values_under(col_id, path, hierarchical))))
         into_row = _value_row(col_id, into)
-        if into_row is None:
-            into_row = db.cc_classes[col_id](value=into)
-            calibre_db.session.add(into_row)
-            calibre_db.session.flush()
+        if into_row is not None and any(
+                _value_row(col_id, raw) is into_row for raw in raw_sources):
+            return _bad_request(_('A value cannot be merged into itself'))
 
         affected = {}
         try:
-            for path in keep:
-                for book in _apply_merge(col_id, path, into_row):
+            if into_row is None:
+                into_row = db.cc_classes[col_id](value=into)
+                calibre_db.session.add(into_row)
+                calibre_db.session.flush()
+            for raw in raw_sources:
+                for book in _apply_merge(col_id, raw, into_row):
                     affected[book.id] = book
             # The source values are gone, so their curated positions are too.
             # The survivor keeps its own; leaving the sources behind would make
@@ -624,6 +694,7 @@ def merge_cc_values(col_id):
                                       "message": _("The values could not be merged")}}), 500
 
     _commit_and_log(list(affected.values()))
+    _invalidate_hierarchy_cache()
     _log_action("merge", col_id, into=into, sources=len(keep),
                 paths=", ".join(keep), books=len(affected))
     return jsonify({"into": into, "merged": keep, "books": len(affected)})
@@ -651,7 +722,7 @@ def delete_cc_values(col_id):
     if col is None:
         return _not_found("Column not found")
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     paths = payload.get("paths")
     if not isinstance(paths, list) or not paths:
         return _bad_request(_('Select at least one value to delete'))
@@ -659,7 +730,7 @@ def delete_cc_values(col_id):
         return _bad_request(_('Pick valid values to delete'))
 
     with metadata_db_write_lock():
-        tree = calibre_db.get_hierarchical_tree(col_id)
+        tree = _value_tree(col_id)
         keep, error = hierarchy.plan_delete(paths, *_leaves_of(tree))
         if error is not None:
             return _bad_request(_explain(error, 'delete'))
@@ -667,7 +738,10 @@ def delete_cc_values(col_id):
         affected = {}
         removed = []
         try:
-            for path in keep:
+            raw_paths = list(dict.fromkeys(
+                raw for path in keep for raw in sorted(_raw_values_under(
+                    col_id, path, not calibre_db.is_flat_cc_column(col_id)))))
+            for path in raw_paths:
                 row = _value_row(col_id, path)
                 if row is None:
                     continue
@@ -681,7 +755,7 @@ def delete_cc_values(col_id):
             # prune these eventually, but only at the next boot -- and until then
             # a value recreated with the same name would inherit the position of
             # the one that was deleted.
-            _drop_order(col_id, removed)
+            _drop_order(col_id, keep)
             calibre_db.session.commit()
         except SQLAlchemyError:
             calibre_db.session.rollback()
@@ -721,7 +795,7 @@ def move_cc_value(col_id):
         return _bad_request(_('This column is a flat list; values cannot be moved.'),
                             code='not_applicable')
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     path = payload.get("path")
     new_parent = payload.get("new_parent", "")
     if not isinstance(path, str) or not path.strip():
@@ -729,15 +803,20 @@ def move_cc_value(col_id):
     if not isinstance(new_parent, str):
         return _bad_request(_('Choose where to move it'))
 
+    if ',' in path or ',' in new_parent:
+        return _bad_request(_('A node name cannot contain a comma'))
     path = hierarchy.join_path([path])
     parent = hierarchy.join_path([new_parent]) if new_parent.strip() else ''
+    if not path or (new_parent.strip() and not parent):
+        return _bad_request(_('Name cannot be empty'))
     leaf = hierarchy.split_path(path)[-1]
     new_path = hierarchy.join_path([parent, leaf] if parent else [leaf])
     if new_path == path:
         return _bad_request(_('That value is already there'))
 
     with metadata_db_write_lock():
-        node = hierarchy.get_node_by_path(calibre_db.get_hierarchical_tree(col_id), path)
+        node = hierarchy.get_node_by_path(calibre_db.get_hierarchical_tree(
+        col_id, apply_common_filters=False, fail_on_error=True), path)
         if node is None:
             return _not_found("Value not found")
 
@@ -748,6 +827,8 @@ def move_cc_value(col_id):
             # The node resolved above but owns no stored row: nothing to move.
             return _not_found("Value not found")
 
+        if not _allowed_values(col, mapping.values()):
+            return _bad_request(_('That value cannot be changed'))
         renames, merges = _resolve_merges(col_id, mapping)
         if merges:
             # The destination already holds a value this move would land on.
@@ -758,14 +839,7 @@ def move_cc_value(col_id):
 
         affected = {}
         try:
-            for old, new in renames.items():
-                row = _value_row(col_id, old)
-                if row is None:
-                    continue
-                for book in row.books:
-                    affected[book.id] = book
-                    helper.mark_book_modified(book, set_dirty=True)
-                row.value = new
+            affected = _apply_rewrite(col_id, mapping)
             # A move DROPS the curated order rather than carrying it, and that is
             # the subtle one. A position is only meaningful *relative to its
             # siblings*: "0" among {775, 778, 779} says nothing among
@@ -774,7 +848,8 @@ def move_cc_value(col_id):
             # has never been part of. Dropping it puts the moved branch in the
             # alphabetical remainder of its new parent -- the same fallback every
             # untouched value uses, and a predictable one.
-            _drop_order(col_id, [old for old in mapping if old != new])
+            _drop_order(col_id, set(mapping) | set(_order_rewrite(
+                col_id, path, new_path, True)))
             calibre_db.session.commit()
         except IntegrityError:
             calibre_db.session.rollback()
@@ -814,7 +889,7 @@ def create_cc_value(col_id):
     if col is None:
         return _not_found("Column not found")
 
-    payload = request.get_json(silent=True) or {}
+    payload = _payload()
     path = payload.get("path")
     if not isinstance(path, str) or not path.strip():
         return _bad_request(_('Name the value to create'))
@@ -826,6 +901,9 @@ def create_cc_value(col_id):
     if not path:
         return _bad_request(_('Name cannot be empty'))
 
+    if not _allowed_values(col, [path]):
+        return _bad_request(_('That value cannot be changed'))
+
     # Optional anchor: place the new value immediately AFTER this sibling, which
     # is what the per-row create button sends. Validated against the requested
     # path's own parent, so a client cannot ask for a value to be positioned in
@@ -835,7 +913,7 @@ def create_cc_value(col_id):
         if not isinstance(after, str) or not after.strip():
             return _bad_request(_('Pick a value to place the new one after'))
         after = hierarchy.join_path([after]) if hierarchical else after.strip()
-        if cc_sidecar.parent_of(after) != cc_sidecar.parent_of(path):
+        if hierarchical and cc_sidecar.parent_of(after) != cc_sidecar.parent_of(path):
             return _bad_request(
                 _('A new value can only be placed beside the one it was created '
                   'from, not in a different level.'))
@@ -881,7 +959,7 @@ def _place_after(col_id, path, after):
     On the same transaction as the create, so the value and the position it was
     asked for cannot come apart.
     """
-    tree = calibre_db.get_hierarchical_tree(col_id)
+    tree = _value_tree(col_id)
     siblings, _node = _siblings_of(tree, after)
     if not siblings or after not in siblings:
         # A stale click: the anchor is not there any more. The create itself

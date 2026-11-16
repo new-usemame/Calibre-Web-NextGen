@@ -2499,28 +2499,14 @@ class CalibreDB:
         return cc_classes[col_id].value == value
 
     def is_flat_cc_column(self, col_id, fail_on_error=False):
-        """Whether a registered tag-like column uses exact atomic values.
-
-        An administrator's stored verdict wins. ``cc_sidecar.hierarchy_verdict``
-        is a tri-state: ``True``/``False`` declared, ``None`` "still derive it".
-        ``None`` is what every install answers today, so consulting it first
-        changes nothing until somebody sets one -- and once they do, the answer
-        stops depending on which books happen to be filed under the column.
-
-        That matters more than it looks. Derived from the data, a Dewey column
-        holding ``778`` and ``778.3`` becomes a tree, and adding ONE book can
-        flip it mid-session behind a 300-second cache, with two workers able to
-        disagree for five minutes.
-        """
+        """Resolve an explicit admin mode before Calibre's automatic mode."""
         if col_id not in cc_classes:
             return False
-        # Local import: cps.cc_sidecar imports calibre_db and db.
         from . import cc_sidecar
         verdict = cc_sidecar.hierarchy_verdict(col_id)
         if verdict.value is not None:
             return not verdict.value
-        return col_id not in self.get_hierarchical_column_ids(
-            fail_on_error=fail_on_error)
+        return col_id not in self.get_hierarchical_column_ids(fail_on_error=fail_on_error)
 
     def get_hierarchical_column_ids(self, ttl=300, fail_on_error=False):
         """Resolve mode once per request, scoped to the active library engine."""
@@ -2530,7 +2516,14 @@ class CalibreDB:
         if engine in cache:
             return cache[engine]
         try:
-            ids = self._read_hierarchical_column_ids(ttl)
+            ids = set(self._read_hierarchical_column_ids(ttl))
+            from . import cc_sidecar
+            for col_id, hierarchical in cc_sidecar.hierarchy_overrides().items():
+                if col_id in cc_classes:
+                    if hierarchical:
+                        ids.add(col_id)
+                    else:
+                        ids.discard(col_id)
         except SQLAlchemyError:
             if fail_on_error:
                 raise
@@ -2629,11 +2622,8 @@ class CalibreDB:
         # FROM and silently discards the select_from. A LEFT OUTER JOIN in that
         # direction is still book-driven, so a bookless value never appears.
         #
-        # So: two queries, merged here. The value list is unfiltered (a value's
-        # existence is not book data -- filtering it by visible books would drop
-        # every bookless value and re-hide anything carried only by a restricted
-        # shelf); the counts keep the book-side filter, because a count IS a book
-        # count and must not reveal books on a shelf the caller cannot see.
+        # So: two queries, merged here. Only genuinely unassigned values are added separately. Values attached
+        # exclusively to restricted books stay private, just as their counts do.
         book_q = (self.session.query(Books.id, cc.value)
             .select_from(Books)
             .join(rel)
@@ -2644,14 +2634,15 @@ class CalibreDB:
             book_q = book_q.filter(self.common_filters())
         try:
             rows = book_q.all()
-            every_value = [r[0] for r in self.session.query(cc.value).distinct().all()]
+            every_value = [r[0] for r in self.session.query(cc.value)
+                           .filter(~cc.books.any()).distinct().all()]
         except SQLAlchemyError:
             if fail_on_error:
                 raise
             log.error("Failed to read custom column %s for hierarchy tree", col_id)
             return []
         seen = {value for _, value in rows if value}
-        # A value with no VISIBLE book still belongs in the tree, but must not
+        # A value with no book still belongs in the tree, but must not
         # inflate a count. parse_tag_hierarchy derives counts from distinct book
         # keys, so an unmatched value needs a key -- and any key it is given
         # counts as one book. They are therefore added AFTER parsing, as nodes
@@ -2697,8 +2688,8 @@ class CalibreDB:
         # Same two-query shape as get_hierarchical_tree, and for the same
         # reason: `rel` is a relationship, so joining from the value side does
         # not work -- SQLAlchemy puts books in the FROM regardless and a
-        # bookless value disappears. Counts stay book-filtered; the value list
-        # does not, because a value's existence is not book data.
+        # bookless value disappears. Counts and assigned values stay book-filtered; only genuinely unused
+        # values are added with zero counts.
         count_q = (self.session.query(cc.value, func.count(func.distinct(Books.id)))
             .select_from(Books)
             .join(rel)
@@ -2709,14 +2700,15 @@ class CalibreDB:
             count_q = count_q.filter(self.common_filters())
         try:
             counts = dict(count_q.all())
-            every_value = [r[0] for r in self.session.query(cc.value).distinct().all()]
+            every_value = [r[0] for r in self.session.query(cc.value)
+                           .filter(~cc.books.any()).distinct().all()]
         except SQLAlchemyError:
             if fail_on_error:
                 raise
             log.error("Failed to read custom column %s for flat list", col_id)
             return []
         entries = []
-        for value in every_value:
+        for value in set(counts) | set(every_value):
             if value is None or not str(value).strip():
                 continue
             count = counts.get(value, 0)
@@ -2725,8 +2717,8 @@ class CalibreDB:
         # A flat column has one level, so a curated order still applies to it. Local
         # import for the same reason as in get_hierarchical_tree.
         from . import cc_sidecar
-        entries.sort(key=lambda e: hierarchy._order_key(
-            cc_sidecar.stored_order(col_id), e))
+        order = cc_sidecar.stored_order(col_id)
+        entries.sort(key=lambda e: hierarchy._order_key(order, e))
         return entries
 
     # read search results from calibre-database and return it (function is used for feed and simple search

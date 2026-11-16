@@ -146,17 +146,7 @@ class _FakeCalibre:
         self.calls += 1
         return set() if self._derived_flat else {3}
 
-    def is_flat_cc_column(self, col_id, fail_on_error=False):
-        # The real method's logic, with the sidecar consulted ahead of the
-        # derivation.
-        if col_id not in db.cc_classes:
-            return False
-        verdict = cc_sidecar.hierarchy_verdict(col_id)
-        if verdict.value is not None:
-            return not verdict.value
-        self.calls += 1
-        return col_id not in self.get_hierarchical_column_ids(
-            fail_on_error=fail_on_error)
+    is_flat_cc_column = db.CalibreDB.is_flat_cc_column
 
 
 @pytest.fixture
@@ -343,3 +333,37 @@ def test_reconcile_never_overwrites_a_declared_verdict(sidecar, tmp_path):
         cc_sidecar.calibre_db = saved
 
     assert _verdict(sidecar, 3) == cc_sidecar.HierarchyVerdict(True, "override")
+
+
+def test_admin_form_saves_hierarchy_modes_without_a_sentinel(sidecar, monkeypatch):
+    """Submit the fields the rendered form actually contains through its handler."""
+    import inspect
+    from flask import Flask
+    from flask_babel import Babel
+    from cps import admin
+    from cps.config_sql import ConfigSQL
+    config = ConfigSQL.__new__(ConfigSQL)
+    config.__dict__['dirty'] = []
+    config.config_restricted_column = config.config_read_column = config.config_default_role = 0
+    monkeypatch.setattr(admin, 'config', config)
+    monkeypatch.setattr(config, 'save', lambda: None)
+    monkeypatch.setattr(admin, 'before_request', lambda: None)
+    monkeypatch.setattr(admin, 'view_configuration', lambda: 'saved')
+    monkeypatch.setattr(admin, 'load_eligible_columns', lambda: [])
+    monkeypatch.setattr(admin, 'flash', lambda *a, **kw: None)
+    app = Flask(__name__)
+    app.secret_key = 'test'
+    Babel(app)
+    for mode, expected in [('hierarchical', True), ('flat', False), ('auto', None)]:
+        with app.test_request_context('/admin/viewconfig', method='POST', data={'cc_hierarchy_mode_3': mode}):
+            assert inspect.unwrap(admin.update_view_configuration)() == 'saved'
+        assert cc_sidecar.hierarchy_verdict(3).value is expected
+
+
+def test_every_hierarchy_consumer_receives_the_admin_override(sidecar, registered):
+    sidecar._read_hierarchical_column_ids = lambda ttl: set()
+    assert cc_sidecar.set_hierarchy_verdict(3, True)
+    assert sidecar.get_hierarchical_column_ids() == {3}
+    sidecar._read_hierarchical_column_ids = lambda ttl: {3}
+    assert cc_sidecar.set_hierarchy_verdict(3, False)
+    assert sidecar.get_hierarchical_column_ids() == set()

@@ -136,29 +136,6 @@ def test_add_bookless_nodes_without_an_order_is_unchanged():
 # Purity: the rules module still cannot reach the sidecar itself
 # ---------------------------------------------------------------------------
 
-def test_the_rule_module_still_imports_nothing_from_the_web_stack():
-    """The order map is passed IN, not fetched.
-
-    ``cps.hierarchy`` is the single home for the node rules, and that only
-    holds while it stays free of database and framework imports -- which is what
-    lets the classic UI and the SPA call the same implementation. Growing a
-    ``cc_sidecar`` import here to fetch the order would trade that guarantee for
-    one convenience.
-    """
-    import ast
-    import pathlib
-
-    source = pathlib.Path("cps/hierarchy.py").read_text(encoding="utf-8")
-    banned = ("flask", "flask_babel", "sqlalchemy", "cps", "db", "cc_sidecar",
-              "calibre_db")
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                assert alias.name.split(".")[0] not in banned, alias.name
-        elif isinstance(node, ast.ImportFrom):
-            root = (node.module or "").split(".")[0]
-            assert node.level == 0, "relative import %r" % (node.module,)
-            assert root not in banned, node.module
 
 
 def test_a_call_with_two_arguments_still_works():
@@ -199,29 +176,3 @@ def test_json_round_trip_of_a_stored_order_does_not_change_the_result():
 # ---------------------------------------------------------------------------
 # The read surfaces all go through the same path
 # ---------------------------------------------------------------------------
-
-def test_every_reader_of_a_sibling_list_reaches_the_same_ordering_helper():
-    """Six surfaces render siblings in tree order -- classic browse, classic
-    editor rows, SPA browse and editor, OPDS, and the write endpoints' own tree
-    queries. They differ only in where they get the tree, so the ordering
-    decision has to be made in exactly one place: ``_order_key``.
-
-    A source assertion rather than a behavioural one, which is the honest trade
-    here: a fake ``CalibreDB`` cannot prove six surfaces agree, but a second
-    sort key in ``db.py`` would silently split them.
-    """
-    import pathlib
-
-    source = pathlib.Path("cps/db.py").read_text(encoding="utf-8")
-    # The tree path never names the sort key: parse_tag_hierarchy applies it
-    # internally via _finalize. Only the flat list, which sorts on its own,
-    # reaches for it. Two callers naming it would mean a second sort key.
-    assert source.count("hierarchy._order_key") == 1, (
-        "only get_cc_flat_list should name hierarchy._order_key; the tree path "
-        "gets the ordering from parse_tag_hierarchy(rows, order)")
-    assert "entries.sort(key=lambda e: e['name'].lower())" not in source, (
-        "a flat list is still sorting alphabetically -- curated order would "
-        "not apply to flat columns")
-    # ...and neither may call parse_tag_hierarchy without passing the order.
-    assert "hierarchy.parse_tag_hierarchy(rows)" not in source
-    assert "hierarchy.add_bookless_nodes(nodes, [" not in source

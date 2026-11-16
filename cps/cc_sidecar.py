@@ -242,6 +242,19 @@ def hierarchy_verdict(col_id) -> HierarchyVerdict:
                             "derived" if value is None else "override")
 
 
+def hierarchy_overrides():
+    """All declared modes, shared by browse, sidebar and book-detail readers."""
+    if not sidecar_ready():
+        return {}
+    try:
+        return {row[0]: bool(row[1]) for row in calibre_db.session.execute(text(
+            "SELECT id, is_hierarchy FROM %s WHERE is_hierarchy IS NOT NULL"
+            % _table("cc_column")))}
+    except Exception:
+        log.debug("Sidecar: hierarchy overrides unavailable", exc_info=True)
+        return {}
+
+
 def stored_order(column_id) -> dict:
     """``{path: view_order}`` for one column. Empty means alphabetical.
 
@@ -331,6 +344,9 @@ def set_hierarchy_verdict(col_id, value):
              col_id, "automatic" if value is None else value)
     # The cached derivation may now be wrong in either direction: a column
     # declared hierarchical must stop being read as flat, and vice versa.
+    from flask import g, has_request_context
+    if has_request_context():
+        g.pop('_cc_hierarchy_modes', None)
     for attr in ("_hier_cache", "_legacy_hier_cache"):
         if hasattr(calibre_db, attr):
             setattr(calibre_db, attr, None)
@@ -349,126 +365,56 @@ def parent_of(path):
 
 
 def set_order_for_siblings(column_id, ordered_paths):
-    """Write an explicit position for every path in ``ordered_paths``.
+    """Write the whole sibling order in the caller's transaction.
 
-    The whole list is written, not just the one that moved. That is what takes
-    the siblings the user arranged out of the alphabetical fallback: an
-    untouched sibling between two positioned ones would otherwise sort itself
-    back into the middle by name.
-
-    No-op when the sidecar is unavailable. The caller is already inside a value
-    write, so raising here would fail a rename for a feature the user may not
-    even have enabled.
+    Database failures must reach the caller so it rolls back partial positions
+    and any accompanying value edits together.
     """
     session = calibre_db.session
     if session is None or not sidecar_ready():
         return 0
-    written = 0
     for position, path in enumerate(ordered_paths):
-        try:
-            session.execute(
-                text("INSERT INTO %s (column_id, path, parent_path, view_order) "
-                     "VALUES (:cid, :path, :parent, :pos) "
-                     "ON CONFLICT(column_id, path) DO UPDATE SET "
-                     "parent_path = :parent, view_order = :pos"
-                     % _table("cc_value_order")),
-                {"cid": column_id, "path": path, "parent": parent_of(path),
-                 "pos": position})
-            written += 1
-        except Exception:
-            log.warning("Sidecar: could not record the order of %r", path,
-                        exc_info=True)
-            return written
-    return written
+        session.execute(
+            text("INSERT INTO %s (column_id, path, parent_path, view_order) "
+                 "VALUES (:cid, :path, :parent, :pos) "
+                 "ON CONFLICT(column_id, path) DO UPDATE SET "
+                 "parent_path = :parent, view_order = :pos" % _table("cc_value_order")),
+            {"cid": column_id, "path": path, "parent": parent_of(path), "pos": position})
+    return len(ordered_paths)
 
 
 def drop_order(column_id, paths):
-    """Forget the curated position of these paths.
-
-    Used by delete and by the source side of a merge, where the value itself is
-    going away and an order row would be an orphan until the next reconcile.
-    """
+    """Forget deleted values' positions in the caller's transaction."""
     session = calibre_db.session
     if session is None or not sidecar_ready():
         return 0
     removed = 0
     for path in paths:
-        try:
-            result = session.execute(
-                text("DELETE FROM %s WHERE column_id = :cid AND path = :path"
-                     % _table("cc_value_order")),
-                {"cid": column_id, "path": path})
-            removed += result.rowcount or 0
-        except Exception:
-            log.warning("Sidecar: could not clear the order of %r", path,
-                        exc_info=True)
+        result = session.execute(
+            text("DELETE FROM %s WHERE column_id = :cid AND path = :path"
+                 % _table("cc_value_order")), {"cid": column_id, "path": path})
+        removed += result.rowcount or 0
     return removed
 
 
 def carry_order(column_id, mapping):
-    """Move curated positions along a value rewrite. Returns the number moved.
-
-    ``mapping`` is ``{old_value: new_value}`` from ``plan_rename`` or
-    ``plan_move`` -- the *stored* spellings, which is what the order rows are
-    keyed on.
-
-    This is the step that is easy to miss and impossible to notice when it is:
-    every stored value is rewritten correctly, the user sees the rename they
-    asked for, and the value has quietly jumped to the alphabetical end of its
-    siblings. Hence its own function, its own test, and the shared transaction.
-
-    Read, then delete, then reinsert. A row cannot be re-keyed in place when the
-    new key already exists -- and a rename onto an existing value IS a merge, so
-    that case is the rule rather than the exception.
-    """
+    """Carry positions through a rewrite, rolling back on any database error."""
     session = calibre_db.session
     if session is None or not sidecar_ready() or not mapping:
         return 0
-
-    # Several old values can map onto one new one (a merge). The survivor keeps
-    # the earliest curated position of any of its sources, so it lands where the
-    # topmost source was rather than at the bottom of the group.
+    order = stored_order(column_id)
     wanted = {}
     for old, new in mapping.items():
-        if old == new:
-            continue
-        try:
-            rows = session.execute(
-                text("SELECT view_order FROM %s "
-                     "WHERE column_id = :cid AND path = :path"
-                     % _table("cc_value_order")),
-                {"cid": column_id, "path": old}).fetchall()
-        except Exception:
-            log.debug("Sidecar: could not read the order of %r", old, exc_info=True)
-            continue
-        if not rows:
-            continue
-        position = rows[0][0]
-        if new not in wanted or position < wanted[new]:
-            wanted[new] = position
-
-    if not wanted:
-        return 0
-
-    # Clear the old keys before writing the new ones, so a rename that is also a
-    # merge cannot collide with the row it is replacing.
-    stale = [old for old, new in mapping.items() if old != new and old not in wanted]
-    drop_order(column_id, [old for old, new in mapping.items()
-                           if old != new and old in wanted] + stale)
-
-    for new, position in sorted(wanted.items(), key=lambda kv: kv[1]):
-        try:
-            session.execute(
-                text("INSERT INTO %s (column_id, path, parent_path, view_order) "
-                     "VALUES (:cid, :path, :parent, :pos) "
-                     "ON CONFLICT(column_id, path) DO UPDATE SET "
-                     "parent_path = :parent, view_order = :pos"
-                     % _table("cc_value_order")),
-                {"cid": column_id, "path": new, "parent": parent_of(new),
-                 "pos": position})
-        except Exception:
-            log.warning("Sidecar: could not carry the order of %r", new,
-                        exc_info=True)
+        if old != new and old in order:
+            wanted[new] = min(wanted.get(new, order[old]), order[old])
+    drop_order(column_id, [old for old, new in mapping.items() if old != new])
+    for new, position in wanted.items():
+        session.execute(
+            text("INSERT INTO %s (column_id, path, parent_path, view_order) "
+                 "VALUES (:cid, :path, :parent, :pos) "
+                 "ON CONFLICT(column_id, path) DO UPDATE SET "
+                 "parent_path = :parent, view_order = :pos" % _table("cc_value_order")),
+            {"cid": column_id, "path": new, "parent": parent_of(new), "pos": position})
     return len(wanted)
 
 
@@ -476,7 +422,7 @@ def carry_order(column_id, mapping):
 # Reconcile
 # ---------------------------------------------------------------------------
 
-def _live_column_ids() -> set:
+def _live_column_ids() -> set | None:
     """Every Calibre custom-column id, including composite and series.
 
     Deliberately not ``get_cc_columns()``: that applies the administrator's
@@ -486,7 +432,7 @@ def _live_column_ids() -> set:
     """
     session = _ensure_session()
     if session is None:
-        return set()
+        return None
     try:
         rows = session.execute(text("SELECT id FROM calibre.custom_columns")).fetchall()
     except Exception:
@@ -495,7 +441,7 @@ def _live_column_ids() -> set:
             rows = session.execute(text("SELECT id FROM custom_columns")).fetchall()
         except Exception:
             log.debug("Sidecar: Calibre columns unavailable", exc_info=True)
-            return set()
+            return None
     return {row[0] for row in rows}
 
 
@@ -518,7 +464,7 @@ def _ordered_column_ids() -> set:
     return {row[0] for row in rows}
 
 
-def _live_paths(column_id) -> set:
+def _live_paths(column_id) -> set | None:
     """Every dotted path the live values of one column can produce.
 
     A path is not only a stored value: ``custom_column_x`` holding ``Arts.Mystery``
@@ -528,19 +474,20 @@ def _live_paths(column_id) -> set:
     session = calibre_db.session
     cc = db.cc_classes.get(column_id)
     if cc is None:
-        return set()
+        return None
     try:
         values = [row[0] for row in
                   session.execute(text('SELECT DISTINCT "value" FROM calibre.%s'
                                        % cc.__tablename__)).fetchall()]
     except Exception:
         log.debug("Sidecar: values unavailable for column %s", column_id, exc_info=True)
-        return set()
+        return None
     paths = set()
     for value in values:
         if not value:
             continue
-        parts = [p for p in str(value).split(".") if p]
+        paths.add(str(value))
+        parts = [p.strip() for p in str(value).split(".") if p.strip()]
         for index in range(len(parts)):
             paths.add(".".join(parts[:index + 1]))
     return paths
@@ -573,6 +520,8 @@ def reconcile() -> dict:
     summary["available"] = True
     session = calibre_db.session
     live = _live_column_ids()
+    if live is None:
+        return summary
 
     # 1. upsert
     added = 0
@@ -618,7 +567,7 @@ def reconcile() -> dict:
             if column_id not in live:
                 continue
             live_paths = _live_paths(column_id)
-            if not live_paths:
+            if live_paths is None:
                 # A column whose value table we could not read. Leaving its order
                 # alone is the safe direction: pruning on a failed read would
                 # discard a user's curation because of our problem, not theirs.

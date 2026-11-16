@@ -383,3 +383,26 @@ def test_damaged_recovery_entry_preserves_source_without_refilling(monkeypatch, 
     with pytest.raises(ingest_processor.PreserveIngestSourceError): processor.ingest_acsm()
     assert Path(processor.filepath).read_text() == 'owned-ticket'
     assert destination.exists()
+
+
+def test_ticket_returned_unchanged_names_registration_and_activation(monkeypatch, tmp_path, capsys):
+    """#1228: hooks that hand the ticket back mean no plugin fulfilled it.
+
+    @sgreadly's three causes all ended in the helper's bare "not the ticket"
+    line, and the guidance then said to place a zip they had already placed.
+    """
+    import calibre_ticket_fulfillment as helper
+    processor = _processor(monkeypatch, tmp_path)
+    with pytest.raises(ValueError) as rejected:
+        helper.validate_book(processor.filepath)
+    helper_output = f'Traceback (most recent call last):\nValueError: {rejected.value}\n'
+    def fail(cmd, **kw):
+        raise subprocess.CalledProcessError(1, cmd, output=helper_output)
+    monkeypatch.setattr(ingest_processor, '_run_converter_streaming', fail)
+    processor.ingest_acsm()
+    assert processor.backed_up == [(processor.filepath, 'failed')]
+    output = capsys.readouterr().out
+    assert 'Registered Calibre plugin' in output
+    assert 'calibre-customize -a' in output
+    assert 'activation' in output
+    assert 'place the ACSM Input plugin zip' not in output

@@ -36,6 +36,7 @@ log = logger.create()
 class Goodreads(Metadata):
     __name__ = "Goodreads (best effort)"
     __id__ = "goodreads"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
     DESCRIPTION = __name__
     META_URL = "https://www.goodreads.com/"
     SEARCH_URL = "https://www.goodreads.com/search?q={}"
@@ -46,6 +47,9 @@ class Goodreads(Metadata):
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.8",
     }
+    # "Title (Series Name, #24.5)" at the end of a book's name.
+    _SERIES_SUFFIX = re.compile(
+        r"^(?P<title>.+?)\s*\((?P<series>[^()#]+?),?\s*#(?P<index>\d+(?:\.\d+)?)\)\s*$")
 
     def search(self, query: str, generic_cover: str = "", locale: str = "en") -> List[MetaRecord]:
         if not self.active or not isinstance(query, str) or not query.strip():
@@ -111,6 +115,11 @@ class Goodreads(Metadata):
         title = data.get("name")
         if not isinstance(title, str) or not title.strip():
             return None
+        # Goodreads often names a book "Cross the Line (Alex Cross, #24)" and
+        # leaves isPartOf out; the suffix is the only place the series is then.
+        named_series = cls._SERIES_SUFFIX.match(title.strip())
+        if named_series:
+            title = named_series.group("title")
         authors = cls._names(data.get("author"))
         book_id = cls._book_id(url, data)
         record = MetaRecord(
@@ -140,6 +149,10 @@ class Goodreads(Metadata):
                     record.series_index = float(position)
                 except ValueError:
                     pass
+        if not record.series and named_series:
+            record.series = named_series.group("series").strip()
+            position = float(named_series.group("index"))
+            record.series_index = int(position) if position.is_integer() else position
         return record
 
     @staticmethod

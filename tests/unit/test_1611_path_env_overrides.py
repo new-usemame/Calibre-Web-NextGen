@@ -433,13 +433,30 @@ def test_cwa_init_ingest_block_reports_missing_sentinel(
         _cwa_init_ingest_block(tmp_path, script_copy)
 
 
-def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
+def _run_network_share_ingest_block(tmp_path, fs_type, abc_can_write):
+    """Run the cwa-init ingest block with NETWORK_SHARE_MODE on.
+
+    `stat -f -c %T` (the filesystem type) and `cwa-as-abc` (the writability
+    probe as the app user) are faked on PATH so the block's decision can be
+    driven from the outside; chown is faked so nothing is really re-owned.
+    `fs_type=None` makes the fake stat fail, as an unreadable mount would.
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     chown_log = tmp_path / "chown.log"
     _write_executable(
         bin_dir / "chown",
         '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CWA_TEST_CHOWN_LOG"\n',
+    )
+    if fs_type is None:
+        _write_executable(bin_dir / "stat", "#!/bin/sh\nexit 1\n")
+    else:
+        _write_executable(
+            bin_dir / "stat", f'#!/bin/sh\nprintf "%s\\n" "{fs_type}"\n'
+        )
+    _write_executable(
+        bin_dir / "cwa-as-abc",
+        "#!/bin/sh\nexit 0\n" if abc_can_write else "#!/bin/sh\nexit 1\n",
     )
     custom_ingest = tmp_path / "custom-ingest"
     env = _isolated_path_env(tmp_path)
@@ -460,11 +477,46 @@ def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
         text=True,
         timeout=10,
     )
-
     assert result.returncode == 0, result.stderr
     assert custom_ingest.is_dir()
-    assert not chown_log.exists()
-    assert f"skipping chown of {custom_ingest}" in result.stdout
+    chowned = chown_log.read_text().splitlines() if chown_log.exists() else []
+    return custom_ingest, chowned, result.stdout
+
+
+@pytest.mark.parametrize("fs_type", ("nfs", "cifs", "smb2", "fuseblk", None))
+def test_cwa_init_skips_ingest_chown_on_a_network_share(tmp_path, fs_type):
+    custom_ingest, chowned, stdout = _run_network_share_ingest_block(
+        tmp_path, fs_type, abc_can_write=False
+    )
+
+    assert chowned == []
+    assert f"skipping chown of {custom_ingest}" in stdout
+
+
+@pytest.mark.parametrize("fs_type", ("ext2/ext3", "xfs", "btrfs", "zfs"))
+def test_cwa_init_reowns_a_local_ingest_dir_the_app_user_cannot_write(
+    tmp_path, fs_type
+):
+    # #2936: NETWORK_SHARE_MODE is often on for the library's sake while the
+    # ingest folder is the image's own local volume, created 911-owned at build
+    # time. Skipping it left uploads failing with "Ingest directory not
+    # writable" after every update.
+    custom_ingest, chowned, stdout = _run_network_share_ingest_block(
+        tmp_path, fs_type, abc_can_write=False
+    )
+
+    assert chowned == [f"abc:abc {custom_ingest}"]
+    assert "skipping chown" not in stdout
+
+
+def test_cwa_init_leaves_a_writable_local_ingest_dir_alone_in_network_share_mode(
+    tmp_path,
+):
+    _custom_ingest, chowned, _stdout = _run_network_share_ingest_block(
+        tmp_path, "ext2/ext3", abc_can_write=True
+    )
+
+    assert chowned == []
 
 
 @pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
@@ -515,7 +567,7 @@ def test_ingest_service_resolves_whitespace_env_through_file_fallback(tmp_path):
     )
 
     result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-ingest-service.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -547,7 +599,7 @@ def test_each_s6_path_caller_fails_closed_on_unusable_resolver_output(
         timeout=10,
     )
     ingest_result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-ingest-service.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -561,7 +613,7 @@ def test_each_s6_path_caller_fails_closed_on_unusable_resolver_output(
     checksum_env = env.copy()
     checksum_env["PATH"] = f"{bin_dir}:{checksum_env['PATH']}"
     checksum_result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-checksum-backfill/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-checksum-backfill.sh")],
         env=checksum_env,
         capture_output=True,
         text=True,
@@ -582,7 +634,7 @@ def test_auto_library_s6_wrapper_propagates_child_failure(tmp_path):
     env.pop("DISABLE_LIBRARY_AUTOMOUNT", None)
 
     result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-auto-library/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-auto-library.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -597,8 +649,8 @@ def test_shell_consumers_delegate_path_resolution_to_app_paths_cli():
     consumers = {
         REPO_ROOT / "scripts/set_ownership.sh": "all",
         S6_DIR / "cwa-init/run": "ingest_folder",
-        S6_DIR / "cwa-ingest-service/run": "ingest_folder",
-        S6_DIR / "cwa-checksum-backfill/run": "calibre_library_dir",
+        SCRIPTS_DIR / "services/cwa-ingest-service.sh": "ingest_folder",
+        SCRIPTS_DIR / "services/cwa-checksum-backfill.sh": "calibre_library_dir",
     }
     for path, command in consumers.items():
         source = path.read_text(encoding="utf-8")
@@ -606,8 +658,8 @@ def test_shell_consumers_delegate_path_resolution_to_app_paths_cli():
         assert command in source, f"{path.relative_to(REPO_ROOT)} does not resolve {command}"
 
     assert "/app/calibre-web-automated/dirs.json" not in (
-        S6_DIR / "cwa-ingest-service/run"
+        SCRIPTS_DIR / "services/cwa-ingest-service.sh"
     ).read_text(encoding="utf-8")
     assert "json.load(config_file).get(\"calibre_library_dir\")" not in (
-        S6_DIR / "cwa-checksum-backfill/run"
+        SCRIPTS_DIR / "services/cwa-checksum-backfill.sh"
     ).read_text(encoding="utf-8")

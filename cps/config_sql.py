@@ -263,6 +263,11 @@ class _Settings(_Base):
     # One-time append of the fork #1608 LCPL default to existing rows. A
     # dedicated marker preserves any later user removal of lcpl.
     config_upload_formats_lcpl_migrated = Column(Boolean, default=False)
+    # One-time append of FBZ to existing rows: FBZ is FB2 in a Zip container —
+    # the form Calibre itself writes on export ("Title.fb2.zip") — so an FB2
+    # entry demonstrates the administrator wants those books. A dedicated
+    # marker preserves any later user removal of fbz.
+    config_upload_formats_fbz_migrated = Column(Boolean, default=False)
     config_unicode_filename = Column(Boolean, default=False)
     config_embed_metadata = Column(Boolean, default=True)
 
@@ -383,14 +388,14 @@ class ConfigSQL(object):
         self.cli = cli
         self.load()
         self.reconcile_lcpl_upload_format()
+        self.reconcile_fbz_upload_format()
 
         change = False
 
         # Fallback auto-detect: if calibre library not configured but default metadata.db exists, set it
         if (not self.config_calibre_dir or not os.path.isfile(os.path.join(self.config_calibre_dir, 'metadata.db'))):
-            fallback_db = '/calibre-library/metadata.db'
-            if os.path.isfile(fallback_db):
-                detected_dir = os.path.dirname(fallback_db)
+            detected_dir = constants.detected_calibre_library_dir()
+            if detected_dir:
                 if not self.config_calibre_dir:
                     log.info("[autoconfig] Detected calibre library at %s (fallback)", detected_dir)
                 else:
@@ -693,6 +698,31 @@ class ConfigSQL(object):
                 self.config_upload_formats = ','.join(normalized)
 
             self.config_upload_formats_lcpl_migrated = True
+            self.save()
+        return self.config_upload_formats
+
+    def reconcile_fbz_upload_format(self):
+        """Inherit FBZ once when an existing allowlist accepts FB2."""
+        if not bool(getattr(
+                self, "config_upload_formats_fbz_migrated", False)):
+            raw_formats = getattr(self, "config_upload_formats", "") or ""
+            normalized = []
+            for raw_format in str(raw_formats).split(','):
+                upload_format = raw_format.strip().lower()
+                if upload_format not in normalized:
+                    normalized.append(upload_format)
+
+            # FBZ is FB2 in a Zip container — the form Calibre itself writes
+            # on export ("Title.fb2.zip") — so an existing FB2 entry shows the
+            # administrator wants FB2 books. If FB2 was removed or never
+            # allowed, preserve the list byte-for-byte; FBZ can still be added
+            # in Basic Configuration. The empty allow-all sentinel also stays
+            # unchanged.
+            if "fb2" in normalized and "fbz" not in normalized:
+                normalized.append("fbz")
+                self.config_upload_formats = ','.join(normalized)
+
+            self.config_upload_formats_fbz_migrated = True
             self.save()
         return self.config_upload_formats
 

@@ -13,7 +13,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "8d8c5edb029ce196",
+    "rev": "736b5aba81787398",
     "series": null,
     "series_index": null,
     "shelves": [
@@ -24,7 +24,7 @@
    }
   ],
   "next_cursor": null,
-  "revision": "3955c876c31b52776a2fe438",
+  "revision": "7e9d4d638e27bcd2cd75bfcd",
   "scope": "shelves",
   "scope_shelves": [
    {
@@ -64,7 +64,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "8d8c5edb029ce196",
+    "rev": "736b5aba81787398",
     "series": null,
     "series_index": null,
     "shelves": [
@@ -85,7 +85,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "037bfce9808aea22",
+    "rev": "ff051b2898cc55b7",
     "series": null,
     "series_index": null,
     "shelves": [
@@ -107,7 +107,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "8e9f92169e978de7",
+    "rev": "27e23e8b8394bcfd",
     "series": null,
     "series_index": null,
     "shelves": [
@@ -129,7 +129,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "f98f642a5dc72521",
+    "rev": "0e4bfa0cc40500dc",
     "series": null,
     "series_index": null,
     "shelves": [],
@@ -148,7 +148,7 @@
     "format": "EPUB",
     "progress": null,
     "read_status": "unread",
-    "rev": "78aecef7071b5ec3",
+    "rev": "2b8a9ba8feb5da82",
     "series": null,
     "series_index": null,
     "shelves": [],
@@ -157,7 +157,7 @@
    }
   ],
   "next_cursor": null,
-  "revision": "9bbf1b4780372d7dfd8b454c",
+  "revision": "0dca0c03c2f3c6da555f27f2",
   "scope": "library",
   "scope_shelves": [],
   "shelves": [

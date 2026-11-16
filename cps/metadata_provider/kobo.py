@@ -25,6 +25,7 @@ from bs4.element import Tag
 from cps import logger
 from cps.isoLanguages import get_lang3, get_language_name
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.isbn import is_valid as isbn_is_valid
 
 log = logger.create()
 
@@ -39,6 +40,7 @@ class Kobo(Metadata):
 
     __name__ = "Kobo"
     __id__ = "kobo"
+    FILLS_SERIES = True  # returns series and position (see metadata_helper)
 
     DESCRIPTION = "Kobo Books"
     META_URL = "https://www.kobo.com/"
@@ -683,7 +685,7 @@ class Kobo(Metadata):
             pass
         return ""
 
-    def _parse_series_from_dom(self, soup: BS) -> Tuple[str, int]:
+    def _parse_series_from_dom(self, soup: BS) -> Tuple[str, Union[int, float]]:
         # Parse the series name and index from dt/dd pairs
         # Example (from search page):
         #   <dt data-testid="series-product-type-and-number">Book 3 -</dt>
@@ -738,7 +740,7 @@ class Kobo(Metadata):
                 candidates.sort(key=lambda x: x[0])
                 _, series_name, series_idx = candidates[0]
                 if series_name and series_idx:
-                    return series_name, int(series_idx)
+                    return series_name, series_idx
 
             # 2) Fallback: any anchor to a series page, try to find an adjacent dt
             for a in scope.select(self.SERIES_LINK_SELECTOR):
@@ -758,7 +760,7 @@ class Kobo(Metadata):
                 if idx:
                     series_idx = idx
                 if series_name and series_idx:
-                    return series_name, int(series_idx)
+                    return series_name, series_idx
 
             # 3) Name-only fallback within scope
             if not series_name:
@@ -767,7 +769,7 @@ class Kobo(Metadata):
                     series_name = a.get_text(strip=True)
         except Exception:
             pass
-        return series_name, int(series_idx)
+        return series_name, series_idx
 
     def _parse_title_from_dom(self, soup: BS) -> str:
         el = soup.select_one("li.title")
@@ -1331,14 +1333,7 @@ class Kobo(Metadata):
         # Clean ISBN: remove hyphens, spaces, and convert to uppercase
         clean_isbn = re.sub(r'[-\s]', '', isbn.strip().upper())
         
-        # Check if it's ISBN-10 or ISBN-13
-        if len(clean_isbn) == 10:
-            # ISBN-10 validation
-            if re.match(r'^\d{9}[\dX]$', clean_isbn):
-                return clean_isbn
-        elif len(clean_isbn) == 13:
-            # ISBN-13 validation (should start with 978 or 979)
-            if re.match(r'^(978|979)\d{10}$', clean_isbn):
-                return clean_isbn
-                
+        # ISBN-10 or ISBN-13 (978/979) with a valid check digit
+        if re.fullmatch(r'\d{9}[\dX]|\d{13}', clean_isbn) and isbn_is_valid(clean_isbn):
+            return clean_isbn
         return None

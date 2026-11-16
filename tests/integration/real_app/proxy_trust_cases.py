@@ -123,3 +123,74 @@ def test_a_trust_list_without_this_host_still_refuses_relayed_internal_calls(rea
         assert _get(real_app, "::1", status).status_code == 200
     finally:
         gate.networks = default
+
+
+# What a client that reaches the listener directly might send to pass as
+# this host. scripts/ingest_processor.py sends the first one on every call.
+FORGED_LOCAL = [
+    {},
+    {"X-Forwarded-For": "127.0.0.1"},
+    {"X-Forwarded-For": "::1"},
+    {"X-Real-IP": "127.0.0.1"},
+    {"Forwarded": "for=127.0.0.1"},
+    {"X-Forwarded-For": "127.0.0.1", "X-Real-IP": "127.0.0.1",
+     "Forwarded": "for=127.0.0.1", "X-Forwarded-Host": "localhost"},
+]
+# Not this host: a public client, a LAN client, a proxy on the docker network.
+NOT_THIS_HOST = ["198.51.100.50", "192.168.1.20", DOCKER_PROXY]
+
+
+def _internal_calls(app):
+    """Every (method, path) the app serves under /cwa-internal/."""
+    calls = []
+    for rule in app.url_map.iter_rules():
+        if rule.rule.startswith("/cwa-internal/"):
+            for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+                calls.append((method, rule.rule))
+    return sorted(calls)
+
+
+def test_every_internal_route_refuses_a_caller_that_is_not_this_host(real_app):
+    """Intent: no internal route answers anyone but this host's own processes.
+
+    Characterizes #2552: since #2324 a direct client's proxy headers are
+    removed, and the internal routes judge the connection itself. The routes
+    are read from the app's own URL map, so one added later is covered too.
+
+    Breaks if: any internal route is registered without the local-call check;
+    or the check believes a header naming loopback from a peer that is not
+    loopback (the ingest processor's own header, forged); or the refusal is
+    caught inside the view and turned into a 500 or a 200.
+    """
+    calls = _internal_calls(real_app)
+    assert {path for _, path in calls} >= {
+        "/cwa-internal/schedule-auto-send",
+        "/cwa-internal/queue-duplicate-scan",
+        "/cwa-internal/run-duplicate-scan",
+        "/cwa-internal/duplicate-scan-status",
+        "/cwa-internal/schedule-convert-library",
+        "/cwa-internal/schedule-epub-fixer",
+        "/cwa-internal/reconnect-db",
+    }, calls
+
+    client = real_app.test_client()
+    answered = []
+    for method, path in calls:
+        for peer in NOT_THIS_HOST:
+            for headers in FORGED_LOCAL:
+                response = client.open(path, method=method, json={}, headers=headers,
+                                       environ_base={"REMOTE_ADDR": peer})
+                if response.status_code != 403:
+                    answered.append((method, path, peer, headers, response.status_code))
+    assert answered == []
+
+    # The ingest processor's own call, from this host, still reaches the view.
+    local = {"X-Forwarded-For": "127.0.0.1"}
+    for path, body, expected in [
+        ("/cwa-internal/reconnect-db", {}, {"status": "refreshed"}),
+        ("/cwa-internal/run-duplicate-scan", {},
+         {"success": True, "skipped": True, "reason": "no_book_ids"}),
+    ]:
+        response = client.post(path, json=body, headers=local,
+                               environ_base={"REMOTE_ADDR": "127.0.0.1"})
+        assert (response.status_code, response.get_json()) == (200, expected), path

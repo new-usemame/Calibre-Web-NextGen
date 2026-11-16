@@ -291,7 +291,9 @@ class User(UserBase, Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(64), unique=True)
-    email = Column(String(120), unique=True, default="")
+    # A blank address is stored as NULL, never '': SQLite's UNIQUE allows any
+    # number of NULLs but only one '' (#2153). See _blank_email_is_null().
+    email = Column(String(120), unique=True, nullable=True)
     role = Column(SmallInteger, default=constants.ROLE_USER)
     # Publishing one's own shelves is independent from editing other users'
     # public shelves (ROLE_EDIT_SHELFS). Existing installs are backfilled on.
@@ -371,6 +373,13 @@ class User(UserBase, Base):
     # only in the SPA (frontend/src/lib/fonts.ts). "" = use the theme default.
     ui_font_body = Column(String, default="")
     ui_font_display = Column(String, default="")
+
+    @validates("email")
+    def _blank_email_is_null(self, _key, value):
+        """Keep "no email" as NULL so any number of accounts can omit it (#2153)."""
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 if oauth_support:
@@ -1473,8 +1482,11 @@ class KoboBookmark(Base):
     # The parent FK is how every reader of this table reaches it. Unindexed,
     # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
     # throwaway index on each statement (measured on the "Recent" order).
+    # One place per reading state (#2783): ``current_bookmark`` is
+    # ``uselist=False``, so a second row makes every reader pick one at random.
     __table_args__ = (
         Index('ix_kobo_bookmark_state', 'kobo_reading_state_id'),
+        Index('uq_kobo_bookmark_state', 'kobo_reading_state_id', unique=True),
     )
 
 
@@ -1486,6 +1498,10 @@ class KoboStatistics(Base):
     last_modified = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     remaining_time_minutes = Column(Integer)
     spent_reading_minutes = Column(Integer)
+
+    __table_args__ = (
+        Index('uq_kobo_statistics_state', 'kobo_reading_state_id', unique=True),
+    )
 
 
 class Device(Base):
@@ -1535,6 +1551,7 @@ class DeviceSleepScreen(Base):
     state = Column(String(24), nullable=False, default='waiting_for_device')
     source_png = Column(LargeBinary, nullable=True)
     prepared_png = Column(LargeBinary, nullable=True)
+    fit = Column(String(8), nullable=True)
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     applied_revision = Column(String(36), nullable=True)
     applied_status = Column(String(16), nullable=True)
@@ -1624,6 +1641,13 @@ class DeviceReadingPosition(Base):
 
     # Delivery work has its own clock; it is never a reading observation.
     rehydrate_armed_at = deferred(Column(DateTime, nullable=True))
+    # #2783: the receipt of the shared place last sent to this Kobo. A report
+    # repeating the Kobo's own last place cannot replace a shared place it
+    # was never sent. Delivery bookkeeping, never a reading observation.
+    served_shared_received_at = deferred(Column(DateTime, nullable=True))
+    # When (server clock) that place was sent. Only a report the Kobo clocked
+    # after it can have seen it; an earlier-clocked one was queued before.
+    served_shared_at = deferred(Column(DateTime, nullable=True))
 
     __table_args__ = (
         UniqueConstraint(
@@ -2983,6 +3007,17 @@ def migrate_user_table(engine, _session):
     except exc.OperationalError:
         _safe_session_rollback(_session, "user.kindle_mail_subject")
         _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'kindle_mail_subject' String DEFAULT ''")
+
+    # Blank emails are stored as NULL, not '' (#2153): the UNIQUE constraint
+    # would otherwise allow only one account without an address. Because of
+    # that same constraint at most one row can hold '', and this is a no-op
+    # once it has run.
+    try:
+        _session.execute(text("UPDATE user SET email = NULL WHERE email = ''"))
+        _session.commit()
+    except exc.OperationalError as e:
+        _safe_session_rollback(_session, "user.email blank-to-NULL")
+        log.error("Failed to convert blank user emails to NULL in app.db: %s", e)
 
     # Migration for cover-preview per-user preference columns (Phase 2 of
     # cover-normalization — see notes/COVER-NORMALIZATION-DESIGN.md).
@@ -4662,6 +4697,7 @@ def migrate_device_sleep_screen(engine, _session):
     _add_column_if_missing(engine, "device", "sleep_screen_capability",
                            "sleep_screen_capability JSON")
     DeviceSleepScreen.__table__.create(engine, checkfirst=True)
+    _add_column_if_missing(engine, "device_sleep_screen", "fit", "fit VARCHAR(8)")
 
 
 def migrate_device_share_place(engine, _session):
@@ -4722,6 +4758,11 @@ def migrate_kobo_place_delivery(engine, _session):
         ("kepub_file_identity", "kepub_file_identity TEXT"),
     ):
         _add_column_if_missing(engine, "kobo_device_book_download", name, ddl)
+    _add_column_if_missing(engine, "device_reading_position",
+                           "served_shared_received_at",
+                           "served_shared_received_at DATETIME")
+    _add_column_if_missing(engine, "device_reading_position",
+                           "served_shared_at", "served_shared_at DATETIME")
     _run_ddl_with_retry(engine, (
         "CREATE TABLE IF NOT EXISTS kobo_place_echo_guard ("
         "id INTEGER NOT NULL PRIMARY KEY, "
@@ -5325,6 +5366,12 @@ def migrate_kobo_two_way_annotation_sync(engine, _session):
     # erases both records; ordinary state deletion leaves the knowledge guard.
     _ensure_kobo_opaque_present_guards(engine)
 
+    # Drop any memoised Stage 0 capability verdict for this engine. (The cache
+    # also revalidates against SQLite's schema_version, so this is belt and
+    # braces for the explicit "migration ran" signal.)
+    from .services import kobo_annotation_stage0
+    kobo_annotation_stage0.invalidate_schema_capable_cache(engine)
+
     log.info("[kobo-two-way-stage0] additive schema ready; runtime ownership unchanged")
 
 
@@ -5598,6 +5645,90 @@ def migrate_thumbnail_lookup_index(engine, _session):
         )
 
 
+#: (table, survivor order, unique index) for :func:`migrate_kobo_bookmark_one_per_state`.
+_ONE_PER_STATE_TABLES = (
+    ("kobo_bookmark",
+     "server_modified_at IS NULL, server_modified_at DESC, "
+     "last_modified IS NULL, last_modified DESC, id DESC",
+     "uq_kobo_bookmark_state"),
+    ("kobo_statistics",
+     "last_modified IS NULL, last_modified DESC, id DESC",
+     "uq_kobo_statistics_state"),
+)
+
+
+def migrate_kobo_bookmark_one_per_state(engine, _session):
+    """Leave each Kobo reading state with one bookmark and one statistics row (#2783).
+
+    ``KoboReadingState.current_bookmark`` and ``.statistics`` are one-to-one in
+    the ORM, but nothing in the schema enforced it. With two bookmark rows for
+    one state SQLAlchemy returns whichever row SQLite yields first, so the
+    Share my place arbitration compared a new place against a stale one and a
+    Kobo was sent nothing.
+
+    The repair removes rows whose state is NULL or gone (a state created later
+    must not adopt them), keeps the bookmark the server received last
+    (``server_modified_at``; the device clock only breaks ties) while keeping the
+    earliest ``created_at`` of the group, keeps the newest statistics row, and
+    then adds a UNIQUE index so a second row is refused from now on.
+
+    Not gated on a CONFIG_DIR marker: a restored or swapped app.db under the
+    same config directory must be repaired too. Every step is a no-op on a
+    clean database, and ``IF NOT EXISTS`` guards the indexes.
+    """
+    from sqlalchemy import inspect as sa_inspect
+    try:
+        tables = set(sa_inspect(engine).get_table_names())
+    except Exception as error:
+        log.warning("[kobo-one-per-state] could not list tables: %s", error)
+        return
+    if "kobo_reading_state" not in tables:
+        return
+
+    for table, order, index_name in _ONE_PER_STATE_TABLES:
+        if table not in tables:
+            continue
+        orphan_sql = (
+            "DELETE FROM {t} WHERE kobo_reading_state_id IS NULL "
+            "OR kobo_reading_state_id NOT IN (SELECT id FROM kobo_reading_state)"
+        ).format(t=table)
+        duplicate_sql = (
+            "DELETE FROM {t} WHERE id IN (SELECT id FROM ("
+            "SELECT id, ROW_NUMBER() OVER (PARTITION BY kobo_reading_state_id "
+            "ORDER BY {o}) AS rn FROM {t}) WHERE rn > 1)"
+        ).format(t=table, o=order)
+        statements = [orphan_sql]
+        if table == "kobo_bookmark":
+            # The survivor keeps the group's first "started reading" date.
+            statements.append(
+                "UPDATE kobo_bookmark SET created_at = ("
+                "SELECT MIN(b2.created_at) FROM kobo_bookmark b2 "
+                "WHERE b2.kobo_reading_state_id = kobo_bookmark.kobo_reading_state_id) "
+                "WHERE kobo_reading_state_id IN (SELECT kobo_reading_state_id "
+                "FROM kobo_bookmark GROUP BY kobo_reading_state_id HAVING COUNT(*) > 1)"
+            )
+        statements.append(duplicate_sql)
+        statements.append(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {i} ON {t}(kobo_reading_state_id)"
+            .format(i=index_name, t=table)
+        )
+        try:
+            with engine.connect() as conn:
+                before = conn.execute(text("SELECT COUNT(*) FROM %s" % table)).scalar()
+            _run_ddl_with_retry(engine, statements)
+            with engine.connect() as conn:
+                after = conn.execute(text("SELECT COUNT(*) FROM %s" % table)).scalar()
+        except Exception as error:
+            log.error("[kobo-one-per-state] %s repair failed: %s", table, error)
+            _safe_session_rollback(_session, "kobo_one_per_state")
+            continue
+        if before != after:
+            log.info(
+                "[kobo-one-per-state] %s: removed %d orphaned or duplicate row(s)",
+                table, before - after,
+            )
+
+
 def migrate_reading_activity_indexes(engine, _session):
     """Index the two reading-position tables by how they are actually read.
 
@@ -5704,6 +5835,8 @@ def migrate_Database(_session):
     migrate_device_share_place(engine, _session)
     migrate_device_sleep_screen(engine, _session)
     migrate_kobo_bookmark_receipt(engine, _session)
+    # After the created_at/server_modified_at columns exist: it reads both (#2783).
+    migrate_kobo_bookmark_one_per_state(engine, _session)
     migrate_kobo_place_delivery(engine, _session)
     migrate_kosync_web_place(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)

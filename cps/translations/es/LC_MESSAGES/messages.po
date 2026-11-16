@@ -8632,6 +8632,10 @@ msgid "Recipient(s)"
 msgstr "Destinatario(s)"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Host de redirección (URL completa)"
 

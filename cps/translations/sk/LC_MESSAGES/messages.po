@@ -8676,6 +8676,10 @@ msgid "Recipient(s)"
 msgstr "Príjemcovia"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Hostiteľ presmerovania (úplná URL)"
 

@@ -8392,6 +8392,10 @@ msgid "Recipient(s)"
 msgstr "收件人"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "重定向主机（完整 URL）"
 

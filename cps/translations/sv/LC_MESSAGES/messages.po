@@ -8578,6 +8578,10 @@ msgid "Recipient(s)"
 msgstr "Mottagare"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Omdirigeringsvärd (fullständig webbadress)"
 

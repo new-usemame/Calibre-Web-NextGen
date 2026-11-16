@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""The edit picker must preserve stored text and enforce the editor's scope."""
+from types import SimpleNamespace
+
+import flask
+import pytest
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, create_engine
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+
+from cps import db, editbooks
+
+pytestmark = pytest.mark.unit
+
+
+@pytest.fixture
+def picker(monkeypatch):
+    base = declarative_base()
+
+    class Book(base):
+        __tablename__ = "books"
+        id = Column(Integer, primary_key=True)
+        visible = Column(Boolean)
+
+    class Value(base):
+        __tablename__ = "custom_column_7"
+        id = Column(Integer, primary_key=True)
+        book = Column(Integer, ForeignKey("books.id"))
+        value = Column(String)
+
+    Book.custom_column_7 = relationship(Value)
+    engine = create_engine("sqlite://")
+    base.metadata.create_all(engine)
+    db.CustomColumns.__table__.create(engine)
+    session = sessionmaker(bind=engine)()
+    column = db.CustomColumns(id=7, label="shelf", name="Shelf", datatype="text", is_multiple=False,
+                              mark_for_delete=False)
+    session.add(column)
+    session.add_all([Book(id=1, visible=True), Book(id=2, visible=False)])
+    session.add_all([Value(book=1, value="Smith, Jr."), Value(book=1, value="QA. 76.."),
+                     Value(book=2, value="Restricted value")])
+    session.commit()
+    calibre = SimpleNamespace(session=session, is_flat_cc_column=lambda _: True,
+                              get_cc_columns=lambda *a, **kw: [column],
+                              common_filters=lambda **kw: Book.visible.is_(True))
+    monkeypatch.setattr(editbooks, "calibre_db", calibre)
+    monkeypatch.setattr(db, "Books", Book)
+    monkeypatch.setattr(db, "cc_classes", {7: Value})
+    monkeypatch.setattr(editbooks, "current_user", SimpleNamespace(role_edit=lambda: True,
+                                                                 role_admin=lambda: False))
+    app = flask.Flask(__name__)
+    # Remove the login wrapper only: the edit-role wrapper must still run.
+    app.add_url_rule("/picker/<int:c_id>", view_func=editbooks.get_cc_tree.__wrapped__)
+    yield app.test_client(), column, calibre
+    session.close()
+    engine.dispose()
+
+
+def test_picker_returns_exact_values_only_from_editable_books(picker):
+    """A single text value with a comma or dots must survive choosing unchanged."""
+    client, _, _ = picker
+    response = client.get("/picker/7")
+    assert response.status_code == 200
+    assert response.json == {"hierarchical": False, "is_multiple": False, "entries": [
+        {"value": "QA. 76..", "depth": 0}, {"value": "Smith, Jr.", "depth": 0}]}
+
+
+def test_picker_requires_edit_permission(picker, monkeypatch):
+    client, _, _ = picker
+    monkeypatch.setattr(editbooks, "current_user", SimpleNamespace(role_edit=lambda: False,
+                                                                 role_admin=lambda: False))
+    assert client.get("/picker/7").status_code == 403
+
+
+@pytest.mark.parametrize("datatype", ["int", "comments", "bool", "enumeration"])
+def test_picker_rejects_non_text_columns(picker, datatype):
+    client, column, _ = picker
+    column.datatype = datatype
+    assert client.get("/picker/7").status_code == 404
+
+
+def test_picker_rejects_unknown_and_ignored_columns(picker):
+    client, _, calibre = picker
+    assert client.get("/picker/999").status_code == 404
+    calibre.get_cc_columns = lambda *a, **kw: []
+    assert client.get("/picker/7").status_code == 404
+
+
+def test_hierarchical_picker_keeps_raw_values_and_tree_depth(picker):
+    """Indentation can normalize paths; the selected value must remain exact."""
+    client, _, calibre = picker
+    calibre.is_flat_cc_column = lambda _: False
+    data = client.get("/picker/7").json
+    assert {"value": "QA. 76..", "depth": 1} in data["entries"]
+    assert {"value": "Restricted value", "depth": 0} not in data["entries"]

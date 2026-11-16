@@ -93,6 +93,7 @@ def delete_book_ajax(book_id, book_format):
 
 @editbook.route("/ajax/get_cc_tree/<int:c_id>")
 @user_login_required
+@edit_required
 def get_cc_tree(c_id):
     """Choices for the custom-column picker on the book-edit page.
 
@@ -100,8 +101,7 @@ def get_cc_tree(c_id):
     one a plain list. The response carries the mode explicitly so the client
     never has to re-detect it.
     """
-    hierarchical, entries = cc_picker_values(c_id)
-    return jsonify({'hierarchical': hierarchical, 'entries': entries})
+    return jsonify(cc_picker_values(c_id))
 
 
 @editbook.route("/admin/book/<int:book_id>", methods=['GET'])
@@ -264,66 +264,41 @@ def convert_bookformat(book_id):
 
 
 def cc_picker_values(c_id):
-    """Every distinct stored value of a text custom column, for the edit-page picker.
+    """Choices from books this editor may access, independent of browse toggles.
 
-    Returns ``(hierarchical, entries)`` where ``entries`` is a list of
-    ``{"value", "depth"}`` ready for the client to render as either an
-    indented tree (hierarchical) or a plain list (flat).
-
-    Both modes are built from the same canonicalisation the browse surfaces
-    use -- ``hierarchy.parse_tag_hierarchy`` -- because this list and
-    ``/custom_column/<id>`` (web.cc_category_list) must agree. Otherwise a
-    stored ``'Computers.'`` or ``'Computers. DB'`` would appear here as a
-    bogus sibling of ``Computers`` that the browse tree does not have.
-
-    For a flat column no splitting happens at all: Dewey ``778.3`` is ONE
-    entry, never a ``778`` parent with a ``3`` child
-    (``calibre_db.get_cc_flat_list`` documents that contract).
-
-    The mode comes from the same detector the browse surfaces use, so a
-    column never renders as a tree in one place and a list in another.
+    Keep raw stored spellings for selection. Canonical paths determine only
+    indentation and virtual parents, otherwise Apply would rename old values.
     """
-    cc = (calibre_db.session.query(db.CustomColumns)
-          .filter(db.CustomColumns.id == c_id)
-          .filter(db.CustomColumns.datatype.notin_(db.cc_exceptions)).one_or_none())
-    if cc is None:
-        return False, []
+    cc = next((column for column in calibre_db.get_cc_columns(
+        config, filter_config_custom_read=False) if column.id == c_id
+        and column.datatype == 'text' and not column.mark_for_delete), None)
     cc_class = db.cc_classes.get(c_id)
-    if cc_class is None:
-        return False, []
-
+    if cc is None or cc_class is None:
+        abort(404)
+    rel = getattr(db.Books, 'custom_column_' + str(c_id))
     try:
-        rows = calibre_db.session.query(cc_class.value).distinct().all()
+        rows = (calibre_db.session.query(cc_class.value)
+                .select_from(db.Books).join(rel)
+                .filter(calibre_db.common_filters(allow_show_archived=True,
+                                                 allow_show_hidden=True,
+                                                 allow_show_global=True))
+                .distinct().all())
     except OperationalError:
         log.error("Failed to read custom column %s values for the edit picker", c_id)
-        return False, []
-
-    # A multi-value column stores each value as its own row, but a single row
-    # can still hold a comma-joined string on installs edited by hand or by
-    # tools that predate --is-multiple. Split so those become individual
-    # choices rather than one un-tickable blob.
-    values = set()
-    for (val,) in rows:
-        if val is None:
-            continue
-        for item in str(val).split(','):
-            item = item.strip()
-            if item:
-                values.add(item)
-
-    if calibre_db.is_flat_cc_column(c_id):
-        # Sorted case-insensitively so Dewey/LCC read in numeric order.
-        return False, [{'value': v, 'depth': 0} for v in sorted(values, key=lambda s: s.lower())]
-
+        abort(503)
+    values = {value for (value,) in rows if value is not None and value.strip()}
+    hierarchical = not calibre_db.is_flat_cc_column(c_id)
     entries = []
-
-    def _flatten(nodes, depth):
-        for node in nodes:
-            entries.append({'value': node['path'], 'depth': depth})
-            _flatten(node['children'], depth + 1)
-
-    _flatten(hierarchy.parse_tag_hierarchy(values), 0)
-    return True, entries
+    if hierarchical:
+        def flatten(nodes, depth):
+            for node in nodes:
+                for value in sorted(node['raw_values'] or {node['path']}, key=str.lower):
+                    entries.append({'value': value, 'depth': depth})
+                flatten(node['children'], depth + 1)
+        flatten(hierarchy.parse_tag_hierarchy(values), 0)
+    else:
+        entries = [{'value': value, 'depth': 0} for value in sorted(values, key=str.lower)]
+    return {'hierarchical': hierarchical, 'is_multiple': bool(cc.is_multiple), 'entries': entries}
 
 
 @editbook.route("/ajax/getcustomenum/<int:c_id>")

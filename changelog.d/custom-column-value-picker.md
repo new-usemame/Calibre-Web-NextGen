@@ -11,6 +11,7 @@
   a flat column is drawn as a plain list, so `778.3` stays one entry rather than
   a `778` with a `3` underneath it. Values already on the book arrive ticked, you
   can add a new dotted value from the same dialog, and typing by hand still works
-  exactly as before — the dialog only fills in the field, so nothing about how a
-  value is saved or undone changes. Available in both the new and the classic
-  interface.
+  exactly as before. Single-value columns allow one choice, filtering keeps your
+  selections, and existing spelling is preserved when you apply it. Choices
+  respect your access to books, independently of personal browse visibility.
+  Available in both the new and the classic interface. Thanks @Rol3333 (#2434).

@@ -1,6 +1,6 @@
 {# Custom-column value picker for the classic book-edit page.
 
-   Opened by the .btn-edit-hierarchy buttons in book_edit.html, which
+   Opened by the .btn-cc-picker buttons in book_edit.html, which
    cps/editbooks.py::render_edit_book renders for EVERY text custom column
    (c.cc_picker_mode is 'hierarchical' or 'flat').
 
@@ -15,7 +15,9 @@
    There is no save endpoint. Applying writes the comma-joined selection
    back into the column's ordinary text input, which the ordinary edit
    pipeline (editbooks.py::edit_cc_data) persists unchanged. #}
-<div class="modal fade" id="ccValueModal" tabindex="-1" role="dialog">
+<div class="modal fade" id="ccValueModal" tabindex="-1" role="dialog" aria-labelledby="ccValueModalTitle"
+     data-no-match="{{ _('No values match the filter.') }}" data-loading="{{ _('Loading values...') }}"
+     data-load-error="{{ _('Could not load the values for this column.') }}" data-retry="{{ _('Try again') }}">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -44,6 +46,7 @@
         <hr>
 
         <h5>{{ _('Add a new value') }}</h5>
+        <div id="ccValueInvalid" class="text-danger" role="alert" hidden>{{ _('Enter one value without commas.') }}</div>
         <div class="input-group">
           <input type="text" id="ccValueNew" class="form-control"
                  placeholder="{{ _('e.g. Category.SubCategory.Item') }}"

@@ -1,171 +1,124 @@
-/* Custom-column value picker for the classic book-edit page.
- *
- * The list button (.btn-cc-picker, rendered for EVERY text custom column in
- * book_edit.html) opens #ccValueModal (custom_column_modal.html, included in
- * book_edit.html — the modal markup MUST be in this page, else the button has
- * nothing to open). It fetches every stored value of the column from
- * /ajax/get_cc_tree/<id> and renders them as a checklist, then writes the
- * comma-joined selection back into the column's ordinary text input so the
- * existing edit pipeline (edit_cc_data -> edit_cc_data_string) persists it
- * unchanged. There is no save endpoint for this modal.
- *
- * Two modes, one code path:
- *   hierarchical -> indented checklist, indent from the server's `depth`
- *   flat         -> plain one-level list (Dewey 778.3 is ONE entry, never a
- *                   778 parent with a 3 child)
- * The server decides and says which in the response; the client never
- * re-detects, so the picker cannot disagree with the browse tree about which
- * a column is.
- */
+/* The classic edit picker fills the existing input; the normal Save persists it. */
 $(document).ready(function () {
   var activeColumnId = null;
-  var entries = [];          // [{value, depth}] as the server sent them
+  var entries = [];
   var isHierarchical = false;
-  var selected = {};        // canonical value -> true
-
-  /* Canonicalise exactly like cps/hierarchy.py's split_path/join_path: each
-   * dot-segment is stripped and empty segments collapse, so a stored
-   * 'Computers.' or 'Computers..' ticks the 'Computers' node the same way the
-   * browse tree counts it. */
-  function canonicalize(value) {
-    return String(value || '')
-      .split('.')
-      .map(function (s) { return s.trim(); })
-      .filter(Boolean)
-      .join('.');
-  }
-
-  function matchesFilter(value, filter) {
-    return !filter || value.toLowerCase().indexOf(filter) !== -1;
-  }
+  var multiple = false;
+  var selected = new Set();
+  var pending = null;
+  var generation = 0;
+  var ready = false;
+  var $modal = $('#ccValueModal');
 
   function renderList() {
+    if (!ready) return;
     var filter = ($('#ccValueSearch').val() || '').toLowerCase();
     var $container = $('#ccValueList').empty();
     var shown = 0;
-
     entries.forEach(function (entry) {
-      var value = String(entry.value == null ? '' : entry.value);
-      if (!value || !matchesFilter(value, filter)) {
-        return;
-      }
+      var value = entry.value;
+      if (!value || (filter && value.toLowerCase().indexOf(filter) === -1)) return;
       shown += 1;
-      var checked = selected[value] ? ' checked' : '';
-      // Only a hierarchical column indents; depth is always 0 for flat.
-      var indent = isHierarchical ? (entry.depth || 0) * 20 : 0;
-      // Escape for safe interpolation into the label and the value attribute.
-      var escaped = $('<div>').text(value).html();
-      $container.append(
-        $('<div class="checkbox"></div>')
-          .css('padding-left', indent + 'px')
-          .html(
-            '<label><input type="checkbox" class="cc-value-checkbox" value="' +
-            escaped + '"' + checked + '> ' + escaped + '</label>'
-          )
-      );
+      // Values are text and DOM properties, never interpolated HTML attributes.
+      var $input = $('<input>', { type: 'checkbox', class: 'cc-value-checkbox' })
+        .val(value).prop('checked', selected.has(value));
+      $('<div class="checkbox"></div>')
+        .css('padding-left', (isHierarchical ? entry.depth * 20 : 0) + 'px')
+        .append($('<label>').append($input).append(document.createTextNode(' ' + value)))
+        .appendTo($container);
     });
-
-    $('#ccValueEmpty').prop('hidden', shown !== 0);
-    if (shown === 0 && filter) {
-      // Nothing matched the filter (the column is not empty) — say so rather
-      // than showing an empty scroll area that looks like a failure.
-      $container.append(
-        $('<div class="text-muted"></div>').text('No values match the filter.')
-      );
+    $('#ccValueEmpty').prop('hidden', shown !== 0 || !!filter);
+    if (!shown && filter) {
+      $container.append($('<div class="text-muted">').text($modal.data('no-match')));
     }
   }
 
-  /* Read the text input back into `selected`. Called on open (to pick up the
-   * saved value) and after adding a node, so neither path loses the other. */
   function readInputIntoSelection() {
-    var current = $('#custom_column_' + activeColumnId).val() || '';
-    Object.keys(selected).forEach(function (key) { delete selected[key]; });
-    current.split(',').forEach(function (part) {
-      var value = canonicalize(part);
-      if (value) {
-        selected[value] = true;
-      }
+    var value = $('#custom_column_' + activeColumnId).val() || '';
+    selected = new Set((multiple ? value.split(',') : [value])
+      .map(function (part) { return part.trim(); }).filter(Boolean));
+  }
+
+  function loadValues() {
+    var currentGeneration = ++generation;
+    if (pending) pending.abort();
+    ready = false;
+    entries = [];
+    $('#ccValueApplyBtn, #ccValueAddBtn').prop('disabled', true);
+    $('#ccValueEmpty, #ccValueInvalid').prop('hidden', true);
+    $('#ccValueList').text($modal.data('loading'));
+    pending = $.getJSON(getPath() + '/ajax/get_cc_tree/' + activeColumnId, function (data) {
+      if (currentGeneration !== generation) return;
+      isHierarchical = !!data.hierarchical;
+      multiple = !!data.is_multiple;
+      readInputIntoSelection();
+      entries = data.entries || [];
+      selected.forEach(function (value) {
+        if (!entries.some(function (entry) { return entry.value === value; })) {
+          entries.push({ value: value, depth: 0 });
+        }
+      });
+      ready = true;
+      $('#ccValueApplyBtn, #ccValueAddBtn').prop('disabled', false);
+      renderList();
+    }).fail(function (_, status) {
+      if (currentGeneration !== generation || status === 'abort') return;
+      $('#ccValueList').empty().append($('<div class="alert alert-danger">')
+        .text($modal.data('load-error'))).append($('<button>', { type: 'button', class: 'btn btn-default' })
+        .text($modal.data('retry')).on('click', loadValues));
     });
   }
 
   $('.btn-cc-picker').on('click', function () {
     activeColumnId = $(this).data('column-id');
-    var columnName = $(this).data('column-name');
-    readInputIntoSelection();
-
-    $('#ccValueModalTitle').text(columnName || 'Values');
-    $('#ccValueNew').val('');
-    $('#ccValueSearch').val('');
-
-    // Open immediately, then populate: waiting for the fetch before showing
-    // made the button look dead whenever the request failed.
-    $('#ccValueModal').modal('show');
-    $('#ccValueList').html(
-      '<div class="text-center" style="padding: 2em 0;"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></div>'
-    );
-    $('#ccValueEmpty').prop('hidden', true);
-
-    // getPath() honours a reverse-proxy mount prefix (same helper every other
-    // classic AJAX call uses; "" at the domain root).
-    $.getJSON(getPath() + '/ajax/get_cc_tree/' + activeColumnId, function (data) {
-      isHierarchical = !!data.hierarchical;
-      entries = data.entries || [];
-      renderList();
-    }).fail(function () {
-      entries = [];
-      $('#ccValueList').html(
-        '<div class="alert alert-danger" style="margin-bottom: 0;">Could not load the values for this column.</div>'
-      );
-    });
+    $('#ccValueModalTitle').text($(this).data('column-name'));
+    $('#ccValueNew, #ccValueSearch').val('');
+    $modal.modal('show');
+    loadValues();
   });
 
-  // Typing in the filter box re-renders the list.
+  $modal.on('hidden.bs.modal', function () {
+    generation += 1;
+    if (pending) pending.abort();
+  });
   $('#ccValueSearch').on('input', renderList);
-
-  $('#ccValueAddBtn, #ccValueNew').on('click', function (event) {
-    if (event.type === 'click' && event.target.id !== 'ccValueAddBtn') {
-      return;
-    }
-    var raw = $('#ccValueNew').val().trim();
-    if (!raw) {
-      return;
-    }
-    var node = canonicalize(raw);
-    var known = entries.some(function (e) { return String(e.value) === node; });
-    if (!known) {
-      // A new value on a hierarchical column is inserted at the depth its
-      // own dot count implies, so it lands in the right place in the tree.
-      entries.push({
-        value: node,
-        depth: isHierarchical ? node.split('.').length - 1 : 0
-      });
-      entries.sort(function (a, b) {
-        return String(a.value).toLowerCase().localeCompare(String(b.value).toLowerCase());
-      });
-    }
-    selected[node] = true;
-    $('#ccValueNew').val('');
-    $('#ccValueSearch').val('');
+  // Update the selection before filtering or adding can rebuild the DOM.
+  $('#ccValueList').on('change', '.cc-value-checkbox', function () {
+    if (this.checked) {
+      if (!multiple) selected.clear();
+      selected.add(this.value);
+    } else selected.delete(this.value);
     renderList();
   });
 
-  // Enter in the new-value box adds it, rather than submitting the whole form.
+  $('#ccValueAddBtn').on('click', function () {
+    if (!ready) return;
+    var raw = $('#ccValueNew').val().trim();
+    if (multiple && raw.indexOf(',') !== -1) {
+      $('#ccValueInvalid').prop('hidden', false);
+      return;
+    }
+    var value = isHierarchical ? raw.split('.').map(function (s) { return s.trim(); })
+      .filter(Boolean).join('.') : raw;
+    if (!value) return;
+    if (!entries.some(function (entry) { return entry.value === value; })) {
+      entries.push({ value: value, depth: isHierarchical ? value.split('.').length - 1 : 0 });
+    }
+    if (!multiple) selected.clear();
+    selected.add(value);
+    $('#ccValueNew, #ccValueSearch').val('');
+    $('#ccValueInvalid').prop('hidden', true);
+    renderList();
+  });
   $('#ccValueNew').on('keydown', function (event) {
     if (event.key === 'Enter') {
       event.preventDefault();
       $('#ccValueAddBtn').trigger('click');
     }
   });
-
   $('#ccValueApplyBtn').on('click', function () {
-    $('.cc-value-checkbox').each(function () {
-      if ($(this).is(':checked')) {
-        selected[String($(this).val())] = true;
-      } else {
-        delete selected[String($(this).val())];
-      }
-    });
-    $('#custom_column_' + activeColumnId).val(Object.keys(selected).join(', '));
-    $('#ccValueModal').modal('hide');
+    if (!ready) return;
+    $('#custom_column_' + activeColumnId).val(Array.from(selected).join(', ')).trigger('input').trigger('change');
+    $modal.modal('hide');
   });
 });

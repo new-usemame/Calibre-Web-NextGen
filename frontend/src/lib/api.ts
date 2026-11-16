@@ -373,6 +373,13 @@ export interface CcTree {
   nodes: CcNode[];
 }
 
+/** Editor choices are independent of personal browse visibility. */
+export interface CcPickerValues {
+  hierarchical: boolean;
+  is_multiple: boolean;
+  entries: { value: string; depth: number }[];
+}
+
 /** Books under one node of a custom column (or all books carrying any value
  *  in the column when no path was requested). */
 export interface CcBooksPage extends BooksPage {

@@ -18406,3 +18406,50 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+# Book-edit custom-column value picker (#2434).
+
+msgid "Apply selection"
+msgstr ""
+
+msgid "Choose from stored values"
+msgstr ""
+
+msgid "Choose from the existing hierarchy"
+msgstr ""
+
+msgid "Choose from the existing values"
+msgstr ""
+
+msgid "Could not load the values for this column."
+msgstr ""
+
+msgid "Enter one value without commas."
+msgstr ""
+
+msgid "Loading values..."
+msgstr ""
+
+msgid "New value"
+msgstr ""
+
+msgid "No values match the filter."
+msgstr ""
+
+msgid "No values stored for this column yet. Add one below."
+msgstr ""
+
+msgid "Search or filter values"
+msgstr ""
+
+msgid "Search or filter values..."
+msgstr ""
+
+msgid "e.g. Category.SubCategory.Item"
+msgstr ""
+
+msgid "Select values"
+msgstr ""
+
+msgid "Add a new value"
+msgstr ""

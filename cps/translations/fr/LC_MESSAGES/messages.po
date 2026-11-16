@@ -21619,3 +21619,50 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
+# Book-edit custom-column value picker (#2434).
+
+msgid "Apply selection"
+msgstr "Appliquer la sélection"
+
+msgid "Choose from stored values"
+msgstr "Choisir parmi les valeurs enregistrées"
+
+msgid "Choose from the existing hierarchy"
+msgstr "Choisir dans la hiérarchie existante"
+
+msgid "Choose from the existing values"
+msgstr "Choisir parmi les valeurs existantes"
+
+msgid "Could not load the values for this column."
+msgstr "Impossible de charger les valeurs de cette colonne."
+
+msgid "Enter one value without commas."
+msgstr "Saisissez une seule valeur sans virgule."
+
+msgid "Loading values..."
+msgstr "Chargement des valeurs..."
+
+msgid "New value"
+msgstr "Nouvelle valeur"
+
+msgid "No values match the filter."
+msgstr "Aucune valeur ne correspond au filtre."
+
+msgid "No values stored for this column yet. Add one below."
+msgstr "Cette colonne ne contient pas encore de valeurs. Ajoutez-en une ci-dessous."
+
+msgid "Search or filter values"
+msgstr "Rechercher ou filtrer les valeurs"
+
+msgid "Search or filter values..."
+msgstr "Rechercher ou filtrer les valeurs..."
+
+msgid "e.g. Category.SubCategory.Item"
+msgstr "p. ex. Catégorie.SousCatégorie.Élément"
+
+msgid "Select values"
+msgstr "Sélectionner des valeurs"
+
+msgid "Add a new value"
+msgstr "Ajouter une nouvelle valeur"

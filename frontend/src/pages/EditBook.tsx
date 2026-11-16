@@ -830,9 +830,9 @@ function CustomColumnField({ column, value, error, onChange }:
   // writes a comma-joined string back into this same field.
   return (
     <>
-      <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error}>
+      <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error} composite>
         <div className={styles.inputWithButton}>
-          <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
+          <input className={styles.input} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} />
           <button type="button" className={styles.pickerBtn}
             onClick={() => setPickerOpen(true)}
             aria-label={t('Choose from stored values')}
@@ -846,6 +846,7 @@ function CustomColumnField({ column, value, error, onChange }:
           columnId={column.id}
           columnLabel={label}
           hierarchical={!!column.hierarchical}
+          multiple={column.is_multiple}
           value={value}
           onApply={onChange}
           onClose={() => setPickerOpen(false)}

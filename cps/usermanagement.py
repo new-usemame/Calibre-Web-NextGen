@@ -100,29 +100,14 @@ def _email_taken(email):
     return ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first() is not None
 
 
-def _user_with_email(address):
-    """The account whose email is this address, or None. Only a single valid address is
-    looked up, so a header value that isn't an email never touches the email column."""
-    address = (address or "").strip()
-    if "@" not in address or "," in address:
-        return None
-    from .helper import valid_email
-    try:
-        address = valid_email(address)
-    except Exception:
-        return None
-    return ub.session.query(ub.User).filter(func.lower(ub.User.email) == address.lower()).first()
-
-
 def _auto_create_email(username, offered=None):
     """Pick the email for a user auto-created from proxy headers.
 
     Uses the username when it is an email address. Header-auth proxies such as
     Cloudflare Access, Authelia and authentik put the address in the username
     header. A separate Remote-Email style header is deliberately not used: the proxy
-    does not always set it, so a client can send any value, and an address stored
-    from it would later match that address's real owner into this account (see
-    load_user_from_reverse_proxy_header).
+    does not always set it, so a client can send any value. Profile emails do not
+    prove identity and are never used to select an account for proxy login.
     The username is skipped if it isn't a single valid address or another account
     already has it: User.email is unique, so a clash would fail the insert on every
     login attempt and the person could never get in. Falls back to a placeholder,
@@ -456,22 +441,9 @@ def load_user_from_reverse_proxy_header(req):
 
     # If user not found and auto-creation is enabled, create new user
     if getattr(config, 'config_reverse_proxy_auto_create_users', False):
-        # The header is the identity the proxy verified. If it is an email address that
-        # an existing account already has (an admin created "rob" with rob@example.com,
-        # then Rob arrives through the proxy as rob@example.com), that is the same
-        # person: log them in instead of creating a second account. This only runs when
-        # auto-create is on, because that is the only case where the alternative is a
-        # duplicate account; with it off nothing is matched and behaviour is unchanged.
-        # Only the identity header is matched. Remote-Email / X-Remote-Email are never
-        # read: proxies such as Cloudflare Access don't set them, so a client can send
-        # any value.
-        user = _user_with_email(rp_header_username)
-        if user:
-            rate_limits.clear_current_limits(limiter)
-            log.debug("Reverse proxy authentication: '%s' matched existing user '%s' by email",
-                      rp_header_username, user.name)
-            return user
-
+        # Profile emails are editable without ownership verification, so only a
+        # username match may select an existing account. Separate email headers
+        # may be client-controlled and must not populate the new account either.
         log.info("Reverse proxy authentication: attempting to create user '%s'", rp_header_username)
 
         user = create_authenticated_user(rp_header_username, auth_source="reverse proxy")

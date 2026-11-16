@@ -1,192 +1,166 @@
 # -*- coding: utf-8 -*-
-# Calibre-Web Automated - fork of Calibre-Web
 # SPDX-License-Identifier: GPL-3.0-or-later
+"""Proxy provisioning and account isolation with real validation and SQLite.
 
+Profile email is editable without ownership verification. It must never select
+an account for proxy authentication, even when automatic provisioning is on.
 """
-Unit tests for the email picked for users auto-created from reverse-proxy headers
-(cps/usermanagement.py: _auto_create_email, create_authenticated_user).
-
-cps.usermanagement is loaded against a stub cps package, scoped to each test with
-patch.dict(sys.modules), so no app context or database is needed. valid_email is
-replaced with a simple stand-in; these tests cover which candidate gets picked,
-not the address regex.
-"""
-
-import importlib
-import os
-import sys
-import types
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
 
 import pytest
+from flask import request
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from cps import app, ub, usermanagement
+from cps.api import account
+from cps.helper import valid_email
 
 pytestmark = pytest.mark.unit
-
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-
-
-def _fake_valid_email(value):
-    local, _, domain = value.partition("@")
-    if not local or not domain or "@" in domain or " " in value:
-        raise Exception("Invalid Email address format")
-    return value
+IDENTITY_HEADER = 'Cf-Access-Authenticated-User-Email'
 
 
 @pytest.fixture
-def um():
-    """cps.usermanagement imported against stubbed dependencies."""
-    cps_pkg = types.ModuleType("cps")
-    cps_pkg.__path__ = [os.path.join(PROJECT_ROOT, "cps")]
-    helper = types.ModuleType("cps.helper")
-    helper.valid_email = _fake_valid_email
-    stubs = {name: MagicMock() for name in (
-        "flask", "flask_httpauth", "werkzeug", "werkzeug.datastructures", "werkzeug.security",
-        "sqlalchemy", "sqlalchemy.sql", "sqlalchemy.sql.expression", "cps.cw_login",
-        "cps.ui_themes",
-    )}
-    for name in ("lm", "ub", "config", "logger", "limiter", "constants", "services", "rate_limits"):
-        mod = MagicMock()
-        setattr(cps_pkg, name, mod)
-        stubs[f"cps.{name}"] = mod
-    stubs.update({"cps": cps_pkg, "cps.helper": helper})
-    with patch.dict(sys.modules, stubs):
-        sys.modules.pop("cps.usermanagement", None)
-        module = importlib.import_module("cps.usermanagement")
-        yield module
-        sys.modules.pop("cps.usermanagement", None)
+def database(monkeypatch):
+    engine = create_engine('sqlite:///:memory:')
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(ub, 'session', session)
+    monkeypatch.setattr(usermanagement, 'config', SimpleNamespace(
+        config_reverse_proxy_login_header_name=IDENTITY_HEADER,
+        config_reverse_proxy_auto_create_users=True,
+        config_default_role=1, config_default_show=1, config_default_locale='en',
+        config_default_language='all', config_theme=1,
+    ))
+    yield session
+    session.close()
+    engine.dispose()
 
 
-def _taken(*emails):
-    taken = {e.lower() for e in emails}
-    return lambda email: email.lower() in taken
+def proxy_login(identity, **headers):
+    with app.test_request_context('/', headers={IDENTITY_HEADER: identity, **headers}):
+        return usermanagement.load_user_from_reverse_proxy_header(request)
 
 
-def test_email_username_is_used_as_email(um):
-    with patch.object(um, "_email_taken", _taken()):
-        assert um._auto_create_email("reader@example.com") == "reader@example.com"
+@pytest.mark.parametrize('auto_create', [False, True])
+def test_unverified_profile_email_does_not_become_someone_elses_proxy_identity(database, monkeypatch, auto_create):
+    """A profile edit must not redirect another person's trusted proxy login.
+
+    Reintroducing email-based linking returns the attacker's persisted account
+    here. Exercise the actual profile mutation before the proxy resolver.
+    """
+    attacker = ub.User(name='attacker', email='attacker@example.test',
+                       password=generate_password_hash('attacker-local-password'))
+    database.add(attacker)
+    database.commit()
+    monkeypatch.setattr(account, 'current_user', attacker)
+    monkeypatch.setattr(account, '_serialize_account', lambda: {'email': attacker.email})
+    with app.test_request_context('/api/v1/account/profile', method='POST',
+                                  json={'email': 'victim@example.test'}):
+        response = account.update_profile()
+    assert response.status_code == 200
+    database.expire_all()
+    assert database.get(ub.User, attacker.id).email == 'victim@example.test'
+    assert check_password_hash(attacker.password, 'attacker-local-password')
+
+    usermanagement.config.config_reverse_proxy_auto_create_users = auto_create
+    authenticated = proxy_login('victim@example.test')
+    assert authenticated is not attacker, 'Unverified profile email selected the attacker account'
+    if auto_create:
+        assert authenticated is not None
+        assert authenticated.name == 'victim@example.test'
+        assert authenticated.email == 'victim.example.test@localhost'
+        assert valid_email(authenticated.email) == authenticated.email
+        assert database.query(ub.User).count() == 2
+    else:
+        assert authenticated is None
+        assert database.query(ub.User).count() == 1
 
 
-def test_non_email_username_gets_placeholder(um):
-    with patch.object(um, "_email_taken", _taken()):
-        assert um._auto_create_email("reader") == "reader@localhost"
+def test_email_username_produces_a_profile_valid_email(database):
+    created = proxy_login('reader@example.test')
+    assert created is not None
+    assert created.email == 'reader@example.test'
+    assert valid_email(created.email) == created.email
+    database.expire_all()
+    assert database.get(ub.User, created.id).email == 'reader@example.test'
 
 
-def test_email_already_on_another_account_falls_back_to_placeholder(um):
-    # e.g. an admin pre-created "rob" with email rob@example.com, then the same
-    # person arrives through the proxy as "rob@example.com"
-    with patch.object(um, "_email_taken", _taken("Rob@Example.com")):
-        email = um._auto_create_email("rob@example.com")
-    assert email == "rob.example.com@localhost"
-    # the placeholder must itself pass validation, or the profile save breaks again
-    assert _fake_valid_email(email) == email
+@pytest.mark.parametrize('identity, expected', [
+    ('reader@example.test', 'reader@example.test'),
+    ('reader', 'reader@localhost'),
+])
+@pytest.mark.parametrize('email_header', ['Remote-Email', 'X-Remote-Email'])
+def test_proxy_does_not_store_or_match_untrusted_separate_email_headers(database, identity, expected, email_header):
+    """Client-supplied email headers neither select an account nor populate one."""
+    owner = ub.User(name='owner', email='someone-else@example.test')
+    database.add(owner)
+    database.commit()
+    created = proxy_login(identity, **{email_header: owner.email})
+    assert created is not None
+    assert created.id != owner.id
+    assert created.name == identity
+    assert created.email == expected
+    assert database.query(ub.User).count() == 2
 
 
-def test_invalid_or_multi_address_username_gets_placeholder(um):
-    with patch.object(um, "_email_taken", _taken()):
-        assert um._auto_create_email("a@example.com,b@example.com") == "a.example.com,b.example.com@localhost"
-        assert um._auto_create_email("a@b@example.com") == "a.b.example.com@localhost"
+def test_existing_username_still_takes_precedence(database):
+    existing = ub.User(name='Reader@Example.test', email='other@example.test')
+    database.add(existing)
+    database.commit()
+    authenticated = proxy_login('reader@example.test', **{'Remote-Email': 'ignored@example.test'})
+    assert authenticated.id == existing.id
+    assert authenticated.email == 'other@example.test'
+    assert database.query(ub.User).count() == 1
 
 
-def _header_request(**headers):
-    req = MagicMock()
-    req.headers = headers
-    return req
+def test_taken_email_is_not_linked_and_uses_a_valid_placeholder(database):
+    existing = ub.User(name='rob', email='Rob@Example.test')
+    database.add(existing)
+    database.commit()
+    created = proxy_login('rob@example.test')
+    assert created is not None
+    assert created.id != existing.id
+    assert created.email == 'rob.example.test@localhost'
+    assert valid_email(created.email) == created.email
 
 
-def _no_user_by_name(um):
-    um.config.config_reverse_proxy_login_header_name = "Cf-Access-Authenticated-User-Email"
-    um.ub.session.query.return_value.filter.return_value.first.return_value = None
+@pytest.mark.parametrize('offered', ['trusted@example.test', None, '', 'invalid', 'a@b@example.test',
+                                    'a@example.test,b@example.test', 'taken@example.test'])
+def test_trusted_caller_email_is_validated_and_deduplicated(database, offered):
+    """Keep the positional email argument for existing non-proxy callers."""
+    database.add(ub.User(name='existing', email='TAKEN@example.test'))
+    database.commit()
+    created = usermanagement.create_authenticated_user('reader@example.test', offered, 'trusted caller')
+    assert created is not None
+    expected = offered if offered == 'trusted@example.test' else 'reader@example.test'
+    assert created.email == expected
+    assert valid_email(created.email) == expected
 
 
-def test_header_email_logs_into_the_account_that_has_it(um):
-    _no_user_by_name(um)
-    um.config.config_reverse_proxy_auto_create_users = True
-    rob = MagicMock(name="rob")
-    with patch.object(um, "_user_with_email", lambda a: rob if a == "rob@example.com" else None), \
-            patch.object(um, "create_authenticated_user") as create:
-        user = um.load_user_from_reverse_proxy_header(
-            _header_request(**{"Cf-Access-Authenticated-User-Email": "rob@example.com"}))
-    assert user is rob
-    create.assert_not_called()
+def test_production_spa_requests_provision_a_separate_account_for_an_email_collision(database, monkeypatch, tmp_path):
+    """The real factory and HTTP route must honor username-only proxy identity.
 
+    Startup services are stubbed by the existing factory harness; provisioning,
+    account queries and the request authentication hook use the real code/DB.
+    """
+    from tests.unit.test_1931_spa_reverse_proxy_auth import _factory_app
 
-def test_email_match_is_off_when_auto_create_is_off(um):
-    _no_user_by_name(um)
-    um.config.config_reverse_proxy_auto_create_users = False
-    rob = MagicMock(name="rob")
-    with patch.object(um, "_user_with_email", lambda a: rob), \
-            patch.object(um, "create_authenticated_user") as create:
-        user = um.load_user_from_reverse_proxy_header(
-            _header_request(**{"Cf-Access-Authenticated-User-Email": "rob@example.com"}))
-    assert user is None
-    create.assert_not_called()
+    create_user = usermanagement.create_authenticated_user
+    world = _factory_app(monkeypatch, tmp_path)
+    monkeypatch.setattr(ub, 'session', database)
+    monkeypatch.setattr(usermanagement, 'create_authenticated_user', create_user)
+    world.config.config_reverse_proxy_login_header_name = IDENTITY_HEADER
+    world.config.config_reverse_proxy_auto_create_users = True
+    database.add(ub.User(name='existing', email='reader@example.test'))
+    database.commit()
 
-
-def test_remote_email_header_is_never_used_to_match_an_account(um):
-    # Behind Cloudflare Access a client can send Remote-Email itself. Matching on it
-    # would let anyone who passes Access log in as whoever owns that address.
-    _no_user_by_name(um)
-    um.config.config_reverse_proxy_auto_create_users = True
-    admin = MagicMock(name="admin")
-    owners = {"admin@example.com": admin}
-    with patch.object(um, "_user_with_email", lambda a: owners.get(a)), \
-            patch.object(um, "create_authenticated_user", return_value=None):
-        user = um.load_user_from_reverse_proxy_header(_header_request(**{
-            "Cf-Access-Authenticated-User-Email": "stranger@example.com",
-            "Remote-Email": "admin@example.com",
-            "X-Remote-Email": "admin@example.com",
-        }))
-    assert user is None
-
-
-def test_remote_email_header_is_never_stored_on_an_auto_created_account(um):
-    # stranger@example.com passes the proxy and sends Remote-Email: victim@example.com.
-    # If that were stored, victim@example.com's own login would later match by email
-    # into the stranger's account.
-    _no_user_by_name(um)
-    um.config.config_reverse_proxy_auto_create_users = True
-    with patch.object(um, "_user_with_email", lambda a: None), \
-            patch.object(um, "_email_taken", _taken()), \
-            patch.object(um, "create_authenticated_user", wraps=um.create_authenticated_user) as create:
-        um.load_user_from_reverse_proxy_header(_header_request(**{
-            "Cf-Access-Authenticated-User-Email": "stranger@example.com",
-            "Remote-Email": "victim@example.com",
-            "X-Remote-Email": "victim@example.com",
-        }))
-    create.assert_called_once_with("stranger@example.com", auth_source="reverse proxy")
-    created = um.ub.session.add.call_args[0][0]
-    assert created.email == "stranger@example.com"
-
-
-def test_non_email_username_with_remote_email_gets_the_placeholder(um):
-    _no_user_by_name(um)
-    um.config.config_reverse_proxy_auto_create_users = True
-    with patch.object(um, "_user_with_email", lambda a: None), \
-            patch.object(um, "_email_taken", _taken()):
-        um.load_user_from_reverse_proxy_header(_header_request(**{
-            "Cf-Access-Authenticated-User-Email": "stranger",
-            "Remote-Email": "victim@example.com",
-        }))
-    assert um.ub.session.add.call_args[0][0].email == "stranger@localhost"
-
-
-def test_user_with_email_ignores_values_that_are_not_one_address(um):
-    for value in ("rob", "", None, "a@example.com,b@example.com", "a@b@example.com"):
-        assert um._user_with_email(value) is None
-    um.ub.session.query.assert_not_called()
-
-
-def test_create_authenticated_user_stores_the_picked_email(um):
-    um.ub.session.query.return_value.filter.return_value.first.return_value = None
-    with patch.object(um, "_email_taken", _taken("rob@example.com")):
-        user = um.create_authenticated_user("rob@example.com", auth_source="reverse proxy")
-    assert user is not None
-    assert user.email == "rob.example.com@localhost"
-    um.ub.session.commit.assert_called_once()
-
-
-def test_an_offered_email_is_tried_before_the_username(um):
-    with patch.object(um, "_email_taken", _taken()):
-        assert um._auto_create_email("rob", "rob@example.com") == "rob@example.com"
-    with patch.object(um, "_email_taken", _taken("rob@example.com")):
-        assert um._auto_create_email("pat@example.com", "rob@example.com") == "pat@example.com"
+    client = world.app.test_client()
+    for _ in range(2):
+        response = client.get('/api/v1/auth/me', headers={IDENTITY_HEADER: 'reader@example.test'})
+        assert response.status_code == 200
+        assert response.get_json()['name'] == 'reader@example.test'
+        assert response.headers['X-Test-Authenticated-As'] == 'reader@example.test'
+    assert database.query(ub.User).count() == 2
+    assert database.query(ub.User).filter_by(name='reader@example.test').one().email == 'reader.example.test@localhost'

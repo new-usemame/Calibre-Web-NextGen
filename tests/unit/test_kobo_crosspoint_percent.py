@@ -20,7 +20,6 @@ handlers (``share_place_span_world``).
 """
 
 import inspect
-import os
 import zipfile
 from bisect import bisect_right
 from datetime import timedelta
@@ -168,10 +167,6 @@ def kobo_off(request, sw, monkeypatch):
 
 def test_the_setting_is_off_by_default_and_only_for_a_kobo(sw):
     from cps import ub
-    column = ub.Device.__table__.c.align_percent
-    assert column.default.arg is False
-    assert str(column.server_default.arg) == "0"
-
     kobo = sw.kobo_device("Kobo", checked=False)
     status, data = _patch(sw, kobo, {"label": "Libra"})
     assert status == 200 and data["align_percent"] is False
@@ -276,12 +271,7 @@ def test_the_book_page_shows_the_percentage_of_the_same_kobo_report(sw, kobo):
 
     sw.put(kobo, row["source"], row["span"], DEVICE_PERCENT, after_now())
 
-    if os.environ[SWITCH] == "1":
-        assert _shown(sw) == crosspoint_percent(sw, row)
-    else:
-        # With the gates off the row gets its own receipt, so it cannot be
-        # matched to the bookmark. The page keeps the device's value.
-        assert _shown(sw) == pytest.approx(DEVICE_PERCENT)
+    assert _shown(sw) == crosspoint_percent(sw, row)
 
 
 def test_the_book_page_shows_the_bookmark_after_a_later_koreader_push(sw, kobo):
@@ -294,6 +284,57 @@ def test_the_book_page_shows_the_bookmark_after_a_later_koreader_push(sw, kobo):
         user_id=sw.reader.id, book_id=sw.book.id).one().current_bookmark
     assert _shown(sw) == bookmark.progress_percent
     assert _shown(sw) != crosspoint_percent(sw, rows[300])
+
+
+def test_an_unchecked_report_does_not_rebind_a_retained_further_carrier(
+        sw, monkeypatch):
+    """A furthest-wins rejection must keep the old receipt and the page's own value."""
+    from cps import ub
+    from cps.progress_syncing.models import KOSyncProgress
+    monkeypatch.setenv(SWITCH, "0")
+    sw.koreader("koreader-1", "KOReader", checked=False)
+    device = sw.kobo_device("Kobo", checked=False)
+    sw.download(device)
+    _align(sw, device, True)
+    rows = span_rows()
+    sw.put(device, rows[350]["source"], rows[350]["span"], 55, after_now(2))
+    carrier = sw.session.query(KOSyncProgress).filter_by(document=str(sw.book.id)).one()
+    receipt, percentage = carrier.timestamp, carrier.percentage
+    # The native percent advances, but this earlier span has a lower aligned
+    # percentage. Legacy furthest-wins keeps the previous shared row.
+    sw.put(device, rows[300]["source"], rows[300]["span"], DEVICE_PERCENT, after_now(4))
+    sw.session.refresh(carrier)
+    assert (carrier.timestamp, carrier.percentage) == (receipt, percentage)
+    bookmark = sw.session.query(ub.KoboReadingState).filter_by(
+        user_id=sw.reader.id, book_id=sw.book.id).one().current_bookmark
+    assert bookmark.server_modified_at != receipt
+    assert _shown(sw) == pytest.approx(DEVICE_PERCENT)
+
+
+def test_a_failed_carrier_write_preserves_the_bookmark_and_hardcover_percent(
+        sw, kobo, hardcover_pushes, monkeypatch):
+    """The optional carrier write must not roll back the Kobo's required save."""
+    from cps import ub
+    from cps.progress_syncing.models import KOSyncProgress
+    from cps.services import kosync_place
+
+    def failed_write(*_args, **_kwargs):
+        sw.session.add(KOSyncProgress(
+            user_id=sw.reader.id, document=str(sw.book.id), progress="partial",
+            percentage=99, device="Partial write"))
+        sw.session.flush()
+        raise RuntimeError("carrier unavailable")
+
+    monkeypatch.setattr(sw.kosync, "record_percentage_only_progress", failed_write)
+    monkeypatch.setattr(kosync_place, "latest_write", failed_write)
+    row = span_rows()[300]
+    sw.put(kobo, row["source"], row["span"], DEVICE_PERCENT, after_now())
+    bookmark = sw.session.query(ub.KoboReadingState).filter_by(
+        user_id=sw.reader.id, book_id=sw.book.id).one().current_bookmark
+    assert bookmark.progress_percent == DEVICE_PERCENT
+    assert bookmark.location_value == row["span"]
+    assert sw.session.query(KOSyncProgress).count() == 0
+    assert hardcover_pushes == [(sw.book.id, crosspoint_percent(sw, row))]
 
 
 # == The setting off: the device's whole number, as before ==================

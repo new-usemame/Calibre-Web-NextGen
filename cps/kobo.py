@@ -4945,6 +4945,7 @@ def HandleStateRequest(book_uuid):
                     shared_progress = share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
                         location=location, device_id=device_id,
+                        received_at=current_bookmark.server_modified_at,
                     )
                 push_reading_state_to_hardcover(
                     current_user, book, shared_progress,
@@ -5070,7 +5071,7 @@ def _handle_unchecked_state_request(book, device_id):
 
 
 def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None,
-                                      location=None, device_id=None):
+                                      location=None, device_id=None, received_at=None):
     """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
 
     #1425 gap 1. KOReader fetches ``KOSyncProgress`` over kosync; a Kobo sync
@@ -5110,6 +5111,8 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     :param percentage: Reading progress, 0-100, as the device reported it.
     :param location: The ``Location`` of the device's report, if any.
     :param device_id: The reporting Kobo's ``Device`` id.
+    :param received_at: The accepted legacy bookmark's server receipt, so the
+        book page can identify its shared percentage without changing arbitration.
     :return: The percentage for the row: the CrossPoint value, or else
         ``percentage``. It is returned also when the row write fails.
     """
@@ -5135,7 +5138,10 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
             percentage = finer
         with ub.begin_contained_nested(ub.session):
             if report is None:
-                record_percentage_only_progress(user_id, book_id, percentage, device=KOBO_DEVICE)
+                record_percentage_only_progress(
+                    user_id, book_id, percentage, device=KOBO_DEVICE,
+                    received_at=received_at,
+                )
             else:
                 from .services.kosync_place import latest_write
                 from .progress_syncing.models import KOSyncProgress

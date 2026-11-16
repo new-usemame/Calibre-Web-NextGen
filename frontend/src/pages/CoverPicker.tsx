@@ -15,6 +15,7 @@ import {
 import { CoverDesignerPanel } from '../features/coverDesigner/DesignerPanel';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
+import { PasswordInput } from '../components/PasswordInput';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { ApiError, resourceUrl } from '../lib/api';
@@ -656,7 +657,7 @@ function KeyRow({ k }: { k: ProviderKey }) {
       </span>
       {k.can_edit && (
         <>
-          <input className={styles.keyInput} type="password" value={val} placeholder="••••••"
+          <PasswordInput wrapClassName={styles.keyWrap} className={styles.keyInput} value={val} placeholder="••••••"
                  aria-label={t('{name} API key', { name: k.name })}
                  onChange={(e) => setVal(e.target.value)} />
           <Button size="sm" variant="ghost" onClick={save} disabled={saving || !val}>{t('Save')}</Button>

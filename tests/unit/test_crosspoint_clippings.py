@@ -770,6 +770,56 @@ def test_an_echo_exception_cannot_create_crosspoint_rows_elsewhere(world, elsewh
     assert world.session.query(ub.Annotation).filter_by(annotation_id="must-not-land").count() == 0
 
 
+# The words are in paragraph 1 and in paragraph 62.
+_ECHO_PHRASE = "never forget that summer by the lake"
+_ECHO_PARAS = (["I will never forget that summer by the lake."]
+               + ["Filler paragraph number %d talks about nothing in particular at all." % i
+                  for i in range(60)]
+               + ["And I will never forget that summer by the lake."])
+
+
+@pytest.mark.parametrize("with_source", [True, False])
+def test_a_quote_echo_keeps_the_place_of_a_clipping(world, with_source):
+    """A word-based client sends back a pulled clipping: its stored quote, a
+    note and its own percentage, with no XPointer. The clipping keeps its
+    place, as the row of any other reader does, and the note lands."""
+    _write_epub(world.book_file(BOOK, "EPUB"), _ECHO_PARAS)
+    start = sum(len(p) for p in _ECHO_PARAS[:-1]) + _ECHO_PARAS[-1].index(_ECHO_PHRASE)
+    upload(world, item(text=_ECHO_PHRASE, spine=0, start_offset=start,
+                       end_offset=start + len(_ECHO_PHRASE)))
+    placed = annotation(world, "a" * 32).start_xpointer
+    assert placed.endswith("/body/p[62]/text().11"), placed
+    served = page(world)["items"]
+    echo = {"annotation_id": "a" * 32, "text_quote": {"exact": _ECHO_PHRASE},
+            "percentage": 0.0, "note_text": "my note"}
+    if with_source:
+        echo["source"] = "crosspoint"
+
+    response = world.client.put("/kosync/syncs/annotations", headers=world.basic("alice"), json={
+        "document": DOC, "annotations": [echo], "device_id": "kindle-1", "device": "Kindle"})
+
+    assert response.status_code == 200, response.get_json()
+    world.session.expire_all()
+    row = annotation(world, "a" * 32)
+    assert row.start_xpointer == placed
+    assert row.note_text == "my note"
+    assert page(world)["items"] == served
+
+
+def test_the_clippings_route_places_its_own_changed_quote_again(world):
+    """The quote rule for other pushes does not stop the clippings route."""
+    first = "So we beat on, boats against the current, borne back ceaselessly"
+    second = "Whenever you feel like criticizing anyone, just remember"
+    _write_epub(world.book_file(BOOK, "EPUB"), [first, "Call me Ishmael.", second])
+    upload(world, item(text=first, start_offset=None, end_offset=None))
+    assert annotation(world, "a" * 32).start_xpointer.endswith("/body/p[1]/text().0")
+
+    upload(world, item(text=second, start_offset=None, end_offset=None))
+
+    world.session.expire_all()
+    assert annotation(world, "a" * 32).start_xpointer.endswith("/body/p[3]/text().0")
+
+
 def test_an_extremely_long_cursor_is_a_client_error(world):
     """Reject before Python's integer-string limit raises an uncaught ValueError."""
     assert get(world, firmware_headers(world), cursor="9" * 5000).status_code == 400

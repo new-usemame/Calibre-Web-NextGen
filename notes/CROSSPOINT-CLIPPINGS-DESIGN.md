@@ -75,7 +75,7 @@ A delete is a tombstone, and a tombstone always wins. A later upload of the same
 
 A web reader delete reaches the reader. Before it pages, GET turns each served clipping that is hidden, and not yet a tombstone, into a tombstone with a new revision.
 
-Only this route can make or delete a `crosspoint` row. `/kosync/syncs/annotations` refuses creation with `source: crosspoint` and refuses `delete_source: crosspoint`. An echo of an existing CrossPoint row belonging to the same account and book is accepted, so one shared clipping cannot reject a KOReader batch. The existing provenance and device ownership rules still apply. An upload or delete through this route of an id that belongs to another source, or to another reader, is accepted, logged, and changes nothing.
+Only this route can make or delete a `crosspoint` row. `/kosync/syncs/annotations` refuses creation with `source: crosspoint` and refuses `delete_source: crosspoint`. An echo of an existing CrossPoint row belonging to the same account and book is accepted, so one shared clipping cannot reject a KOReader batch. The existing provenance and device ownership rules still apply. A text quote in such an echo is dropped, as for the row of any other reader, so the echo never moves the clipping. An upload or delete through this route of an id that belongs to another source, or to another reader, is accepted, logged, and changes nothing.
 
 ## Not done
 

@@ -12350,6 +12350,16 @@ msgstr "In „{title}“ zusammengeführt."
 msgid "Could not merge these books."
 msgstr "Diese Bücher konnten nicht zusammengeführt werden."
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr ""
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "Unbenanntes Schlagwort"

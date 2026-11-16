@@ -11607,6 +11607,16 @@ msgstr "已合并到「{title}」。"
 msgid "Could not merge these books."
 msgstr "无法合并这些书籍。"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr ""
+
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
 msgstr "未命名标签"

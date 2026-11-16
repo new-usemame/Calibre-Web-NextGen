@@ -13,7 +13,7 @@ from pypdf import PdfWriter
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SERVICE = ROOT / 'root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run'
+SERVICE = ROOT / 'scripts/services/cwa-ingest-service.sh'
 
 
 def run_service(tmp_path, source, budget, *, helper=None, complete_pdf=None, event_mode=None, expected_exit=0):

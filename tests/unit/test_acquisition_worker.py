@@ -252,7 +252,7 @@ def _refuse_publication(monkeypatch):
 def _run_ingest_service(book, exit_code):
     """Drive the production shell service with a processor exit status."""
     root = Path(__file__).resolve().parents[2]
-    run_script = root / 'root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run'
+    run_script = root / 'scripts/services/cwa-ingest-service.sh'
     scratch = book.parent.parent / f'service-test-{exit_code}'
     scratch.mkdir()
     stub = scratch / 'processor.sh'

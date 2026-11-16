@@ -71,10 +71,10 @@ export PROCESSOR_CONTENT_DB="$tmpdir/content-markers"
 export POST_BATCH_LOG="$post_batch_log"
 export PROCESSOR_EXIT_CODE=0
 mkdir -p "$PROCESSOR_CONTENT_DB"
-unset CALIBRE_CONFIG_DIRECTORY
+unset CALIBRE_CONFIG_DIRECTORY CALIBRE_DBPATH
 
 # shellcheck disable=SC1091
-source "$REPO_ROOT/root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run" >/dev/null
+source "$REPO_ROOT/scripts/services/cwa-ingest-service.sh" >/dev/null
 
 if [ "$CALIBRE_CONFIG_DIRECTORY" != "/config/.config/calibre-runtime" ]; then
         printf 'Expected ingest service to export the abc-safe Calibre config; got: %s\n' \

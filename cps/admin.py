@@ -161,10 +161,10 @@ def before_request():
     # Safety net: if not configured but metadata.db now exists at default location, auto-set without redirect loop
     if not config.db_configured:
         try:
-            default_metadata = '/calibre-library/metadata.db'
+            detected_dir = constants.detected_calibre_library_dir()
             if (not config.config_calibre_dir or not os.path.isfile(os.path.join(config.config_calibre_dir, 'metadata.db'))) \
-                    and os.path.isfile(default_metadata):
-                config.config_calibre_dir = os.path.dirname(default_metadata)
+                    and detected_dir:
+                config.config_calibre_dir = detected_dir
                 log.info('[autoconfig] Late-detected calibre library at %s; updating config and rebuilding db session', config.config_calibre_dir)
                 try:
                     config.save()
@@ -3034,9 +3034,9 @@ def _db_simulate_change():
     to_save = dict()
     incoming = param.get('config_calibre_dir', config.config_calibre_dir or '')
     incoming = strip_whitespaces(re.sub(r'[\\/]metadata\.db$', '', incoming, flags=re.IGNORECASE))
-    # Fallback: if nothing provided and default metadata exists, assume /calibre-library
-    if not incoming and os.path.isfile('/calibre-library/metadata.db'):
-        incoming = '/calibre-library'
+    # Fallback: if nothing provided and default metadata exists, assume the configured library dir
+    if not incoming:
+        incoming = constants.detected_calibre_library_dir() or ''
     to_save['config_calibre_dir'] = incoming
     db_valid, db_change = calibre_db.check_valid_db(to_save["config_calibre_dir"],
                                                     ub.app_DB_path,
@@ -3067,8 +3067,8 @@ def _db_configuration_update_helper():
         log.warning("DB config update missing config_calibre_dir; using current config value")
         incoming = config.config_calibre_dir or ''
     incoming = re.sub(r'[\\/]metadata\.db$', '', incoming, flags=re.IGNORECASE)
-    if not incoming and os.path.isfile('/calibre-library/metadata.db'):
-        incoming = '/calibre-library'
+    if not incoming:
+        incoming = constants.detected_calibre_library_dir() or ''
     to_save['config_calibre_dir'] = incoming
     db_valid = False
     try:
@@ -3622,9 +3622,16 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if desired_library_mode not in constants.LIBRARY_MODES:
         flash(_("Invalid library mode"), category="error")
         return "", 400
+    # The checkbox only applies alongside the My Library radio. Pass even a
+    # stale form's choice to the validator instead of silently ignoring it.
+    library_start_empty = bool(
+        to_save.get("library_start_empty")
+        and desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+    )
     library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
-            and not bool(content.user_library_seeded)):
+            and not bool(content.user_library_seeded)
+            and not library_start_empty):
         try:
             # Seed before mutating the rest of the combined admin form. Its
             # bounded commits must never make unrelated half-validated edits
@@ -3847,6 +3854,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             desired_library_mode,
             seed_rows_prepared=library_seed_prepared,
             commit=False,
+            start_empty=library_start_empty,
         )
         ub.session.commit()
         flash(_("User '%(nick)s' updated", nick=content.name), category="success")

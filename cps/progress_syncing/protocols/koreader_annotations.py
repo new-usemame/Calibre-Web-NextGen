@@ -739,8 +739,20 @@ def push_annotations():
         delete_source = "koreader"
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
+        existing_source = None
+        if isinstance(payload, dict) and payload.get("source") == "crosspoint":
+            aid = payload.get("annotation_id")
+            if isinstance(aid, str):
+                # Legacy pulls include shared CrossPoint clippings. Accept an
+                # echo of this book's existing row, never creation without the
+                # firmware layout sidecar that only the clippings route owns.
+                existing_source = ub.session.query(ub.Annotation.source).filter(
+                    ub.Annotation.user_id == user.id,
+                    ub.Annotation.book_id == book.id,
+                    ub.Annotation.annotation_id == aid.strip(),
+                ).scalar()
         error = validate_portable_payload(
-            payload, book_uuid=getattr(book, "uuid", None),
+            payload, book_uuid=getattr(book, "uuid", None), existing_source=existing_source,
         )
         if error:
             return _reject(user, document, "invalid_annotation",

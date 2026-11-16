@@ -34,7 +34,7 @@ from .annotation_types import to_storage_type
 log = logger.create()
 
 _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote", "crosspoint"}
-# Sources a pushed payload may name. ``crosspoint`` rows are made only by the
+# Sources a pushed payload may create. ``crosspoint`` rows are made only by the
 # CrossPoint clippings route, with the layout sidecar the firmware needs back
 # (progress_syncing/protocols/crosspoint_clippings).
 _PUSH_SOURCES = _VALID_SOURCES - {"crosspoint"}
@@ -43,11 +43,16 @@ _PUSH_SOURCES = _VALID_SOURCES - {"crosspoint"}
 QUOTE_SOURCES = frozenset({"textquote", "crosspoint"})
 
 
-def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
-    """Return a validation error for fields that would make an upsert unsafe."""
+def validate_portable_payload(payload, *, book_uuid=None, existing_source=None) -> Optional[str]:
+    """Validate an upsert; ``existing_source`` permits an echo, never a new origin.
+
+    The caller must resolve the existing source within this account and book.
+    """
     if not isinstance(payload, dict):
         return None  # non-object entries are deliberately counted as skipped
-    if "source" in payload and payload.get("source") not in _PUSH_SOURCES:
+    echoed_crosspoint = (payload.get("source") == "crosspoint"
+                        and existing_source == "crosspoint")
+    if "source" in payload and payload.get("source") not in _PUSH_SOURCES and not echoed_crosspoint:
         return "source must be one of: " + ", ".join(sorted(_PUSH_SOURCES))
     for field in ("annotation_id", "highlighted_text", "note_text", "color",
                   "content_id", "context_string", "position_type",

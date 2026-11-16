@@ -92,3 +92,21 @@ def test_hierarchical_picker_keeps_raw_values_and_tree_depth(picker):
     data = client.get("/picker/7").json
     assert {"value": "QA. 76..", "depth": 1} in data["entries"]
     assert {"value": "Restricted value", "depth": 0} not in data["entries"]
+
+
+def test_classic_editor_only_offers_picker_for_eligible_columns(picker, monkeypatch):
+    """An ignored column may keep its text input, but must not offer a dead picker."""
+    _, column, calibre = picker
+    calibre.get_cc_columns = lambda *a, **kw: []
+    calibre.get_hierarchical_column_ids = lambda: set()
+    calibre.get_filtered_book = lambda *a, **kw: SimpleNamespace(id=1, languages=[], authors=[])
+    calibre.order_authors = lambda books: []
+    query = SimpleNamespace(first=lambda: None)
+    query.filter = lambda *a: query
+    monkeypatch.setattr(editbooks.ub, "session", SimpleNamespace(query=lambda *a: query))
+    monkeypatch.setattr(editbooks.helper, "get_convert_options", lambda book: ([], []))
+    monkeypatch.setattr(editbooks, "render_title_template", lambda template, **context: context)
+    monkeypatch.setattr(editbooks, "_", lambda message: message)
+    context = editbooks.render_edit_book(1)
+    assert context["cc"] == [column]
+    assert column.cc_picker_mode is None

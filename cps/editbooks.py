@@ -2079,8 +2079,10 @@ def render_edit_book(book_id):
     cc_picker_modes = {}
     try:
         hier_ids = calibre_db.get_hierarchical_column_ids()
+        eligible_ids = {column.id for column in calibre_db.get_cc_columns(
+            config, filter_config_custom_read=False) if not column.mark_for_delete}
         for c in cc:
-            if c.datatype == 'text':
+            if c.datatype == 'text' and c.id in eligible_ids:
                 cc_picker_modes[c.id] = 'hierarchical' if c.id in hier_ids else 'flat'
     except Exception as ex:  # noqa: BLE001 - a picker must never break the page
         log.error("Could not classify custom columns for the edit picker: %s", ex)

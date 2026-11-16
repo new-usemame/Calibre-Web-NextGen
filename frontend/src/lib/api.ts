@@ -656,11 +656,6 @@ export interface EditableCustomColumn {
   value: string;
   /** Allowed values, enumeration columns only. */
   enum_values?: string[];
-  /** Text columns only: true when the stored values form a dotted hierarchy,
-   *  false when they are flat atomic values. Decided by the server from the
-   *  same detector the browse views use, so the picker cannot disagree with
-   *  CcBrowse about which a column is. */
-  hierarchical?: boolean;
 }
 
 /** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),

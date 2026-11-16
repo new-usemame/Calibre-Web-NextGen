@@ -96,7 +96,7 @@ export function CcValueEditor({ colId, hierarchical, onDone }: CcValueEditorProp
   const merge = useMergeCcValues(colId);
   const remove = useDeleteCcValues(colId);
   const move = useMoveCcValue(colId);
-const reorder = useReorderCcValue(colId);
+  const reorder = useReorderCcValue(colId);
   const create = useCreateCcValue(colId);
 
   const [mode, setMode] = useState<Mode>('idle');
@@ -200,11 +200,11 @@ const reorder = useReorderCcValue(colId);
     collect(tree.nodes);
     const out: string[] = [];
     for (const p of subtreePaths(root)) {
-      const next = rewritePath(p, draft.trim());
+      const next = hierarchical ? rewritePath(p, draft.trim()) : draft.trim();
       if (next !== p && taken.has(next)) out.push(next);
     }
     return out;
-  }, [target, mode, draft, tree, nodeByPath]);
+  }, [target, mode, draft, tree, nodeByPath, hierarchical]);
 
   /** Why the Merge button on `path` is (or is not) available right now.
    *
@@ -332,7 +332,7 @@ const reorder = useReorderCcValue(colId);
   };
 
 
-  const busy = rename.isPending || merge.isPending || remove.isPending || move.isPending || create.isPending;
+  const busy = rename.isPending || merge.isPending || remove.isPending || move.isPending || create.isPending || reorder.isPending;
 
   // ------------------------------------------------------------------ panels
   if (mode === 'rename' || mode === 'create') {
@@ -343,7 +343,7 @@ const reorder = useReorderCcValue(colId);
     // must not do. Without one the dots ARE the point (Arts.Mystery).
     const beside = mode === 'create' && !!createBeside;
     const placeholder = mode === 'create' ? (beside ? 'Sculpture' : 'Arts.Mystery') : 'Culture';
-    const hasDot = beside && draft.includes('.');
+    const hasDot = hierarchical && beside && draft.includes('.');
     const canSubmit = beside
       ? !!target && !!draft.trim() && !hasDot
       : (mode === 'create' ? !!draft.trim() : (!!target && !!draft.trim()));
@@ -352,7 +352,7 @@ const reorder = useReorderCcValue(colId);
       if (mode === 'rename') { runRename(false); return; }
       const name = draft.trim();
       // Same level as the anchor: the parent comes off the clicked row's path.
-      const parent = beside && String(target).includes('.')
+      const parent = hierarchical && beside && String(target).includes('.')
         ? String(target).replace(/\.[^.]*$/, '') : '';
       create.mutate(
         beside ? { path: parent ? `${parent}.${name}` : name, after: target } : { path: name },
@@ -628,6 +628,7 @@ const reorder = useReorderCcValue(colId);
                   onClick={() => { setTarget(node.path); setDraft(node.name); setConflicts(null); setMode('rename'); }}>
                   <Pencil size={14} aria-hidden="true" focusable={false} />
                 </button>
+                {hierarchical && (
                 <button type="button" className={styles.rowBtn}
                   disabled={busy || !canCut(isTicked)}
                   aria-label={t('Cut {name}', { name: node.name })}
@@ -639,7 +640,8 @@ const reorder = useReorderCcValue(colId);
                   }}>
                   <Scissors size={14} aria-hidden="true" focusable={false} />
                 </button>
-                {hierarchical && (
+                )}
+
                   <button type="button" className={styles.rowBtn}
                     disabled={busy || !isTicked || !moveState(node, 'up').ok}
                     aria-label={t('Move {name} up one place', { name: node.name })}
@@ -647,8 +649,7 @@ const reorder = useReorderCcValue(colId);
                     onClick={() => runReorder(node.path, 'up')}>
                     <ChevronUp size={14} aria-hidden="true" focusable={false} />
                   </button>
-                )}
-                {hierarchical && (
+
                   <button type="button" className={styles.rowBtn}
                     disabled={busy || !isTicked || !moveState(node, 'down').ok}
                     aria-label={t('Move {name} down one place', { name: node.name })}
@@ -656,7 +657,6 @@ const reorder = useReorderCcValue(colId);
                     onClick={() => runReorder(node.path, 'down')}>
                     <ChevronDown size={14} aria-hidden="true" focusable={false} />
                   </button>
-                )}
                 {hierarchical && (
                   <button type="button" className={styles.rowBtn}
                     disabled={!pasteState.ok || busy}

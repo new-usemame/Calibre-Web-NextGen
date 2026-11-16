@@ -96,7 +96,7 @@ var totalRows = $rows.length;
         }
 
         function rowFor(path) {
-            return $rows.filter(function () { return $(this).data('path') === path; });
+            return $rows.filter(function () { return $(this).attr('data-path') === path; });
         }
 
         function nameOf(path) {
@@ -112,7 +112,7 @@ var totalRows = $rows.length;
             return $rows.filter(function () {
                 return $(this).find('.cc-values-tick').prop('checked');
             }).map(function () {
-                return $(this).data('path');
+                return $(this).attr('data-path');
             }).get();
         }
 
@@ -245,7 +245,7 @@ var totalRows = $rows.length;
             var shown = 0;
             $rows.each(function () {
                 var $row = $(this);
-                var show = inFocus(String($row.data('path')))
+                var show = inFocus(String($row.attr('data-path')))
                     && (limit === 0 || depthOf($row) < limit);
                 $row.toggle(show);
                 if (show) {
@@ -371,7 +371,7 @@ var totalRows = $rows.length;
          * ones -- a hidden row must not keep live buttons, or its Cut would
          * name a value the user cannot see. */
         function renderRowActions($row) {
-                var path = $row.data('path');
+                var path = $row.attr('data-path');
                 var canDelete = $row.data('can-delete') === 1 || $row.data('can-delete') === '1';
                 var canBeSource = $row.data('can-merge-source') === 1
                     || $row.data('can-merge-source') === '1';
@@ -397,10 +397,10 @@ var totalRows = $rows.length;
                 $row.find('.cc-values-actions').empty().append([
                     action('pencil', t('renameValue', { name: name }), t('rename'),
                         function () { runRename(path, name); }, false),
-                    action('scissors', t('cutValue', { name: name }),
+                    hierarchical ? action('scissors', t('cutValue', { name: name }),
                         isChecked(path) ? t('cut') : t('tickToCut'),
                         function () { cutPath = path; showError(''); render(); },
-                        !isChecked(path)),
+                        !isChecked(path)) : null,
                     // Icons verified against the shipped Bootstrap 3 build:
                     // `clipboard` and `compress` DO NOT EXIST there, so those
                     // buttons rendered blank. `paste`, `transfer`, `arrow-up`
@@ -412,12 +412,12 @@ var totalRows = $rows.length;
                     // tick gate -- the same shape as Cut. No cycle rule and no
                     // "can this receive" logic: a move cannot cross a level, and
                     // that is the server's `plan_reorder` to enforce.
-                    hierarchical ? action('arrow-up', t('moveUpValue', { name: name }),
+                    action('arrow-up', t('moveUpValue', { name: name }),
                         moveTitle(path, 'up'), function () { runReorder(path, 'up'); },
-                        !(canMoveUp && isChecked(path))) : null,
-                    hierarchical ? action('arrow-down', t('moveDownValue', { name: name }),
+                        !(canMoveUp && isChecked(path))),
+                    action('arrow-down', t('moveDownValue', { name: name }),
                         moveTitle(path, 'down'), function () { runReorder(path, 'down'); },
-                        !(canMoveDown && isChecked(path))) : null,
+                        !(canMoveDown && isChecked(path))),
                     hierarchical ? action('paste', t('pasteUnder', { name: name }),
                         pasteTitle(path), function () { runMove(path); }, !pasteOk) : null,
                     action('transfer', t('mergeSelectedInto', { name: name }),
@@ -543,11 +543,11 @@ var totalRows = $rows.length;
                 t('createBesidePrompt', { name: nameOf(path) }));
             if (!name || !name.trim()) { return; }
             name = name.trim();
-            if (name.indexOf('.') !== -1) {
+            if (hierarchical && name.indexOf('.') !== -1) {
                 showError(t('besideNoDot'));
                 return;
             }
-            var parent = String(path).indexOf('.') === -1
+            var parent = !hierarchical || String(path).indexOf('.') === -1
                 ? '' : String(path).replace(/\.[^.]*$/, '');
             write('create', {
                 path: parent ? parent + '.' + name : name,
@@ -612,7 +612,7 @@ var totalRows = $rows.length;
          * render(), but the row itself is not. A direct binding per row would
          * work until the first paint; this survives it. */
         $rows.on('click', '.cc-values-create-under', function () {
-            runCreateBeside($(this).data('path'));
+            runCreateBeside($(this).attr('data-path'));
         });
 
         /* One handler for both directions, on the element that exists in both
@@ -637,7 +637,7 @@ var totalRows = $rows.length;
         // the first narrowing.
 
         $rows.on('click', '.cc-values-focus-here', function () {
-            setFocus($(this).data('path'));
+            setFocus($(this).attr('data-path'));
         });
 
         $('#ccValuesFocusClear').on('click', function () {

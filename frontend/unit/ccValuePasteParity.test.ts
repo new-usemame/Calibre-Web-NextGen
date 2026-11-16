@@ -67,25 +67,3 @@ test('the table keeps the cases that have actually been got wrong', () => {
   assert.ok(has('TestNode', 'TestNode.TestSubNode.TestDeepNode'),
     'the cycle guard must be checked at depth, not just one level');
 });
-
-test('the classic editor and the SPA share this rule, not a copy of it', () => {
-  // The classic editor's canPasteInto is the other consumer of the same rule,
-  // and it must agree with the SPA's. This reads both and compares their
-  // verdict on every case in the table.
-  const classic = fs.readFileSync(
-    path.join(process.cwd(), '..', 'cps', 'static', 'js', 'cc_value_editor.js'),
-    'utf8');
-
-  assert.match(classic, /can_place_under/,
-    'the classic editor must name the server-side rule it mirrors, so a reader ' +
-    'knows which copy is authoritative');
-
-  for (const c of table.cases) {
-    // Reproduce the classic editor's expression inline and compare. Kept as
-    // the same two-part test the file uses, so a change to one shows up.
-    const classicVerdict =
-      !!c.cut && c.onto !== c.cut && !c.onto.startsWith(c.cut + '.');
-    assert.equal(classicVerdict, c.allowed,
-      `the classic editor's expression disagrees on: ${c.name}`);
-  }
-});

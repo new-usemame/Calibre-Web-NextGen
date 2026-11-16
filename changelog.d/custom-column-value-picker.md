@@ -3,7 +3,7 @@
 - **Custom column values can be chosen from a list while editing a book.** Editing
   a text custom column — a genre, a Dewey or LCC number — meant typing the value
   from memory, and a dotted hierarchy meant reproducing its exact spelling or
-  quietly creating a new, near-duplicate one. Every text custom column now has a
+  quietly creating a new, near-duplicate one. Supported text custom columns have a
   list button beside its field that opens a searchable checklist of the values
   already in the library, and applying it fills the field for you. The list is
   shaped to match how the column is stored and browsed: a hierarchical column

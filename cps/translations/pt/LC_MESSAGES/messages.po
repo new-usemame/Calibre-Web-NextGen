@@ -22,7 +22,8 @@ msgstr "Estatísticas"
 
 #: cps/admin.py
 msgid "Calibre database unavailable. Please reconfigure the library path."
-msgstr "Banco de dados do Calibre indisponível. Reconfigure o caminho da biblioteca."
+msgstr ""
+"Banco de dados do Calibre indisponível. Reconfigure o caminho da biblioteca."
 
 #: cps/admin.py
 #, fuzzy
@@ -8741,7 +8742,8 @@ msgstr "Guardar configurações"
 
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
-msgstr "Guardar o arquivo, ejetar o Kobo com segurança e, em seguida, reinicie-o"
+msgstr ""
+"Guardar o arquivo, ejetar o Kobo com segurança e, em seguida, reinicie-o"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8750,7 +8752,9 @@ msgstr "Guardado {time}"
 
 #: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
-msgstr "Guardado. Reinicie o servidor para que as alterações de login entrem em vigor."
+msgstr ""
+"Guardado. Reinicie o servidor para que as alterações de login entrem em "
+"vigor."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid ""
@@ -11453,6 +11457,29 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -16271,7 +16298,9 @@ msgstr "Painel de Atividade do Utilizador"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Track library usage, downloads, and user engagement"
-msgstr "Monitorize a utilização da biblioteca, os descarregamentos e o envolvimento dos utilizadores"
+msgstr ""
+"Monitorize a utilização da biblioteca, os descarregamentos e o envolvimento "
+"dos utilizadores"
 
 #: cps/templates/cwa_user_activity.html
 msgid "Filter by User:"
@@ -16758,7 +16787,9 @@ msgstr "Fundir livros selecionados"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scanning needs a one-time full scan."
-msgstr "A detecção de duplicados requer uma verificação completa realizada uma única vez."
+msgstr ""
+"A detecção de duplicados requer uma verificação completa realizada uma única "
+"vez."
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -16802,15 +16833,20 @@ msgstr "Estratégia:"
 
 #: cps/templates/duplicates.html
 msgid "Keep Newest - Delete older copies, keep the most recently added"
-msgstr "Manter os mais recentes – Excluir cópias mais antigas, manter as adicionadas mais recentemente"
+msgstr ""
+"Manter os mais recentes – Excluir cópias mais antigas, manter as adicionadas "
+"mais recentemente"
 
 #: cps/templates/duplicates.html
 msgid "Keep Oldest - Delete newer copies, keep the earliest added"
-msgstr "Manter a mais antiga – Excluir cópias mais recentes, manter a que foi adicionada primeiro"
+msgstr ""
+"Manter a mais antiga – Excluir cópias mais recentes, manter a que foi "
+"adicionada primeiro"
 
 #: cps/templates/duplicates.html
 msgid "Merge Formats - Merge formats into the newest book, delete the rest"
-msgstr "Unir formatos – Unir formatos no livro mais recente; excluir os restantes"
+msgstr ""
+"Unir formatos – Unir formatos no livro mais recente; excluir os restantes"
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -16820,11 +16856,15 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "Keep Most Metadata - Keep book with most complete information"
-msgstr "Manter a maior parte dos metadados – Manter o livro com as informações mais completas"
+msgstr ""
+"Manter a maior parte dos metadados – Manter o livro com as informações mais "
+"completas"
 
 #: cps/templates/duplicates.html
 msgid "Keep Largest File Size - Keep book with largest total file size"
-msgstr "Manter o arquivo de maior tamanho – Manter o livro com o maior tamanho total de arquivo"
+msgstr ""
+"Manter o arquivo de maior tamanho – Manter o livro com o maior tamanho total "
+"de arquivo"
 
 #: cps/templates/duplicates.html
 msgid "Execute Resolution"
@@ -16832,7 +16872,9 @@ msgstr "Executar resolução"
 
 #: cps/templates/duplicates.html
 msgid "This will permanently delete books. Original files will be backed up to"
-msgstr "Isso excluirá os livros permanentemente. Os arquivos originais serão salvos em"
+msgstr ""
+"Isso excluirá os livros permanentemente. Os arquivos originais serão salvos "
+"em"
 
 #: cps/templates/duplicates.html
 #, fuzzy
@@ -18547,6 +18589,13 @@ msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
 
 #: cps/templates/user_edit.html

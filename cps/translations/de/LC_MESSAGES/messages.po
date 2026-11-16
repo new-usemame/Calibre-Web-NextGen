@@ -12289,6 +12289,29 @@ msgstr ""
 "Die Bildanpassung konnte nicht geändert werden. Bitte versuche Sie es erneut."
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr "Diese Kopie behalten"
 
@@ -19882,6 +19905,13 @@ msgstr ""
 "Wiederherstellung und ändert keine Anmerkungen, die an Ihren Kobo übertragen "
 "werden. Die Opt-in-Option auf Instanzebene muss vom Administrator separat "
 "aktiviert werden."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

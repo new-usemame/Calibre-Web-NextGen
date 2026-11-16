@@ -113,5 +113,90 @@ def test_a_network_failure_is_an_empty_result(monkeypatch):
     assert wd.Wikidata().search("Dune Frank Herbert") == []
 
 
-def test_it_is_a_series_source():
-    assert wd.Wikidata.FILLS_SERIES is True
+@pytest.mark.parametrize("configured", [False, True])
+def test_auto_fetch_contacts_wikidata_only_in_the_configured_order(monkeypatch, configured):
+    """Drive the real provider through auto-fetch and observe HTTP calls and saved series."""
+    from copy import deepcopy
+    from tests.unit.test_series_fill import _Provider, _record, _auto_fetch
+
+    work = deepcopy(WORK)
+    work["labels"]["en"]["value"] = "Cross Justice"
+    calls = _api(monkeypatch, {"Q10": work}, _labels(Q100="James Patterson", Q200="Alex Cross"))
+    ibdb = _Provider("ibdb", [_record()], fills=False)
+    hierarchy = ["ibdb", "wikidata"] if configured else ["ibdb"]
+    applied, book = _auto_fetch(monkeypatch, [ibdb, wd.Wikidata()], hierarchy)
+    assert applied
+    assert [s.name for s in book.series] == (["Alex Cross"] if configured else [])
+    assert len(calls) == (3 if configured else 0)
+    if configured:
+        assert book.series_index == "23.5"
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_manual_search_only_contacts_wikidata_after_user_opt_in(monkeypatch, enabled):
+    """Exercise the real Flask handler and observe HTTP calls and wire results."""
+    import inspect
+    from flask import Flask
+    from types import SimpleNamespace
+    from cps import search_metadata as search
+
+    calls = _api(monkeypatch, {"Q10": WORK}, _labels(Q100="James Patterson", Q200="Alex Cross"))
+    monkeypatch.setattr(search, "cl", [wd.Wikidata()])
+    preferences = {"wikidata": True} if enabled else {}
+    monkeypatch.setattr(search, "current_user", SimpleNamespace(view_settings={"metadata": preferences}))
+    monkeypatch.setattr(search, "_get_global_provider_enabled_map", lambda: {})
+    monkeypatch.setattr(search, "_get_provider_hierarchy", lambda: ["ibdb"])
+    monkeypatch.setattr(search, "get_locale", lambda: "en")
+    monkeypatch.setattr(search, "boost_covers", lambda _: None)
+    app = Flask(__name__)
+    app.add_url_rule("/metadata/search", view_func=inspect.unwrap(search.metadata_search), methods=["POST"])
+    payload = app.test_client().post("/metadata/search", data={"query": "Cross Kill James Patterson"}).get_json()
+    assert len(calls) == (3 if enabled else 0)
+    assert len(payload["results"]) == (1 if enabled else 0)
+    assert payload["providers"][0]["status"] == ("ok" if enabled else "disabled")
+
+
+def test_cover_picker_requires_wikidata_opt_in(monkeypatch):
+    from types import SimpleNamespace
+    from cps import cover_picker, search_metadata
+
+    monkeypatch.setattr(cover_picker, "current_user", SimpleNamespace(view_settings={}))
+    monkeypatch.setattr(search_metadata, "_get_global_provider_enabled_map", lambda: {})
+    assert cover_picker._is_provider_enabled_for_user(wd.Wikidata()) is False
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_provider_settings_do_not_silently_enable_wikidata_for_ingest(monkeypatch, configured):
+    """Settings must preserve opt-in even though their reorder list includes new providers."""
+    import inspect
+    from flask import Flask
+    from types import SimpleNamespace
+    from cps import search_metadata as search
+
+    monkeypatch.setattr(search, "cl", [wd.Wikidata()])
+    monkeypatch.setattr(search, "current_user", SimpleNamespace(view_settings={}))
+    monkeypatch.setattr(search, "_get_global_provider_enabled_map", lambda: {})
+    monkeypatch.setattr(search, "_get_provider_hierarchy", lambda: ["wikidata"] if configured else ["ibdb"])
+    with Flask(__name__).test_request_context("/metadata/provider"):
+        (provider,) = inspect.unwrap(search.metadata_provider)().get_json()
+    assert provider["active"] is False
+    assert provider["default_ingest_enabled"] is configured
+
+
+
+def test_explicit_disable_wins_over_configured_series_fill(monkeypatch):
+    from tests.unit.test_series_fill import _fill
+    calls = _api(monkeypatch, {"Q10": WORK}, {})
+    filled, _ = _fill(monkeypatch, [wd.Wikidata()], ["wikidata"], enabled={"wikidata": False})
+    assert filled is None and calls == []
+
+
+def test_wikidata_in_the_order_can_supply_the_primary_metadata(monkeypatch):
+    from copy import deepcopy
+    from tests.unit.test_series_fill import _auto_fetch
+    work = deepcopy(WORK)
+    work["labels"]["en"]["value"] = "Cross Justice"
+    calls = _api(monkeypatch, {"Q10": work}, _labels(Q100="James Patterson", Q200="Alex Cross"))
+    applied, book = _auto_fetch(monkeypatch, [wd.Wikidata()], ["wikidata"])
+    assert applied and len(calls) == 3
+    assert [s.name for s in book.series] == ["Alex Cross"] and book.series_index == "23.5"

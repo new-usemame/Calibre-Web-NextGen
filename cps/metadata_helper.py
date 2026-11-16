@@ -85,7 +85,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
-            is_enabled = metadata_provider_enabled(provider_id, enabled_map)
+            is_enabled = metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)
             if not is_enabled:
                 log.debug(f"Provider {provider_id} is globally disabled")
                 continue
@@ -526,11 +526,10 @@ _SERIES_KIND_WORDS = frozenset({
 _SERIES_FILL_LIMIT = 3
 
 # Series-capable providers the fill asks even when the configured order leaves
-# them out: each carries series data of their own. Wikidata comes last because
-# it finds fewer series than Hardcover. Any other provider (Amazon, Goodreads
-# and the rest scrape pages that throttle bots) is asked only when the
-# administrator put it in the order.
-_SERIES_FILL_EXTRAS = ("hardcover", "kobo", "wikidata")
+# them out: both carry series data of their own. Other providers, including
+# the opt-in Wikidata service, are asked only when the administrator put them
+# in the order.
+_SERIES_FILL_EXTRAS = ("hardcover", "kobo")
 
 # The fill has not run yet for this book (None means it ran and found nothing).
 _NOT_ASKED = object()
@@ -649,7 +648,7 @@ def _find_missing_series_unguarded(book, search_query, applied_provider_id, prov
     for provider_id in ordered:
         provider = by_id[provider_id]
         if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
-                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)):
             continue
         if asked >= _SERIES_FILL_LIMIT:
             break

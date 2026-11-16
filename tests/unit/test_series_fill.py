@@ -178,13 +178,13 @@ def test_outside_the_order_only_hardcover_and_kobo_are_asked(monkeypatch):
     assert amazon.queries == [] and amazon_jp.queries == []
 
 
-def test_outside_the_order_wikidata_is_asked_after_hardcover_and_kobo(monkeypatch):
+def test_outside_the_order_wikidata_is_never_asked(monkeypatch):
     wikidata = _Provider("wikidata", [_hit("Alex Cross", 23)])
     kobo = _Provider("kobo", [])
     hardcover = _Provider("hardcover", [])
     filled, _ = _fill(monkeypatch, [wikidata, kobo, hardcover], ["ibdb", "google"])
-    assert filled == ("Alex Cross", 23)
-    assert hardcover.queries and kobo.queries and wikidata.queries
+    assert filled is None
+    assert hardcover.queries and kobo.queries and wikidata.queries == []
 
 
 def test_wikidata_is_not_asked_when_hardcover_has_the_series(monkeypatch):

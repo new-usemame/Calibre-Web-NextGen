@@ -41,7 +41,7 @@ An upload is checked at least as strictly as the firmware decodes a pull. A stor
 
 ## Why the layout fields come back exactly
 
-The firmware does not set its local `syncRevision` after an upload. So the pull in the same sync finds a different revision and replaces the local record with the server copy (`ClippingStore.cpp`, `applyRemote`). If the server changed a layout field, each new highlight would lose its place on its first sync. So CWNG stores the fields as sent and serves them unchanged. The `chapter` is cut to 64 characters, as crosspoint-sync does. The firmware itself cuts it to 47 bytes.
+The firmware does not set its local `syncRevision` after an upload. So the pull in the same sync finds a different revision and replaces the local record with the server copy (`ClippingStore.cpp`, `applyRemote`). If the server changed a layout field, each new highlight would lose its place on its first sync. So CWNG stores the fields as sent and serves them unchanged. The `chapter` is cut to at most 64 UTF-8 bytes at a character boundary, and embedded NUL is refused. The firmware itself cuts it to 47 bytes.
 
 ## Storage
 
@@ -69,13 +69,13 @@ A clipping goes back only to the reader that made it, by `X-CWNG-Device-ID`. Thi
 | `X-CWNG-Device-ID` names no known reader yet | Clippings of no reader |
 | No `X-CWNG-Device-ID` | Every clipping of the account for the book, as crosspoint-sync does |
 
-GET resolves the reader read-only and never registers one. PUT registers it, as the other KOSync writes do.
+GET resolves the reader read-only and never registers one. PUT registers it, as the other KOSync writes do. A supplied header that cannot register (including an empty or invalid identity, or a full device registry) is rejected rather than saved as a shared clipping. A headerless write cannot edit or delete a clipping owned by a device.
 
-A delete is a tombstone, and a tombstone always wins. A later upload of the same id is accepted and changes nothing, because `apply_portable` never brings back a hidden row. A delete of an id that CWNG never stored is accepted. The firmware sends one when an upload failed and the user then deleted the clipping.
+A delete is a tombstone, and a tombstone always wins. A later upload of the same id is accepted and changes nothing, because `apply_portable` never brings back a hidden row. A delete of an id that CWNG never stored creates a hidden annotation and a device-scoped tombstone with a new revision. Its layout fields are empty placeholders that are never served; a delayed upload cannot resurrect it. The firmware sends one when an upload failed and the user then deleted the clipping.
 
 A web reader delete reaches the reader. Before it pages, GET turns each served clipping that is hidden, and not yet a tombstone, into a tombstone with a new revision.
 
-Only this route can make or delete a `crosspoint` row. `/kosync/syncs/annotations` refuses `source: crosspoint` on a pushed annotation and `delete_source: crosspoint`. An upload or delete through this route of an id that belongs to another source, or to another reader, is accepted, logged, and changes nothing.
+Only this route can make or delete a `crosspoint` row. `/kosync/syncs/annotations` refuses creation with `source: crosspoint` and refuses `delete_source: crosspoint`. An echo of an existing CrossPoint row belonging to the same account and book is accepted, so one shared clipping cannot reject a KOReader batch. The existing provenance and device ownership rules still apply. An upload or delete through this route of an id that belongs to another source, or to another reader, is accepted, logged, and changes nothing.
 
 ## Not done
 

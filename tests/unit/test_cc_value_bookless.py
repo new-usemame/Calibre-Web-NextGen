@@ -20,7 +20,7 @@ Counts must stay honest: a value nobody can see reports 0, and a subtree that
 contains only such values reports 0 -- not 1.
 """
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, text
-from sqlalchemy.orm import foreign, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, foreign, relationship, sessionmaker
 
 from cps import db, hierarchy
 from cps.api import cc_values
@@ -30,19 +30,15 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-# Declared ONCE at module scope. Defining it inside the fixture re-registers
-# the table on the shared db.Base MetaData on every test, which SQLAlchemy
-# rejects ("already defined for this MetaData instance").
-# Column ids are deliberately HIGH and unused by the rest of the suite.
-#
-# Ids 2 and 3 are already claimed by test_flat_custom_columns.py, which
-# monkeypatches db.Books.custom_column_2 / _3 to None for its own stubbed
-# readers. Those monkeypatches are undone at teardown, but which module's
-# assignment survives an import depends on import order -- so reusing those ids
-# here made these tests pass alone (16/16) and fail in a full run, and moving the
-# relationship into a fixture leaked into unrelated tag/kobo tests. Private ids
-# remove the interaction entirely.
-class Ddc(db.Base):
+# Isolated mappers keep these fixtures from changing the real Books mapper.
+_Base = declarative_base()
+
+
+class _Book(_Base):
+    __table__ = db.Books.__table__.to_metadata(_Base.metadata)
+
+
+class Ddc(_Base):
     __tablename__ = "custom_column_2403"
     id = Column(Integer, primary_key=True)
     book = Column(Integer, ForeignKey("books.id"))
@@ -51,11 +47,11 @@ class Ddc(db.Base):
     # here (db.Base is already mapper-configured at import time), and without
     # uselist SQLAlchemy reads the primaryjoin as MANYTOONE and returns a single
     # Book -- None -- instead of the list the readers iterate.
-    books = relationship(db.Books, uselist=True,
-                         primaryjoin=lambda: foreign(Ddc.book) == db.Books.id)
+    books = relationship(_Book, uselist=True,
+                         primaryjoin=lambda: foreign(Ddc.book) == _Book.id)
 
 
-class Subj(db.Base):
+class Subj(_Base):
     __tablename__ = "custom_column_2402"
     id = Column(Integer, primary_key=True)
     book = Column(Integer, ForeignKey("books.id"))
@@ -63,40 +59,14 @@ class Subj(db.Base):
     # Declared on THIS side, with uselist=True, for the same two reasons as
     # Ddc.books above: a Books-side backref is not instrumented once db.Base is
     # already mapper-configured, and SQLAlchemy otherwise infers MANYTOONE.
-    books = relationship(db.Books, uselist=True,
-                         primaryjoin=lambda: foreign(Subj.book) == db.Books.id)
+    books = relationship(_Book, uselist=True,
+                         primaryjoin=lambda: foreign(Subj.book) == _Book.id)
 
 
-def _install_relationship(col_id, model):
-    """Attach ``Books.custom_column_<id>``; return a callable that undoes it.
-
-    Two traps, both of which only show up in a full-suite run:
-
-    * The relationship cannot be declared at import time. ``db.Base`` is already
-      mapper-configured by then, and a relationship added to an already-mapped
-      class is discarded -- the attribute resolves to ``None`` and the readers
-      raise "Join target ... expected, got None".
-    * ``monkeypatch.setattr`` cannot be used to undo it. Its teardown issues
-      ``delattr`` when the attribute was absent beforehand, and SQLAlchemy
-      refuses: "Can't un-map individual mapped attributes on a mapped class".
-
-    So both directions are plain ``setattr``, and restoring ``None`` is
-    deliberate: the attribute must stay present, because deleting it is exactly
-    what SQLAlchemy rejects.
-    """
-    name = 'custom_column_%s' % col_id
-    previous = getattr(db.Books, name, None)
-    setattr(db.Books, name, relationship(
-        model, primaryjoin=db.Books.id == model.book))
-    return lambda: setattr(db.Books, name, previous)
-
-
-# db.Books.custom_column_2403 / _2402 are installed by the fixtures, NOT here.
-# db.Base is already mapper-configured by the time this module is imported, and
-# a relationship assigned to an already-mapped class afterwards is discarded:
-# the attribute is present but resolves to None and the readers fail with
-# "Join target ... expected, got None". That is order-dependent, which is why
-# the file passed 15/15 alone and failed 8 tests in a full run.
+_Book.custom_column_2403 = relationship(Ddc, primaryjoin=_Book.id == Ddc.book,
+                                          overlaps="books")
+_Book.custom_column_2402 = relationship(Subj, primaryjoin=_Book.id == Subj.book,
+                                          overlaps="books")
 
 
 @pytest.fixture()
@@ -109,7 +79,8 @@ def library(monkeypatch):
     mapper over the same table and break every other test in the session.
     """
     engine = create_engine("sqlite://")
-    db.Books.__table__.create(engine)
+    monkeypatch.setattr(db, "Books", _Book)
+    _Book.__table__.create(engine)
     db.CustomColumns.__table__.create(engine)
     Ddc.__table__.create(engine)
 
@@ -131,11 +102,9 @@ def library(monkeypatch):
     calibre.common_filters = lambda *a, **kw: None
 
     monkeypatch.setattr(db, "cc_classes", {2403: Ddc})
-    restore = _install_relationship(2403, Ddc)
     try:
         yield calibre
     finally:
-        restore()
         session.close()
         engine.dispose()
 
@@ -298,7 +267,8 @@ def tree_library(monkeypatch):
     ``software`` must relocate the whole branch.
     """
     engine = create_engine("sqlite://")
-    db.Books.__table__.create(engine)
+    monkeypatch.setattr(db, "Books", _Book)
+    _Book.__table__.create(engine)
     db.CustomColumns.__table__.create(engine)
     Subj.__table__.create(engine)
 
@@ -329,7 +299,6 @@ def tree_library(monkeypatch):
     calibre.session = session
     calibre.common_filters = lambda *a, **kw: None
     monkeypatch.setattr(db, "cc_classes", {2402: Subj})
-    _install_relationship(2402, Subj)
     # cc_values does `from .. import calibre_db`, binding that NAME at import
     # time. Patching db.calibre_db would leave the module still talking to the
     # real, unconnected instance -- so the name is patched where it is used.
@@ -462,7 +431,8 @@ CUT_VALUES = [
 @pytest.fixture()
 def cut_tree(monkeypatch):
     engine = create_engine("sqlite://")
-    db.Books.__table__.create(engine)
+    monkeypatch.setattr(db, "Books", _Book)
+    _Book.__table__.create(engine)
     db.CustomColumns.__table__.create(engine)
     Subj.__table__.create(engine)
 
@@ -486,11 +456,9 @@ def cut_tree(monkeypatch):
     calibre.common_filters = lambda *a, **kw: None
     monkeypatch.setattr(db, "cc_classes", {2402: Subj})
     monkeypatch.setattr(cc_values, "calibre_db", calibre)
-    restore = _install_relationship(2402, Subj)
     try:
         yield calibre
     finally:
-        restore()
         session.close()
         engine.dispose()
 

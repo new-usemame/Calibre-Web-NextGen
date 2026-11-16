@@ -32,7 +32,7 @@ from types import SimpleNamespace
 import flask
 import pytest
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, event, text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.pool import StaticPool
 
 from cps import cc_sidecar, db, hierarchy
@@ -44,60 +44,30 @@ pytestmark = pytest.mark.unit
 
 COL_ID = 2411
 
-# Declared ONCE at module scope -- defining these inside the fixture would
-# re-register the tables on the shared db.Base MetaData on every test, which
-# SQLAlchemy rejects.
+# Keep test mappers separate from the application's process-wide registry.
+# Otherwise collecting this module makes unrelated tests configure _Val before
+# its Books-side relationship exists.
+_Base = declarative_base()
+
+
+class _Book(_Base):
+    __table__ = db.Books.__table__.to_metadata(_Base.metadata)
+
+
 _CC_LINK = db.Table(
-    'books_custom_column_%d_link' % COL_ID, db.Base.metadata,
+    'books_custom_column_%d_link' % COL_ID, _Base.metadata,
     Column('book', Integer, ForeignKey('books.id'), primary_key=True),
     Column('value', Integer, ForeignKey('custom_column_%d.id' % COL_ID),
            primary_key=True),
 )
 
 
-class _Val(db.Base):
-    """The link-table shape every hierarchical text column uses."""
+class _Val(_Base):
     __tablename__ = 'custom_column_%d' % COL_ID
     id = Column(Integer, primary_key=True)
-    value = Column(String, nullable=False, unique=True)
-    # back_populates, not two free-standing relationships: both ends write the
-    # same link table, and without shared state the unit of work deletes a
-    # link row once per relationship ("expected to delete 2 row(s); only 1
-    # were matched"). The production classes are one relationship pair.
-    books = relationship(db.Books, uselist=True, secondary=_CC_LINK,
-                         back_populates='custom_column_%d' % COL_ID)
-
-
-def _install_books_side(col_id, model):
-    """Attach ``Books.custom_column_<id>``; return a callable that undoes it.
-
-    Same trap as in test_cc_value_bookless: monkeypatch cannot undo a
-    relationship on an already-mapped class, so this is plain setattr with a
-    restore callable the fixture MUST call.
-    """
-    name = 'custom_column_%s' % col_id
-    previous = getattr(db.Books, name, None)
-    setattr(db.Books, name, relationship(
-        model, secondary=_CC_LINK, uselist=True,
-        back_populates='books'))
-    return lambda: setattr(db.Books, name, previous)
-
-
-@pytest.fixture(scope='module', autouse=True)
-def _books_side():
-    """Install ``Books.custom_column_2411`` once for the whole module.
-
-    Re-installing the relationship per test churns the mapper wiring: the
-    back_populates pair from the previous install stays registered alongside
-    the new one, and the unit of work then deletes each link row twice
-    (StaleDataError, "expected to delete 1 row(s); only 0 were matched") --
-    the first delete passes, every later one fails. One stable install per
-    module keeps one relationship pair; sessions still resolve against each
-    test's own engine.
-    """
-    restore = _install_books_side(COL_ID, _Val)
-    yield
-    restore()
+    value = Column(String(collation='NOCASE'), nullable=False, unique=True)
+    books = relationship(_Book, secondary=_CC_LINK,
+                         backref='custom_column_%d' % COL_ID)
 
 
 @pytest.fixture()
@@ -132,7 +102,9 @@ def library(tmp_path, monkeypatch):
     # loads a Book object SQLAlchemy eagerly reads all of them. A minimal
     # schema dies with "no such table: books_tags_link" on the first
     # row.books access. In-memory CREATE TABLEs are effectively free.
-    db.Base.metadata.create_all(engine)
+    _Base.metadata.create_all(engine)
+    db.CustomColumns.__table__.create(engine)
+    monkeypatch.setattr(db, "Books", _Book)
 
     with engine.begin() as connection:
         connection.execute(text(

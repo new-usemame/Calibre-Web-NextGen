@@ -7,6 +7,7 @@
 
 from functools import wraps
 
+from sqlalchemy import inspect
 from sqlalchemy.sql.expression import func
 from .cw_login import login_required
 
@@ -93,6 +94,27 @@ def _verify_app_password(user, password):
     """True when ``password`` is any of ``user``'s live app passwords."""
     return (_verify_app_password_digest(user, password)
             or _verify_app_password_older(user, password))
+
+
+def _fresh_user(user):
+    """The same User with its columns re-read from app.db, or None if the row is gone.
+
+    The app.db session is long-lived, so a User loaded by an earlier request kept
+    the values it had then. A password, role or account change written by another
+    process (an admin script, a second worker) was not seen: after a browser visit
+    a disabled reader could still download over OPDS, and a newly set password was
+    refused while the old one still worked. The Basic-auth, reverse-proxy and
+    signed-in-session lookups below go through this.
+    """
+    state = inspect(user, raiseerr=False)
+    if state is None or not state.persistent or state.session is not ub.session:
+        return user  # An unattached test stand-in has nothing to re-read.
+    # Re-populate only this User, retaining its identity. Unlike refresh(), a
+    # missing row returns None rather than raising InvalidRequestError, which
+    # can also mean a broken session and must not return cached credentials.
+    return (ub.session.query(ub.User)
+            .populate_existing()
+            .filter(ub.User.id == state.identity[0]).first())
 
 
 def create_authenticated_user(username, email=None, auth_source="unknown"):
@@ -227,7 +249,7 @@ def verify_password(username, password):
     # browsing is enabled, otherwise return 401.
     if not username:
         return None
-    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
+    user = _fresh_user(ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first())
 
     # Handle existing users
     if user:
@@ -272,6 +294,12 @@ def verify_password(username, password):
     return None
 
 
+def _names_an_account(authorisation):
+    """True when Basic credentials name an account other than Guest."""
+    username = ((authorisation or {}).get("username") or "").strip()
+    return bool(username) and username.lower() != "guest"
+
+
 def requires_basic_auth_if_no_ano(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -292,11 +320,15 @@ def requires_basic_auth_if_no_ano(f):
                 b"Basic", {'username': "Guest", 'password': ""})
         if not user:
             user = auth.authenticate(authorisation, "")
-        # Issue #121 part 2: graceful fallback to Guest when auth was
-        # attempted but failed and anonymous browsing is on. Without this
-        # the OPDS client never sees the anon catalog whenever it has a
-        # bad/empty credential cached.
-        if user in (False, None) and config.config_anonbrowse == 1:
+        # Issue #121 part 2: with anonymous browsing on, a request that named
+        # no account (an empty-username probe such as Readest's) still gets
+        # the Guest catalog. #2844: credentials that name an account and are
+        # wrong get 401 instead, as KOSync answers and as the web sign-in
+        # form does, so a client learns its password is wrong rather than
+        # silently browsing as the guest. Unknown and known names get the
+        # same 401, so the status reveals nothing about which accounts exist.
+        if (user in (False, None) and config.config_anonbrowse == 1
+                and not _names_an_account(authorisation)):
             guest_auth = Authorization(
                 b"Basic", {'username': "Guest", 'password': ""})
             user = auth.authenticate(guest_auth, "")
@@ -316,6 +348,11 @@ def requires_basic_auth_if_no_ano(f):
 def login_required_if_no_ano(func):
     @wraps(func)
     def decorated_view(*args, **kwargs):
+        # An /api/v1 write the API already authenticated by Basic (#2842) runs
+        # as that user. Explicit credentials win over a proxy header, as they
+        # do on OPDS (requires_basic_auth_if_no_ano).
+        if g.get("api_basic_auth_user") is not None:
+            return func(*args, **kwargs)
         if config.config_allow_reverse_proxy_header_login:
             user = load_user_from_reverse_proxy_header(request)
             if user:
@@ -359,7 +396,7 @@ def load_user_from_reverse_proxy_header(req):
         return None
     
     # Look for existing user first
-    user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first()
+    user = _fresh_user(ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first())
     if user:
         rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
@@ -391,7 +428,7 @@ def load_user(user_id, random, session_key):
         # Handle potential invalid user_id
         if not user_id:
             return None
-        user = ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
+        user = _fresh_user(ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first())
         if not user:
             return None
             

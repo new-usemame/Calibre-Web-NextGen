@@ -25,6 +25,7 @@ import shutil
 from typing import Optional, Tuple
 
 import app_paths
+from library_copy import copy_file as _copy_file
 import service_user
 
 from cwa_db import CWA_DB
@@ -500,7 +501,7 @@ class EPUBFixer:
                     app_paths.processed_books_dir() / "fixed_originals"
                 )
                 os.makedirs(output_path, exist_ok=True)
-                shutil.copy2(epub_path, output_path)
+                _copy_file(epub_path, os.path.join(output_path, os.path.basename(epub_path)))
             except Exception as e:
                 print_and_log(f"[cwa-kindle-epub-fixer] ERROR - Error occurred when backing up {epub_path} to {output_path}:\n{e}", log=self.manually_triggered)
 

@@ -147,6 +147,8 @@ def test_opt_in_and_default_plugin_environments_are_distinct_probe_keys(tmp_path
     monkeypatch.setenv("HOME", str(tmp_path / "ambient-home"))
     monkeypatch.delenv("CALIBRE_CONFIG_DIRECTORY", raising=False)
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    # The container layout, where the plugin opt-in's HOME is /config.
+    monkeypatch.delenv("CALIBRE_DBPATH", raising=False)
     calls = []
 
     def run(_debug_path, env):
@@ -285,7 +287,9 @@ def _process_running(pid):
     if sys.platform.startswith("linux"):
         try:
             return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
+            # Reaped after os.kill(pid, 0): before the open (ENOENT) or
+            # between the open and the read (ESRCH). Either way it is gone.
             return False
     return True
 
@@ -419,3 +423,16 @@ def test_directory_only_oeb_output_is_not_offered_as_a_stored_book_file(monkeypa
     monkeypatch.setattr(helper, "get_conversion_capabilities", lambda *_:
         (frozenset({"epub"}), frozenset({"epub", "txt", "oeb"})))
     assert helper.get_convert_options(_book("epub")) == (["epub"], ["txt"])
+
+
+def test_process_running_treats_a_process_reaped_mid_read_as_gone(monkeypatch):
+    """Observed on main CI: the helper was reaped between opening and reading
+    /proc/<pid>/stat, so the read raised ESRCH and the cleanup test failed
+    although the probe had done its job."""
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    def reaped_during_read(self, *args, **kwargs):
+        raise ProcessLookupError(3, "No such process")
+
+    monkeypatch.setattr(Path, "read_text", reaped_during_read)
+    assert _process_running(os.getpid()) is False

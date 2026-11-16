@@ -1658,21 +1658,16 @@ class CalibreDB:
                           allow_show_hidden=False, allow_show_global=False,
                           user=None, allow_public_shelf_books=False):
         self.ensure_session()
-        # Eagerly load all relationships to prevent detached instance errors during editing
+        # Every relationship still loads eagerly, through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (?)` query each), so a
+        # detached book stays readable. No joinedload here (#2699): SQLite
+        # materializes each `LEFT JOIN (link JOIN table)` by scanning the whole
+        # table first, which cost ~4s per cover on a 272k-book library.
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
         # OWN hidden book must reach it (hidden is a listing exclusion, not an
         # access revocation — otherwise the detail page's action buttons all
         # error 'unavailable' and the listing shows no covers). See #319.
         return (self.session.query(Books)
-                .options(joinedload(Books.authors),
-                         joinedload(Books.tags),
-                         joinedload(Books.comments),
-                         joinedload(Books.data),
-                         joinedload(Books.series),
-                         joinedload(Books.ratings),
-                         joinedload(Books.languages),
-                         joinedload(Books.publishers),
-                         joinedload(Books.identifiers))
                 .filter(Books.id == book_id)
                 .filter(self.common_filters(
                     allow_show_archived,
@@ -2134,16 +2129,9 @@ class CalibreDB:
                     discover_filter,
                     extra_filter if extra_filter is not None else true(),
                 )
-            # Eagerly load template relationships to prevent detached lazy-load
-            # failures if another request tears down the shared scoped session.
-            if database == Books:
-                random_query = random_query.options(
-                    joinedload(Books.authors),
-                    joinedload(Books.tags),
-                    joinedload(Books.data),
-                    joinedload(Books.series),
-                    joinedload(Books.ratings),
-                )
+            # Template relationships load eagerly through the model's
+            # lazy='selectin', so a torn-down scoped session cannot leave them
+            # unloaded. No joinedload: see get_filtered_book (#2699).
             randm = (random_query.filter(self.common_filters(allow_show_archived,
                                                              viewing_tag_id=viewing_tag_id,
                                                              allow_show_hidden=allow_show_hidden,
@@ -2159,16 +2147,12 @@ class CalibreDB:
         else:
             query = self.session.query(database)
         
-        # Eagerly load template relationships to prevent DetachedInstanceError
-        # during rendering under concurrent status/notification requests.
-        if database == Books and not ids_only:
-            query = query.options(
-                joinedload(Books.authors),
-                joinedload(Books.tags),
-                joinedload(Books.data),
-                joinedload(Books.series),
-                joinedload(Books.ratings),
-            )
+        # Template relationships load eagerly through the model's
+        # lazy='selectin' (one indexed `WHERE book IN (<page ids>)` query
+        # each), which prevents DetachedInstanceError during rendering under
+        # concurrent status/notification requests. A joinedload here made
+        # SQLite read the whole authors/tags/series tables for every page,
+        # about 3s per page on a 270k-book library (#2699).
         
         off = int(int(pagesize) * (page - 1))
 
@@ -2365,11 +2349,41 @@ class CalibreDB:
     def search_query(self, term, config, *join, allow_show_hidden=False, user=None,
                      eager_data=True, viewing_tag_id=None):
         self.ensure_session()
-        strip_whitespaces(term).lower()
-        q = list()
-        author_terms = re.split("[, ]+", term)
-        for author_term in author_terms:
-            q.append(Books.authors.any(func.lower(Authors.name).ilike("%" + author_term + "%")))
+        # ``lower()`` on this connection is the Python ``lcase`` (lower case plus
+        # unidecode). Fold the term here once and match each name table in an
+        # uncorrelated subquery, then keep the books linked to a matching name
+        # (#2720). The old predicate was a correlated EXISTS per book that
+        # folded every linked name for every book, twice (``ilike`` wraps
+        # ``lower()`` in another ``lower()``), and probed each book against
+        # every matching name: 8.6 to 11.6 million ``lower()`` calls and 3 to
+        # 7 seconds per query on 270,000 books. ``lcase`` is idempotent, so
+        # ``lower(x) LIKE lcase(t)`` finds the rows ``lower(x) ILIKE t`` did.
+        def folded_like(column, needle):
+            return func.lower(column).like("%" + lcase(needle) + "%")
+
+        def names(table, column, needle):
+            return select(table.id).where(folded_like(column, needle)).scalar_subquery()
+
+        def linked(link_book, link_name, table, column, needle):
+            return Books.id.in_(
+                select(link_book).where(link_name.in_(names(table, column, needle))).scalar_subquery()
+            )
+
+        def custom_column_match(cc_id, needle):
+            value_table = cc_classes[cc_id]
+            prop = getattr(Books, 'custom_column_' + str(cc_id)).property
+            if prop.secondary is not None:  # text, enumeration: books_custom_column_N_link
+                link = prop.secondary
+                return linked(link.c.book, link.c.value, value_table, value_table.value, needle)
+            # comments: one value row per book (custom series columns are never mapped)
+            return Books.id.in_(
+                select(value_table.book).where(folded_like(value_table.value, needle)).scalar_subquery()
+            )
+
+        # Every word must match an author of the book (not necessarily the same one).
+        author_matches = [linked(books_authors_link.c.book, books_authors_link.c.author,
+                                 Authors, Authors.name, author_term)
+                          for author_term in re.split("[, ]+", term)]
         query = self.generate_linked_query(config.config_read_column, Books, user=user)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
@@ -2383,17 +2397,15 @@ class CalibreDB:
             query = query.outerjoin(join[0])
 
         cc = self.get_cc_columns(config, filter_config_custom_read=True)
-        filter_expression = [Books.tags.any(func.lower(Tags.name).ilike("%" + term + "%")),
-                             Books.series.any(func.lower(Series.name).ilike("%" + term + "%")),
-                             Books.authors.any(and_(*q)),
-                             Books.publishers.any(func.lower(Publishers.name).ilike("%" + term + "%")),
-                             func.lower(Books.title).ilike("%" + term + "%")]
+        filter_expression = [linked(books_tags_link.c.book, books_tags_link.c.tag, Tags, Tags.name, term),
+                             linked(books_series_link.c.book, books_series_link.c.series, Series, Series.name, term),
+                             and_(*author_matches),
+                             linked(books_publishers_link.c.book, books_publishers_link.c.publisher,
+                                    Publishers, Publishers.name, term),
+                             folded_like(Books.title, term)]
         for c in cc:
             if c.datatype not in ["datetime", "rating", "bool", "int", "float"]:
-                filter_expression.append(
-                    getattr(Books,
-                            'custom_column_' + str(c.id)).any(
-                        func.lower(cc_classes[c.id].value).ilike("%" + term + "%")))
+                filter_expression.append(custom_column_match(c.id, term))
         # Eagerly load the data relationship to prevent session errors.
         # Bounded export iterators use selectinload instead: joinedload on a
         # collection requires result uniquing and is incompatible with yield_per.

@@ -7050,7 +7050,7 @@ msgstr "隐藏设备书库"
 msgid "Hide fields"
 msgstr "隐藏字段"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "隐藏密码"
 
@@ -9130,7 +9130,7 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开更多"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "显示密码"
 
@@ -10786,6 +10786,44 @@ msgstr "搜索书名、作者、丛书…"
 #, python-brace-format
 msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr "{total} 本书中有 {failed} 本无法添加，仍保持选中状态。"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -18513,6 +18551,16 @@ msgstr "如果您需要更改您的电子邮件地址或密码，可以在此处
 #: cps/templates/user_edit.html
 msgid "Reset user Password"
 msgstr "重置用户密码"
+
+#: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "eReader Configuration"

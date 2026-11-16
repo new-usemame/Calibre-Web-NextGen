@@ -7355,7 +7355,7 @@ msgstr "Скрыть библиотеку устройства"
 msgid "Hide fields"
 msgstr "Скрыть поля"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Скрыть пароль"
 
@@ -9495,7 +9495,7 @@ msgstr "Показать меньше"
 msgid "Show more"
 msgstr "Показать больше"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Показать пароль"
 
@@ -11262,6 +11262,44 @@ msgstr "Поиск по названию, автору, серии…"
 msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 "Не удалось добавить книг: {failed} из {total}. Они остаются выбранными."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -19381,6 +19419,18 @@ msgstr ""
 #: cps/templates/user_edit.html
 msgid "Reset user Password"
 msgstr "Сбросить пароль пользователя"
+
+#: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "eReader Configuration"

@@ -5230,6 +5230,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
+"Smart shelves are not synced to e-readers on this server, so a smart shelf "
+"ticked here adds no books. An administrator can turn on Sync smart shelves "
+"in the settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Choose which books this device keeps. Books you take off are removed from "
 "the device at its next sync; your place, highlights and notes stay saved."
 msgstr ""
@@ -12137,6 +12144,29 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -19668,6 +19698,13 @@ msgstr ""
 "Desactivada per defecte. La fase 0 només registra dades per recuperar "
 "l'estat anterior i no canvia les anotacions que rep el Kobo. L'administrador "
 "també ha d'activar l'opció general de la instància."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

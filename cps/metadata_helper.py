@@ -18,6 +18,7 @@ from cps.metadata_constants import (
 )
 from cps.search_metadata import cl as metadata_providers
 from cps.cwa_db_loader import load_cwa_db
+from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid
 CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
@@ -341,6 +342,14 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         if (cwa_settings.get('auto_metadata_update_identifiers', True) and
             hasattr(metadata, 'identifiers') and metadata.identifiers):
             for identifier_type, identifier_value in metadata.identifiers.items():
+                if (identifier_type and identifier_value
+                        and identifier_type.lower() in ISBN_IDENTIFIER_TYPES
+                        and not isbn_is_valid(identifier_value)):
+                    log.info(
+                        f"Auto metadata fetch: skipped {identifier_type} {identifier_value!r} "
+                        f"for book {book.id}, it fails the ISBN check digit"
+                    )
+                    continue
                 if identifier_type and identifier_value:
                     # Check if identifier already exists
                     existing = False
@@ -506,11 +515,6 @@ def _apply_cover_from_metadata(book, metadata):
     return False
 
 
-def _normalize_isbn(value):
-    """Strip separators and upper-case so ISBNs compare regardless of formatting."""
-    return "".join(ch for ch in str(value) if ch.isalnum()).upper()
-
-
 # Trailing words that name the kind of series rather than the series itself:
 # "Dune Chronicles" is the library's "Dune", "Red Rising Saga" its "Red Rising".
 _SERIES_KIND_WORDS = frozenset({
@@ -667,15 +671,21 @@ def _find_missing_series_unguarded(book, search_query, applied_provider_id, prov
 
 
 def _book_isbn(book):
-    """Return the book's existing ISBN (preferring ISBN-13) or None (fork #402)."""
-    isbn13 = isbn = None
+    """Return the book's existing ISBN (preferring ISBN-13) or None (fork #402).
+
+    One whose check digit is valid wins over one that fails it, so a bad
+    ``isbn13`` value does not hide a good ``isbn``.
+    """
+    candidates = []
     for ident in (getattr(book, "identifiers", None) or []):
         itype = (getattr(ident, "type", "") or "").lower()
-        if itype in ("isbn13", "isbn_13"):
-            isbn13 = ident.val
-        elif itype == "isbn":
-            isbn = ident.val
-    return isbn13 or isbn
+        if itype in ISBN_IDENTIFIER_TYPES:
+            candidates.append((itype not in ("isbn13", "isbn_13"), ident.val))
+    candidates.sort(key=lambda candidate: candidate[0])
+    for _, candidate in candidates:
+        if candidate and isbn_is_valid(candidate):
+            return candidate
+    return next((value for _, value in candidates if value), None)
 
 
 # How close two titles must be, when their identifying words are NOT identical,
@@ -896,13 +906,15 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
     kept, so the gate is only ever as strong as the caller. ``fetch_and_apply_
     metadata`` always passes them and a test pins that call site.
     """
-    if book_isbn:
-        target = _normalize_isbn(book_isbn)
+    # Both sides are compared as checksum-valid ISBN-13s: an ISBN-10 matches
+    # its ISBN-13, and a value that fails its check digit matches nothing.
+    target = isbn13(book_isbn) if book_isbn else None
+    if target:
         for result in results:
             identifiers = getattr(result, "identifiers", None) or {}
-            for key in ("isbn", "isbn13", "isbn_13", "isbn10"):
+            for key in ISBN_IDENTIFIER_TYPES:
                 candidate = identifiers.get(key)
-                if candidate and _normalize_isbn(candidate) == target:
+                if candidate and isbn13(candidate) == target:
                     return result
 
     if not book_title:

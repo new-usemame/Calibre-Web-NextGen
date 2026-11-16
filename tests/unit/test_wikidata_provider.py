@@ -132,6 +132,23 @@ def test_auto_fetch_contacts_wikidata_only_in_the_configured_order(monkeypatch, 
         assert book.series_index == "23.5"
 
 
+@pytest.mark.parametrize("query", [None, "", "  ", 123, []])
+def test_invalid_queries_make_no_requests(monkeypatch, query):
+    calls = _api(monkeypatch, {}, {})
+    assert wd.Wikidata().search(query) == []
+    assert calls == []
+
+
+@pytest.mark.parametrize("ordinal", ["NaN", "Infinity", "-Infinity", "1e9999"])
+def test_non_finite_series_positions_are_not_returned(monkeypatch, ordinal):
+    from copy import deepcopy
+    work = deepcopy(WORK)
+    work["claims"]["P179"] = [_series("Q200", ordinal)]
+    _api(monkeypatch, {"Q10": work}, _labels(Q100="James Patterson", Q200="Alex Cross"))
+    (record,) = wd.Wikidata().search("Cross Kill James Patterson")
+    assert record.series == "Alex Cross" and record.series_index == 0
+
+
 @pytest.mark.parametrize("enabled", [False, True])
 def test_manual_search_only_contacts_wikidata_after_user_opt_in(monkeypatch, enabled):
     """Exercise the real Flask handler and observe HTTP calls and wire results."""
@@ -182,6 +199,15 @@ def test_provider_settings_do_not_silently_enable_wikidata_for_ingest(monkeypatc
     assert provider["active"] is False
     assert provider["default_ingest_enabled"] is configured
 
+
+
+def test_manual_search_accepts_the_babel_locale_object(monkeypatch):
+    """Flask-Babel supplies a Locale, rather than a string, to providers."""
+    from babel import Locale
+    calls = _api(monkeypatch, {"Q10": WORK}, _labels(Q100="James Patterson", Q200="Alex Cross"))
+    (record,) = wd.Wikidata().search("Cross Kill James Patterson", locale=Locale.parse("fr_FR"))
+    assert record.title == "Cross Kill"  # English label fallback
+    assert calls[1][0]["languages"] == "fr|en"
 
 
 def test_explicit_disable_wins_over_configured_series_fill(monkeypatch):

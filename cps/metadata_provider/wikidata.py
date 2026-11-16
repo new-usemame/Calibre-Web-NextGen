@@ -19,6 +19,7 @@
 # whether a result is the book being fetched; Wikidata has no covers or
 # blurbs to offer, so none are returned.
 
+import math
 from typing import Dict, List, Optional
 
 import requests
@@ -34,8 +35,8 @@ class Wikidata(Metadata):
     __id__ = "wikidata"
     DESCRIPTION = "Wikidata"
     META_URL = "https://www.wikidata.org/"
-    # A series source for auto-fetch's series fill (#2684): asked when the
-    # record applied first left the series empty.
+    # A series source for auto-fetch's series fill (#2684), only when the
+    # administrator included Wikidata in the configured provider order.
     FILLS_SERIES = True
 
     API_URL = "https://www.wikidata.org/w/api.php"
@@ -49,12 +50,12 @@ class Wikidata(Metadata):
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
     ) -> Optional[List[MetaRecord]]:
-        if not self.active:
+        if not self.active or not isinstance(query, str):
             return []
         text = " ".join(self.get_title_tokens(query, strip_joiners=False)).strip()
         if not text:
             return []
-        language = (locale or "en").split("_")[0].split("-")[0].lower() or "en"
+        language = str(locale or "en").split("_")[0].split("-")[0].lower() or "en"
 
         # Only items with an author (P50): works, not people, places or podcasts.
         hits = self._call({
@@ -150,6 +151,8 @@ class Wikidata(Metadata):
                 try:
                     number = float(str(raw).strip())
                 except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(number):
                     continue
                 position = int(number) if number.is_integer() else number
                 break

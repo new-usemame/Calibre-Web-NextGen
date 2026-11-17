@@ -431,7 +431,7 @@ import os
 import sys
 
 volume_root, external_base = sys.argv[1:3]
-if not (os.path.isdir(volume_root) and os.path.ismount(volume_root)):
+if not (os.path.isdir(volume_root) and os.path.ismount(os.path.realpath(volume_root))):
     raise SystemExit(3)
 
 os.makedirs(external_base, exist_ok=True)

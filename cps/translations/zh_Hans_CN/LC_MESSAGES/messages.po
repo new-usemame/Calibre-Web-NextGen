@@ -4993,7 +4993,7 @@ msgid ""
 "Kobo and in KOReader? Your read status is not changed. A device that still "
 "holds its own position can send it back the next time it syncs."
 msgstr ""
-"清除您在网页阅读器、Kobo 阅读器和 KOReader 中保存的《{title}》阅读位置？"
+"清除您在网页阅读器、Kobo 阅读器和 KOReader 中保存的「{title}」阅读位置？"
 "您的阅读状态不会改变。设备中仍保留阅读位置的下次同步时可能会送回原处。"
 
 #: cps/spa_strings.py

@@ -1,4 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { test, expect, type Page } from '@playwright/test';
+import JSZip from 'jszip';
+import type { MetaResult } from '../src/lib/api';
 import { assertNoHorizontalOverflow } from './utils';
 
 /*
@@ -16,7 +20,7 @@ const HARDCOVER_SOURCE = { id: 'hardcover', description: 'Hardcover', link: 'htt
 
 // Title-level results: one Hardcover hit (offers Editions), one non-Hardcover
 // hit (must NOT offer Editions).
-const TITLE_RESULTS = [
+const TITLE_RESULTS: MetaResult[] = [
   {
     title: 'The Picture of Dorian Gray',
     authors: ['Oscar Wilde'],
@@ -34,8 +38,8 @@ const TITLE_RESULTS = [
     cover: '',
     identifiers: { openlibrary: 'OL123M' },
     publisher: 'Penguin',
-    publishedDate: '1949-01-01',
-    source: { id: 'openlibrary', description: 'Open Library', link: 'https://openlibrary.org' },
+    publishedDate: '2021',
+    source: { id: 'openlibrary', description: 'Open Library' },
   },
 ];
 
@@ -49,7 +53,7 @@ const EDITION_RESULTS = [
     cover: '',
     format: 'Physical Book',
     publisher: 'Penguin Classics',
-    publishedDate: '2003-02-04',
+    publishedDate: '2021-10-26',
     identifiers: { 'hardcover-id': '436692', 'hardcover-slug': 'the-picture-of-dorian-gray', 'hardcover-edition': '32701290', isbn: '9789815204230' },
     source: HARDCOVER_SOURCE,
   },
@@ -74,7 +78,7 @@ const EDITION_RESULTS = [
   },
 ];
 
-async function mockSearch(page: import('@playwright/test').Page, opts: { editionDelayMs?: number } = {}) {
+async function mockSearch(page: Page, opts: { editionDelayMs?: number; titleResults?: MetaResult[] } = {}) {
   await page.route('**/metadata/search', async (route) => {
     const body = route.request().postData() || '';
     const isEditionQuery = decodeURIComponent(body).includes('hardcover-id:');
@@ -85,15 +89,20 @@ async function mockSearch(page: import('@playwright/test').Page, opts: { edition
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        results: isEditionQuery ? EDITION_RESULTS : TITLE_RESULTS,
+        results: isEditionQuery ? EDITION_RESULTS : opts.titleResults ?? TITLE_RESULTS,
         providers: [{ id: 'hardcover', name: 'Hardcover', status: 'ok', count: 2, message: '' }],
       }),
     });
   });
 }
 
+async function searchFromEditor(page: Page) {
+  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
+  await page.getByRole('button', { name: /^Search$/ }).click();
+}
+
 /** Open the edit page of the first book in the grid and reveal the fetch panel. */
-async function openFetchPanel(page: import('@playwright/test').Page) {
+async function openFetchPanel(page: Page) {
   await page.goto('/app');
   const firstBook = page.locator('a[href*="/book/"]').first();
   await expect(firstBook).toBeVisible();
@@ -102,8 +111,7 @@ async function openFetchPanel(page: import('@playwright/test').Page) {
   expect(id, 'could not resolve a book id from the grid').toBeTruthy();
 
   await page.goto(`/app/book/${id}/edit`);
-  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
-  await page.getByRole('button', { name: /^Search$/ }).click();
+  await searchFromEditor(page);
   await expect(page.getByText('Hardcover Books')).toBeVisible();
 }
 
@@ -148,7 +156,9 @@ test('applying an edition merges its identifiers into the form', async ({ page }
   await page.getByRole('button', { name: /^Editions$/ }).click();
   const paperback = page.getByRole('listitem').filter({ hasText: 'The Picture of Dorian Gray (Paperback)' });
   await paperback.getByRole('button', { name: /choose fields/i }).click();
+  await expect(paperback.getByRole('checkbox', { name: 'Published 2021-10-26' })).toBeChecked();
   await paperback.getByRole('button', { name: /apply selected/i }).click();
+  await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-10-26');
 
   // The chosen edition's identifiers now populate the form's identifiers table.
   const idents = await page.evaluate(() => {
@@ -158,6 +168,99 @@ test('applying an edition merges its identifiers into the form', async ({ page }
   });
   expect(idents).toContainEqual({ type: 'hardcover-edition', val: '32701290' });
   expect(idents).toContainEqual({ type: 'isbn', val: '9789815204230' });
+});
+
+test('publication dates use provider precision and only apply when selected', async ({ page }) => {
+  const dates = [
+    { title: 'Month only', publishedDate: ' 2020-02 ', preview: '2020-02', value: '2020-02-01' },
+    { title: 'Timestamp with offset', publishedDate: '2020-02-29T23:30:00-05:00', preview: '2020-02-29', value: '2020-02-29' },
+    { title: 'Missing date', publishedDate: null },
+    { title: 'Impossible date', publishedDate: '2021-02-29' },
+    { title: 'Malformed date', publishedDate: '2021-10-26Tgarbage' },
+    { title: 'Sentinel date', publishedDate: '0101-01-01' },
+  ];
+  await mockSearch(page, {
+    titleResults: [...TITLE_RESULTS, ...dates.map(({ title, publishedDate }) => ({ title, publishedDate, authors: [], cover: '' }))],
+  });
+  await openFetchPanel(page);
+
+  const published = page.getByLabel('Published', { exact: true });
+  await published.fill('1980-05-06');
+  const openLibrary = page.getByRole('listitem').filter({ hasText: 'Penguin' });
+  await openLibrary.getByRole('button', { name: /choose fields/i }).click();
+  const year = openLibrary.getByRole('checkbox', { name: 'Published 2021' });
+  await expect(year).toBeChecked();
+  await year.uncheck();
+  await openLibrary.getByRole('button', { name: /apply selected/i }).click();
+  await expect(published).toHaveValue('1980-05-06');
+  await openLibrary.getByRole('button', { name: /choose fields/i }).click();
+  await year.check();
+  await openLibrary.getByRole('button', { name: /apply selected/i }).click();
+  await expect(published).toHaveValue('2021-01-01');
+
+  let expectedDate = '2021-01-01';
+  for (const { title, preview, value } of dates) {
+    const row = page.getByRole('listitem').filter({ hasText: title });
+    await row.getByRole('button', { name: /choose fields/i }).click();
+    if (preview && value) {
+      await expect(row.getByRole('checkbox', { name: `Published ${preview}` })).toBeChecked();
+      expectedDate = value;
+    } else {
+      await expect(row.getByRole('checkbox', { name: /^Published/ })).toHaveCount(0);
+    }
+    await row.getByRole('button', { name: /apply selected/i }).click();
+    await expect(published).toHaveValue(expectedDate);
+  }
+});
+
+test('saving a fetched publication year persists it when the editor reopens', async ({ page }) => {
+  test.setTimeout(90_000);
+  // Import an owned book so desktop, mobile, and other specs can save in parallel.
+  const uuid = randomUUID();
+  const title = `Publication date fixture ${uuid}`;
+  const zip = await JSZip.loadAsync(await readFile('../tests/fixtures/sample_books/reader_lookup_2400.epub'));
+  const packagePath = 'EPUB/package.opf';
+  const opf = await zip.file(packagePath)!.async('string');
+  zip.file(packagePath, opf.replace('urn:uuid:cwng-2400-reader-lookup-fixture', `urn:uuid:${uuid}`)
+    .replace('<dc:title>CWNG 2400 Reader Lookup Fixture</dc:title>', `<dc:title>${title}</dc:title>`));
+
+  const csrf = await page.request.get('/api/v1/auth/csrf');
+  expect(csrf.ok()).toBeTruthy();
+  const headers = { 'X-CSRFToken': (await csrf.json()).csrf_token };
+  const filename = `${uuid}.epub`;
+  const uploaded = await page.request.post('/api/v1/upload', {
+    headers,
+    multipart: { file: { name: filename, mimeType: 'application/epub+zip', buffer: await zip.generateAsync({ type: 'nodebuffer' }) } },
+  });
+  expect(uploaded.ok(), await uploaded.text()).toBeTruthy();
+  expect((await uploaded.json()).queued).toContain(filename);
+
+  let bookId: number | undefined;
+  try {
+    await expect.poll(async () => {
+      const books = await page.request.get('/api/v1/books?per_page=100&sort=new');
+      if (books.ok()) bookId = (await books.json()).items.find((book: { title: string }) => book.title === title)?.id;
+      return bookId;
+    }, { timeout: 45_000 }).toBeDefined();
+
+    const editUrl = `/app/book/${bookId}/edit`;
+    await mockSearch(page, { titleResults: [{ ...TITLE_RESULTS[1], title }] });
+    await page.goto(editUrl);
+    await searchFromEditor(page);
+    const row = page.getByRole('listitem').filter({ hasText: 'Penguin' });
+    await row.getByRole('button', { name: /choose fields/i }).click();
+    await row.getByRole('button', { name: /apply selected/i }).click();
+    await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-01-01');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}$`));
+    await page.goto(editUrl);
+    await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-01-01');
+  } finally {
+    if (bookId !== undefined) {
+      const deleted = await page.request.post(`/api/v1/books/${bookId}/delete`, { headers });
+      expect(deleted.status(), 'delete the temporary publication date book').toBe(204);
+    }
+  }
 });
 
 test('editions view has a Close, and reopening returns to the search form (not stranded)', async ({ page }) => {

@@ -543,6 +543,7 @@ def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
         _miss_diag_last.clear()
         _miss_diag_window["start"] = now
         _miss_diag_window["total"] = None
+        _miss_diag_window["damage_warned"] = False
     if document_checksum in _miss_diag_last:
         return ""
     if len(_miss_diag_last) >= _MISS_DIAG_MAX_TRACKED:
@@ -550,6 +551,8 @@ def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
     _miss_diag_last[document_checksum] = now
 
     try:
+        from sqlalchemy import text as sql_text
+
         from ... import calibre_db
         from ...db import BookFormatChecksum, Books
 
@@ -571,6 +574,43 @@ def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
                 "a checksum row exists for book id %s (%s) but that book is not "
                 "in the library; the id is stale, e.g. after a Calibre database "
                 "rebuild" % (stale[0], stale[1])
+            )
+        # Issue #2960: the lookup above and the stale-id check both go
+        # through the checksum index. If that index has lost entries (seen
+        # after a library file was written by two processes at once), the
+        # row exists and every plain read of the table finds it, but
+        # ``WHERE checksum = ?`` cannot. Look once more without the index so
+        # that case is named instead of reading as "never registered".
+        probe = (
+            "SELECT book, format FROM book_format_checksums NOT INDEXED "
+            "WHERE checksum = :checksum"
+        )
+        params = {"checksum": document_checksum}
+        if version is not None:
+            probe += " AND version = :version"
+            params["version"] = version
+        probe += " ORDER BY created DESC, version DESC LIMIT 1"
+        unindexed = calibre_db.session.execute(sql_text(probe), params).first()
+        if unindexed:
+            # The miss line carries the cause per checksum; this is the one
+            # line an admin filtering for warnings will see, once per window
+            # however many books are affected.
+            if not _miss_diag_window.get("damage_warned"):
+                _miss_diag_window["damage_warned"] = True
+                log.warning(
+                    "KOReader sync: checksum index damaged: book id %s (%s) "
+                    "has a row for checksum %s that the indexed lookup cannot "
+                    "find. Run PRAGMA integrity_check on the library's "
+                    "metadata.db and rebuild the file; other books may be "
+                    "affected too",
+                    unindexed[0], unindexed[1], document_checksum,
+                )
+            return (
+                "a checksum row exists for book id %s (%s) but the lookup by "
+                "checksum did not find it; if this repeats, the checksum "
+                "index in metadata.db is damaged. Run PRAGMA integrity_check "
+                "on the library's metadata.db and rebuild the file"
+                % (unindexed[0], unindexed[1])
             )
         total = _miss_diag_window["total"]
         if total is None:

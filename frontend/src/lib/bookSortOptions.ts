@@ -19,6 +19,12 @@ export const SORT_OPTIONS = [
 
 export type BookSortValue = (typeof SORT_OPTIONS)[number]['value'];
 
+// These sort by the book's numeric position in its series.
+export const SERIES_SORT_OPTIONS = [
+  { label: 'Series order', value: 'seriesasc' },
+  { label: 'Series order (reverse)', value: 'seriesdesc' },
+] as const;
+
 /** What the plain Library view opens on when the reader has expressed no choice. */
 export const DEFAULT_LIBRARY_SORT = 'recent';
 

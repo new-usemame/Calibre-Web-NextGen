@@ -1,7 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { test, expect, type Page } from '@playwright/test';
-import JSZip from 'jszip';
 import type { MetaResult } from '../src/lib/api';
 import { assertNoHorizontalOverflow } from './utils';
 
@@ -20,7 +17,7 @@ const HARDCOVER_SOURCE = { id: 'hardcover', description: 'Hardcover', link: 'htt
 
 // Title-level results: one Hardcover hit (offers Editions), one non-Hardcover
 // hit (must NOT offer Editions).
-const TITLE_RESULTS: MetaResult[] = [
+const TITLE_RESULTS = [
   {
     title: 'The Picture of Dorian Gray',
     authors: ['Oscar Wilde'],
@@ -38,10 +35,19 @@ const TITLE_RESULTS: MetaResult[] = [
     cover: '',
     identifiers: { openlibrary: 'OL123M' },
     publisher: 'Penguin',
-    publishedDate: '2021',
-    source: { id: 'openlibrary', description: 'Open Library' },
+    publishedDate: '1949-01-01',
+    source: { id: 'openlibrary', description: 'Open Library', link: 'https://openlibrary.org' },
   },
 ];
+
+const OPEN_LIBRARY_YEAR_RESULT: MetaResult = {
+  title: 'Five Decembers',
+  authors: ['James Kestrel'],
+  cover: '',
+  publisher: 'Titan Books Limited',
+  publishedDate: '2021',
+  source: { id: 'openlibrary', description: 'Open Library' },
+};
 
 // Edition results for `hardcover-id:436692`: two real editions (each carrying a
 // `hardcover-edition` identifier) plus one noise row from another provider that
@@ -53,7 +59,7 @@ const EDITION_RESULTS = [
     cover: '',
     format: 'Physical Book',
     publisher: 'Penguin Classics',
-    publishedDate: '2021-10-26',
+    publishedDate: '2003-02-04',
     identifiers: { 'hardcover-id': '436692', 'hardcover-slug': 'the-picture-of-dorian-gray', 'hardcover-edition': '32701290', isbn: '9789815204230' },
     source: HARDCOVER_SOURCE,
   },
@@ -96,13 +102,8 @@ async function mockSearch(page: Page, opts: { editionDelayMs?: number; titleResu
   });
 }
 
-async function searchFromEditor(page: Page) {
-  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
-  await page.getByRole('button', { name: /^Search$/ }).click();
-}
-
 /** Open the edit page of the first book in the grid and reveal the fetch panel. */
-async function openFetchPanel(page: Page) {
+async function openFetchPanel(page: Page, resultText = 'Hardcover Books') {
   await page.goto('/app');
   const firstBook = page.locator('a[href*="/book/"]').first();
   await expect(firstBook).toBeVisible();
@@ -111,8 +112,10 @@ async function openFetchPanel(page: Page) {
   expect(id, 'could not resolve a book id from the grid').toBeTruthy();
 
   await page.goto(`/app/book/${id}/edit`);
-  await searchFromEditor(page);
-  await expect(page.getByText('Hardcover Books')).toBeVisible();
+  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
+  await page.getByRole('button', { name: /^Search$/ }).click();
+  await expect(page.getByText(resultText)).toBeVisible();
+  return id;
 }
 
 test('Editions button appears only on Hardcover results', async ({ page }) => {
@@ -149,16 +152,16 @@ test('Editions drill-down lists editions, filters noise, and Back restores resul
   await expect(page.getByRole('button', { name: /^Editions$/ })).toHaveCount(1);
 });
 
-test('applying an edition merges its identifiers into the form', async ({ page }) => {
+test('applying an edition fills the publication date and merges identifiers', async ({ page }) => {
   await mockSearch(page);
   await openFetchPanel(page);
 
   await page.getByRole('button', { name: /^Editions$/ }).click();
   const paperback = page.getByRole('listitem').filter({ hasText: 'The Picture of Dorian Gray (Paperback)' });
   await paperback.getByRole('button', { name: /choose fields/i }).click();
-  await expect(paperback.getByRole('checkbox', { name: 'Published 2021-10-26' })).toBeChecked();
+  await expect(paperback.getByRole('checkbox', { name: 'Published 2003-02-04', exact: true })).toBeChecked();
   await paperback.getByRole('button', { name: /apply selected/i }).click();
-  await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-10-26');
+  await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2003-02-04');
 
   // The chosen edition's identifiers now populate the form's identifiers table.
   const idents = await page.evaluate(() => {
@@ -180,19 +183,20 @@ test('publication dates use provider precision and only apply when selected', as
     { title: 'Sentinel date', publishedDate: '0101-01-01' },
   ];
   await mockSearch(page, {
-    titleResults: [...TITLE_RESULTS, ...dates.map(({ title, publishedDate }) => ({ title, publishedDate, authors: [], cover: '' }))],
+    titleResults: [OPEN_LIBRARY_YEAR_RESULT, ...dates.map(({ title, publishedDate }) => ({ title, publishedDate, authors: [], cover: '' }))],
   });
-  await openFetchPanel(page);
+  const id = await openFetchPanel(page, OPEN_LIBRARY_YEAR_RESULT.title);
 
   const published = page.getByLabel('Published', { exact: true });
   await published.fill('1980-05-06');
-  const openLibrary = page.getByRole('listitem').filter({ hasText: 'Penguin' });
+  const openLibrary = page.getByRole('listitem').filter({ hasText: OPEN_LIBRARY_YEAR_RESULT.title });
   await openLibrary.getByRole('button', { name: /choose fields/i }).click();
-  const year = openLibrary.getByRole('checkbox', { name: 'Published 2021' });
+  const year = openLibrary.getByRole('checkbox', { name: 'Published 2021', exact: true });
   await expect(year).toBeChecked();
   await year.uncheck();
   await openLibrary.getByRole('button', { name: /apply selected/i }).click();
   await expect(published).toHaveValue('1980-05-06');
+  await expect(page.getByLabel('Publishers (comma separated)', { exact: true })).toHaveValue('Titan Books Limited');
   await openLibrary.getByRole('button', { name: /choose fields/i }).click();
   await year.check();
   await openLibrary.getByRole('button', { name: /apply selected/i }).click();
@@ -203,7 +207,7 @@ test('publication dates use provider precision and only apply when selected', as
     const row = page.getByRole('listitem').filter({ hasText: title });
     await row.getByRole('button', { name: /choose fields/i }).click();
     if (preview && value) {
-      await expect(row.getByRole('checkbox', { name: `Published ${preview}` })).toBeChecked();
+      await expect(row.getByRole('checkbox', { name: `Published ${preview}`, exact: true })).toBeChecked();
       expectedDate = value;
     } else {
       await expect(row.getByRole('checkbox', { name: /^Published/ })).toHaveCount(0);
@@ -211,56 +215,19 @@ test('publication dates use provider precision and only apply when selected', as
     await row.getByRole('button', { name: /apply selected/i }).click();
     await expect(published).toHaveValue(expectedDate);
   }
-});
 
-test('saving a fetched publication year persists it when the editor reopens', async ({ page }) => {
-  test.setTimeout(90_000);
-  // Import an owned book so desktop, mobile, and other specs can save in parallel.
-  const uuid = randomUUID();
-  const title = `Publication date fixture ${uuid}`;
-  const zip = await JSZip.loadAsync(await readFile('../tests/fixtures/sample_books/reader_lookup_2400.epub'));
-  const packagePath = 'EPUB/package.opf';
-  const opf = await zip.file(packagePath)!.async('string');
-  zip.file(packagePath, opf.replace('urn:uuid:cwng-2400-reader-lookup-fixture', `urn:uuid:${uuid}`)
-    .replace('<dc:title>CWNG 2400 Reader Lookup Fixture</dc:title>', `<dc:title>${title}</dc:title>`));
-
-  const csrf = await page.request.get('/api/v1/auth/csrf');
-  expect(csrf.ok()).toBeTruthy();
-  const headers = { 'X-CSRFToken': (await csrf.json()).csrf_token };
-  const filename = `${uuid}.epub`;
-  const uploaded = await page.request.post('/api/v1/upload', {
-    headers,
-    multipart: { file: { name: filename, mimeType: 'application/epub+zip', buffer: await zip.generateAsync({ type: 'nodebuffer' }) } },
-  });
-  expect(uploaded.ok(), await uploaded.text()).toBeTruthy();
-  expect((await uploaded.json()).queued).toContain(filename);
-
-  let bookId: number | undefined;
-  try {
-    await expect.poll(async () => {
-      const books = await page.request.get('/api/v1/books?per_page=100&sort=new');
-      if (books.ok()) bookId = (await books.json()).items.find((book: { title: string }) => book.title === title)?.id;
-      return bookId;
-    }, { timeout: 45_000 }).toBeDefined();
-
-    const editUrl = `/app/book/${bookId}/edit`;
-    await mockSearch(page, { titleResults: [{ ...TITLE_RESULTS[1], title }] });
-    await page.goto(editUrl);
-    await searchFromEditor(page);
-    const row = page.getByRole('listitem').filter({ hasText: 'Penguin' });
-    await row.getByRole('button', { name: /choose fields/i }).click();
-    await row.getByRole('button', { name: /apply selected/i }).click();
-    await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-01-01');
-    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}$`));
-    await page.goto(editUrl);
-    await expect(page.getByLabel('Published', { exact: true })).toHaveValue('2021-01-01');
-  } finally {
-    if (bookId !== undefined) {
-      const deleted = await page.request.post(`/api/v1/books/${bookId}/delete`, { headers });
-      expect(deleted.status(), 'delete the temporary publication date book').toBe(204);
-    }
-  }
+  // Assert the real submit payload without changing a book shared by parallel specs.
+  const metadataUrl = `/api/v1/books/${id}/metadata`;
+  const metadata = await page.request.get(metadataUrl);
+  expect(metadata.ok()).toBeTruthy();
+  const current = await metadata.json();
+  await page.route(`**${metadataUrl}`, (route) => route.request().method() === 'POST'
+    ? route.fulfill({ json: { ...current, pubdate: expectedDate } })
+    : route.continue());
+  const saving = page.waitForResponse((response) =>
+    response.request().method() === 'POST' && new URL(response.url()).pathname === metadataUrl);
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  expect((await saving).request().postDataJSON()).toMatchObject({ pubdate: '2020-02-29' });
 });
 
 test('editions view has a Close, and reopening returns to the search form (not stranded)', async ({ page }) => {

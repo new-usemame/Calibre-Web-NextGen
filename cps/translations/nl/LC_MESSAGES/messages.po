@@ -5111,6 +5111,28 @@ msgstr ""
 "of werk deze bij om te kiezen."
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr "Percentage van deze Kobo afstemmen op CrossPoint"
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr "Kan de percentage-instelling niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+"Standaard uit. Als dit aan staat en deze Kobo de huidige KEPUB heeft, wordt "
+"zijn positie gedeeld als het percentage dat CrossPoint daar toont, niet als "
+"het hele getal dat de Kobo meldt. KOReader, CrossPoint, Hardcover en de "
+"boekpagina krijgen dat percentage, dus de pagina die Hardcover toont "
+"verandert. De Kobo houdt zijn eigen waarde."
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "Boeken op dit apparaat"
 
@@ -6955,6 +6977,54 @@ msgstr "E-mailserver"
 #: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "E-mailinstellingen opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr "E-mail is ingesteld en klaar om te verzenden."
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr "E-mail is nog niet ingesteld. Voer een SMTP-server in en sla op."
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+"Gmail (OAuth) is geselecteerd maar niet geautoriseerd, dus e-mail staat uit. "
+"Gebruik hieronder standaard SMTP, of autoriseer Gmail in de klassieke "
+"instellingen."
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+"E-mail wordt nu via Gmail (OAuth) verzonden, dat in de klassieke "
+"instellingen is ingesteld. De SMTP-instellingen hieronder worden niet "
+"gebruikt."
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr "Gebruik in plaats daarvan standaard SMTP"
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr "Standaard SMTP wordt gebruikt zodra u opslaat."
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr "Opslaan en testmail verzenden"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+"Testmail in de wachtrij voor {email}. Bekijk de taken voor het resultaat."
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr "Kon de testmail niet verzenden."
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
@@ -11255,11 +11325,6 @@ msgstr "{seeded} van {total} boeken geïnitialiseerd"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "…and {count} more groups"
-msgstr "… en nog {count} groepen"
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -19645,6 +19710,10 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#, python-brace-format
+#~ msgid "…and {count} more groups"
+#~ msgstr "… en nog {count} groepen"
 
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."

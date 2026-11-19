@@ -97,10 +97,12 @@ def _assert_upgraded(engine):
 
     with engine.connect() as conn:
         shares = dict(conn.execute(text("SELECT id, share_place FROM device")).all())
+        alignments = dict(conn.execute(text("SELECT id, align_percent FROM device")).all())
         progress = conn.execute(text(
             "SELECT progress_percent FROM device_reading_position WHERE book_id = 42"
         )).scalar_one()
     assert shares == {1: 0, 2: 0, 3: 0}
+    assert alignments == {1: 0, 2: 0, 3: 0}
     assert progress == 37.5
 
     db = sessionmaker(bind=engine)()
@@ -149,6 +151,8 @@ def test_migration_turns_share_my_place_off_for_every_existing_device(tmp_path):
             "'auto')"), {"seen": SEEN})
         assert conn.execute(text(
             "SELECT share_place FROM device WHERE id = 4")).scalar_one() == 0
+        assert conn.execute(text(
+            "SELECT align_percent FROM device WHERE id = 4")).scalar_one() == 0
     engine.dispose()
 
 
@@ -166,6 +170,7 @@ def test_migration_is_idempotent_and_keeps_choices_made_after_the_first_run(tmp_
         ub.migrate_device_share_place(engine, session)
         with engine.begin() as conn:
             conn.execute(text("UPDATE device SET share_place = 1 WHERE id = 2"))
+            conn.execute(text("UPDATE device SET align_percent = 1 WHERE id = 1"))
             conn.execute(text(
                 "UPDATE device_reading_position SET reading_status = :finished",
             ), {"finished": ub.ReadBook.STATUS_FINISHED})
@@ -175,9 +180,11 @@ def test_migration_is_idempotent_and_keeps_choices_made_after_the_first_run(tmp_
 
     with engine.connect() as conn:
         shares = dict(conn.execute(text("SELECT id, share_place FROM device")).all())
+        alignments = dict(conn.execute(text("SELECT id, align_percent FROM device")).all())
         status = conn.execute(text(
             "SELECT reading_status FROM device_reading_position")).scalar_one()
     assert shares == {1: 0, 2: 1, 3: 0}
+    assert alignments == {1: 1, 2: 0, 3: 0}
     assert status == ub.ReadBook.STATUS_FINISHED
     engine.dispose()
 

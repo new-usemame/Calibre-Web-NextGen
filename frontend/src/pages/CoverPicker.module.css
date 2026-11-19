@@ -275,6 +275,10 @@
   background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text); font-size: var(--fs-sm);
 }
 
+/* Wrapper for the show/hide API-key field; takes over the flex sizing. */
+.keyWrap { flex: 1 1 120px; min-width: 100px; }
+.keyWrap .keyInput { width: 100%; box-sizing: border-box; }
+
 /* ---- confirm modal ---- */
 .overlay {
   position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--overlay-backdrop);

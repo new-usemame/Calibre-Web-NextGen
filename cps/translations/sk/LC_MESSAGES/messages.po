@@ -6416,6 +6416,10 @@ msgstr "Vytvára sa…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Orezať na vyplnenie — bez okraja, oreže okraje"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Aktuálne"
@@ -7298,7 +7302,7 @@ msgstr "Skryť knižnicu zariadenia"
 msgid "Hide fields"
 msgstr "Skryť polia"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Skryť heslo"
 
@@ -8676,6 +8680,10 @@ msgid "Recipient(s)"
 msgstr "Príjemcovia"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Hostiteľ presmerovania (úplná URL)"
 
@@ -9427,7 +9435,7 @@ msgstr "Zobraziť menej"
 msgid "Show more"
 msgstr "Zobraziť viac"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Zobraziť heslo"
 
@@ -11170,6 +11178,44 @@ msgstr "Hľadať názov, autora, sériu…"
 msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr "{failed} z {total} kníh sa nepodarilo pridať. Zostávajú vybrané."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -11956,6 +12002,29 @@ msgid "Could not change image fit. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr ""
 
@@ -11988,6 +12057,16 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -19208,6 +19287,18 @@ msgid "Reset user Password"
 msgstr "Resetovať heslo používateľa"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
+
+#: cps/templates/user_edit.html
 msgid "eReader Configuration"
 msgstr "Konfigurácia čítačky"
 
@@ -19362,6 +19453,13 @@ msgstr ""
 "Predvolene vypnuté. Fáza 0 len zachytáva údaje na obnovu a nemení anotácie "
 "vracané do vášho Kobo. Správca musí samostatne zapnúť prihlásenie na úrovni "
 "inštancie."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

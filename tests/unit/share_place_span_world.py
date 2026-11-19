@@ -206,9 +206,10 @@ def sw(monkeypatch, tmp_path):
         assert response.status_code == 200, response.get_data(as_text=True)
         assert response.get_json()["RequestResult"] == "Success"
 
-    def sync(device):
+    def sync(device, *, token=None):
         """One library/sync, handing back the previous token as Nickel does."""
-        headers = {header: tokens[device.id]} if tokens.get(device.id) else {}
+        incoming = token if token is not None else tokens.get(device.id)
+        headers = {header: incoming} if incoming else {}
         # The sync handler reads ``wsgi_app.is_proxied``; the KOReader half
         # needs the real wsgi_app for HTTP, so stand it in only for this call.
         real_wsgi_app, world.app.wsgi_app = world.app.wsgi_app, SimpleNamespace(is_proxied=True)

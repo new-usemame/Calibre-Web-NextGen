@@ -134,3 +134,10 @@
 .afterActions {
   margin-top: var(--sp-1);
 }
+
+.importProgress {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}

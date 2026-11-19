@@ -5110,6 +5110,13 @@ def _handle_unchecked_state_request(book, device_id):
     })
 
 
+# How far CrossPoint's percentage at a Kobo's span may sit from the Kobo's own whole-number
+# percentage and still be shared (#2887). The Kobo rounds down a measure taken on its KEPUB and
+# CrossPoint weighs EPUB bytes, so they differ by a point or two; a larger gap means the span
+# resolved to the wrong place, and the device's own value is shared instead.
+ALIGN_PERCENT_TOLERANCE = 5.0
+
+
 def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None,
                                       location=None, device_id=None, received_at=None):
     """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
@@ -5174,8 +5181,13 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
                                            location=location)
             except Exception:
                 log.debug("No CrossPoint percentage for book %s", book_id, exc_info=True)
-        if finer is not None:
+        if finer is not None and abs(finer - float(percentage)) <= ALIGN_PERCENT_TOLERANCE:
             percentage = finer
+        elif finer is not None:
+            # The two measures weigh a book differently, but not by this much: the span
+            # matched the wrong place. A furthest-wins row would hold every reader there.
+            log.info("Kobo reported %s%% for book %s but its span measures %.2f%%; sharing %s%%",
+                     percentage, book_id, finer, percentage)
         with ub.begin_contained_nested(ub.session):
             if report is None:
                 record_percentage_only_progress(

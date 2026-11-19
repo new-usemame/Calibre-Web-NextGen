@@ -1,4 +1,0 @@
-### Fixed
-
-- **The classic account form shows Library contents and OPDS Shelf Exposure on every server.** Both sat inside the "OAuth & API Integrations" card, which only appears when Kobo sync, Hardcover or an OAuth login is turned on. On a server with none of them, an administrator could not switch a user to My Library (or start it empty) from the classic user page, a user could not do it from their own profile, and every save of either form turned the account's "Expose only books in selected shelves to OPDS" off, because the form no longer sent the checkbox. They now have their own card.
-- **An upload watch that stalls on a failing server stops asking it.** When every check of the library failed, the watch reached its time limit but still retried its last check up to three times afterwards. It now cancels that retry when the watch ends.

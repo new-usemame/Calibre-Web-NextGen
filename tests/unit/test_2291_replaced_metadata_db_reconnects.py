@@ -36,6 +36,7 @@ CREATE TABLE custom_columns (id INTEGER PRIMARY KEY, label TEXT, name TEXT, data
 """
 
 _CLASS_STATE = ("_init", "engine", "config", "session_factory", "_desktop_compat",
+                "book_metadata_edits_available",
                 "_metadata_db_path", "_metadata_db_identity", "_metadata_db_content",
                 "_replacement_checked_at", "_replacement_candidate")
 

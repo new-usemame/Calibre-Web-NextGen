@@ -451,10 +451,18 @@ def _adapt_replayed_reading_states(body, device_id):
                 current = get_current_bookmark_response(mark) if mark is not None else None
                 # A saved inexact page deliberately has a different Location.
                 # The receipt isn't on the wire, so compare its bookmark clock
-                # and percentage; a newer shared change will have its own feed.
+                # and percentage. Exact web/KOReader places are delivered in
+                # Kobo's percentage units; held places retain the shared units.
+                # Accept either before rechecking this receiver's file proof.
+                same_progress = (current is not None and
+                                 cached.get("ProgressPercent") == current.get("ProgressPercent"))
+                if (current is not None and not same_progress
+                        and cached.get("LastModified") == current.get("LastModified")):
+                    converted = kobo_place_gate._with_kobo_percentage(book, mark, current)
+                    same_progress = cached.get("ProgressPercent") == converted.get("ProgressPercent")
                 superseded = (current is None or
                               cached.get("LastModified") != current.get("LastModified") or
-                              cached.get("ProgressPercent") != current.get("ProgressPercent"))
+                              not same_progress)
                 if superseded:
                     changed = True
                     if key == "ChangedReadingState":

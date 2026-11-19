@@ -376,6 +376,14 @@
   background: var(--accent-press);
 }
 
+/* Send can be disabled (no recipient ticked or typed, #1763): make that visible. */
+.actionPrimary:disabled,
+.actionPrimary[aria-disabled='true'] {
+  background: var(--accent);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Secondary text action in the ordered book row. */
 .actionSecondary {
   display: inline-flex;
@@ -779,6 +787,12 @@
 .sendOthers label {
   flex-wrap: wrap;
   min-height: 44px;
+  overflow-wrap: anywhere;
+}
+
+.sendAddress {
+  min-width: 0;
+  flex: 1 1 0;
   overflow-wrap: anywhere;
 }
 

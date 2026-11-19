@@ -6516,6 +6516,10 @@ msgstr "S'està creant…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Retalla per omplir: sense marges, es retallen les vores de la imatge"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Actual"
@@ -7412,7 +7416,7 @@ msgstr "Amaga la biblioteca del dispositiu"
 msgid "Hide fields"
 msgstr "Amaga camps"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Amaga la contrasenya"
 
@@ -8805,6 +8809,10 @@ msgid "Recipient(s)"
 msgstr "Destinataris"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Amfitrió de redirecció (URL completa)"
 
@@ -9563,7 +9571,7 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra'n més"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Mostra la contrasenya"
 
@@ -11341,6 +11349,44 @@ msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 "No s'han pogut afegir {failed} dels {total} llibres. Queden seleccionats."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -12147,6 +12193,29 @@ msgid "Could not change image fit. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr ""
 
@@ -12179,6 +12248,16 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -19515,6 +19594,17 @@ msgid "Reset user Password"
 msgstr "Restableix la contrasenya d'usuari"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+msgstr[1] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
+
+#: cps/templates/user_edit.html
 msgid "eReader Configuration"
 msgstr "Configuració del lector electrònic"
 
@@ -19675,6 +19765,13 @@ msgstr ""
 "Desactivada per defecte. La fase 0 només registra dades per recuperar "
 "l'estat anterior i no canvia les anotacions que rep el Kobo. L'administrador "
 "també ha d'activar l'opció general de la instància."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

@@ -1009,8 +1009,14 @@ jobs:
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
+      # The browser step is bimodal: about 30-60s when the apt mirror is quick,
+      # 200-600s when it is slow. On 2026-11-19, 7 of 25 runs hit the old 10m
+      # limit while packages were still arriving (run 44582337839 fetched its
+      # 121st package at 9m15s), so a slow mirror failed the gate rather than
+      # a hang. 20m covers the slow mode and still stops a real hang long
+      # before the job's 180m guard.
       - name: Install Playwright browsers
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: frontend
         run: npx playwright install --with-deps chromium webkit
 

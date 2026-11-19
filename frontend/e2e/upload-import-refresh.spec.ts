@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Request } from '@playwright/test';
 
 // Exercise the real upload mutation, app-shell watcher and catalog cache.
 // Only the upload/ingest hand-off is simulated: no shared library writes.
@@ -48,11 +48,11 @@ async function uploadScenario(page: Page, options: { missingBaseline?: boolean; 
   // Probe requests the browser has issued but not finished. The fake clock
   // only schedules a fetch; its request reaches the route in real time.
   let inFlight = 0;
-  const isProbe = (request: { url(): string }) => new URL(request.url()).searchParams.get('per_page') === '1';
+  const isProbe = (request: Request) => new URL(request.url()).searchParams.get('per_page') === '1';
+  const done = (request: Request) => { if (isProbe(request)) inFlight -= 1; };
   page.on('request', (request) => { if (isProbe(request)) inFlight += 1; });
-  for (const event of ['requestfinished', 'requestfailed'] as const) {
-    page.on(event, (request) => { if (isProbe(request)) inFlight -= 1; });
-  }
+  page.on('requestfinished', done);
+  page.on('requestfailed', done);
   return {
     title,
     arrive: () => { arrivals += 1; releaseProbe?.(); },

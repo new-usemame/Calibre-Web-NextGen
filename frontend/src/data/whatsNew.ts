@@ -110,13 +110,28 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         category: 'Library',
       },
       {
-        title: 'Account changes made elsewhere apply right away',
-        body: 'A password or role changed by an admin script or another process used to wait for a restart. It now takes effect on the next request, including for OPDS and reverse-proxy logins.',
+        title: 'Security updates and more ways to run it',
+        body: 'Images are now read with Pillow 13, which fixes critical decoder advisories, and the web reader\'s bundled XML parser is updated. NextGen can also run on NixOS without Docker, retained originals can live on another disk with CWA_PROCESSED_BOOKS_DIR, and Windows installs start cleanly.',
         category: 'Under the hood',
       },
       {
-        title: 'Security updates and more ways to run it',
-        body: 'Images are now read with Pillow 13, which fixes critical decoder advisories, and the web reader\'s bundled XML parser is updated. NextGen can also run on NixOS without Docker, retained originals can live on another disk with CWA_PROCESSED_BOOKS_DIR, and Windows installs start cleanly.',
+        title: 'Resolve duplicates automatically in the new UI',
+        body: 'The Duplicates page now has a Resolve automatically panel for administrators, as the classic view does. Pick a strategy such as newest, best format or most complete metadata, preview which books are kept and deleted, then confirm. Nothing is deleted until you confirm.',
+        category: 'Library',
+      },
+      {
+        title: 'Metadata edits reach a Kobo without a new download',
+        body: 'When only a book\'s metadata changed since the Kobo last synced it, the next sync updates its entry in My Books in place instead of downloading the book again. Publication-date-only edits in the classic editor now reach the next sync too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Hardcover journal entries name the right reader and page',
+        body: 'Every highlight sent to the Hardcover journal was tagged Kobo, and many showed page 0 or a page near the start of the book. Entries now name the reader they came from, and Hardcover shows the page where you made the highlight.',
+        category: 'Sync',
+      },
+      {
+        title: 'Account changes made elsewhere apply right away',
+        body: 'A password or role changed by an admin script or another process used to wait for a restart. It now takes effect on the next request, including for OPDS and reverse-proxy logins.',
         category: 'Under the hood',
       },
     ],

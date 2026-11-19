@@ -888,3 +888,71 @@ def test_owned_empty_and_object_noop_patch_bodies_answer_locally(
 
     assert response.status_code == 204
     assert response.get_data() == b""
+
+
+# --- #2958: with the store proxy off, checkforchanges is never forwarded. ---
+# The device's token is then one CWNG issued on /oauth/token, which
+# readingservices.kobo.com always rejects with 401 (reporter: 116 of 116 over
+# 14 days; 3 of 3 on a Clara BW, v4.1.70), shown on the device as a sync error.
+# "[]" is the device-measured safe answer: no annotations GET, highlights kept.
+# These tests override the module's proxy-on fixture where they need it off.
+
+
+def _2958_entries(*content_ids):
+    return [{"ContentId": c, "etag": f"etag-{c}"} for c in content_ids]
+
+
+def _2958_ownership(content_id):
+    return SimpleNamespace(id=347) if content_id == OWNED else None
+
+
+def _2958_post(app, entries):
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=entries,
+    ):
+        return rs.handle_check_for_changes.__wrapped__()
+
+
+@pytest.mark.parametrize("ids", [(FOREIGN,), (OWNED, FOREIGN), (FOREIGN, FOREIGN)])
+def test_proxy_off_answers_locally_and_never_contacts_kobo(app, monkeypatch, ids):
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", False, raising=False)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", _2958_ownership)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kw: pytest.fail("proxy off: a CWNG token can never succeed at Kobo"),
+    )
+    response = _2958_post(app, _2958_entries(*ids))
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_proxy_off_unknown_route_spelling_is_also_answered_locally(app, monkeypatch):
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", False, raising=False)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", _2958_ownership)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kw: pytest.fail("proxy off: must not forward"),
+    )
+    with app.test_request_context(
+        "/api/v3/content/CheckForChanges", method="POST", json=_2958_entries(FOREIGN),
+    ):
+        response = rs.handle_unknown_reading_service_request.__wrapped__(
+            "content/CheckForChanges",
+        )
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_proxy_on_still_forwards_foreign_ids_and_filters_owned(app, monkeypatch):
+    outbound = []
+
+    def _proxy(*, data):
+        outbound.extend(json.loads(data))
+        return jsonify([FOREIGN])
+
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", True, raising=False)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", _2958_ownership)
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", _proxy)
+    response = _2958_post(app, _2958_entries(OWNED, FOREIGN))
+    assert outbound == _2958_entries(FOREIGN)
+    assert response.get_json() == [FOREIGN]

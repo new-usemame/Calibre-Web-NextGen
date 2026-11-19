@@ -1,0 +1,47 @@
+2026-11-19T12:12:32.8639417Z ##[group]Run npx playwright install --with-deps chromium webkit
+2026-11-19T12:12:32.8640290Z [36;1mnpx playwright install --with-deps chromium webkit[0m
+2026-11-19T12:12:32.8659365Z shell: /usr/bin/bash -e {0}
+2026-11-19T12:12:32.8659930Z ##[endgroup]
+2026-11-19T12:12:33.6112863Z Installing dependencies...
+2026-11-19T12:12:33.6175176Z Switching to root user to install dependencies...
+2026-11-19T12:19:42.8903088Z Err:23 https://security.ubuntu.com/ubuntu noble/universe amd64 libhwy1t64 amd64 1.0.7-8.1build1
+2026-11-19T12:19:42.8904376Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:19:57.9070847Z Ign:25 https://archive.ubuntu.com/ubuntu noble/main amd64 libmp3lame0 amd64 3.100-6build1
+2026-11-19T12:19:57.9403601Z Ign:24 https://security.ubuntu.com/ubuntu noble-updates/universe amd64 libjxl0.7 amd64 0.7.0-10.2ubuntu6.1
+2026-11-19T12:19:57.9406416Z Err:24 mirror+file:/etc/apt/apt-mirrors.txt noble-updates/universe amd64 libjxl0.7 amd64 0.7.0-10.2ubuntu6.1
+2026-11-19T12:19:57.9407216Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:20:12.9560102Z Ign:26 https://archive.ubuntu.com/ubuntu noble/main amd64 libopus0 amd64 1.4-1build1
+2026-11-19T12:20:12.9941233Z Err:25 https://security.ubuntu.com/ubuntu noble/main amd64 libmp3lame0 amd64 3.100-6build1
+2026-11-19T12:20:12.9942438Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:20:28.0050210Z Ign:27 https://archive.ubuntu.com/ubuntu noble/universe amd64 librav1e0 amd64 0.7.1-2
+2026-11-19T12:20:28.0291795Z Err:26 https://security.ubuntu.com/ubuntu noble/main amd64 libopus0 amd64 1.4-1build1
+2026-11-19T12:20:28.0292556Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:20:43.0542455Z Ign:28 https://archive.ubuntu.com/ubuntu noble-updates/main amd64 librsvg2-2 amd64 2.58.0+dfsg-1ubuntu0.1
+2026-11-19T12:20:43.0804580Z Err:27 https://security.ubuntu.com/ubuntu noble/universe amd64 librav1e0 amd64 0.7.1-2
+2026-11-19T12:20:43.0805283Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:20:58.1026394Z Ign:29 https://archive.ubuntu.com/ubuntu noble/universe amd64 libshine3 amd64 3.1.1-2build1
+2026-11-19T12:20:58.1295055Z Ign:28 https://security.ubuntu.com/ubuntu noble-updates/main amd64 librsvg2-2 amd64 2.58.0+dfsg-1ubuntu0.1
+2026-11-19T12:20:58.1295922Z Err:28 mirror+file:/etc/apt/apt-mirrors.txt noble-updates/main amd64 librsvg2-2 amd64 2.58.0+dfsg-1ubuntu0.1
+2026-11-19T12:20:58.1296548Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:21:13.1509763Z Ign:18 https://security.ubuntu.com/ubuntu noble/universe amd64 ocl-icd-libopencl1 amd64 2.3.2-1build1
+2026-11-19T12:21:13.1804639Z Err:29 https://security.ubuntu.com/ubuntu noble/universe amd64 libshine3 amd64 3.1.1-2build1
+2026-11-19T12:21:13.1805364Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:21:28.2000114Z Ign:30 https://archive.ubuntu.com/ubuntu noble-updates/main amd64 libspeex1 amd64 1.2.1-2ubuntu2.24.04.1
+2026-11-19T12:21:28.2319087Z Err:18 https://security.ubuntu.com/ubuntu noble/universe amd64 ocl-icd-libopencl1 amd64 2.3.2-1build1
+2026-11-19T12:21:28.2320018Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:21:43.2488426Z Ign:31 https://archive.ubuntu.com/ubuntu noble/universe amd64 libsvtav1enc1d1 amd64 1.7.0+dfsg-2build1
+2026-11-19T12:21:43.2841736Z Err:30 https://security.ubuntu.com/ubuntu noble-updates/main amd64 libspeex1 amd64 1.2.1-2ubuntu2.24.04.1
+2026-11-19T12:21:43.2842436Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:21:58.2993104Z Ign:32 https://archive.ubuntu.com/ubuntu noble/universe amd64 libsoxr0 amd64 0.1.3-4build3
+2026-11-19T12:21:58.3360201Z Err:31 https://security.ubuntu.com/ubuntu noble/universe amd64 libsvtav1enc1d1 amd64 1.7.0+dfsg-2build1
+2026-11-19T12:21:58.3361285Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:22:13.3482841Z Ign:33 https://archive.ubuntu.com/ubuntu noble/universe amd64 libswresample4 amd64 7:6.1.1-3ubuntu5
+2026-11-19T12:22:13.3875450Z Err:32 https://security.ubuntu.com/ubuntu noble/universe amd64 libsoxr0 amd64 0.1.3-4build3
+2026-11-19T12:22:13.3877002Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:22:28.3963869Z Ign:34 https://archive.ubuntu.com/ubuntu noble/main amd64 libtheora0 amd64 1.1.1+dfsg.1-16.1build3
+2026-11-19T12:22:28.4297276Z Err:33 https://security.ubuntu.com/ubuntu noble/universe amd64 libswresample4 amd64 7:6.1.1-3ubuntu5
+2026-11-19T12:22:28.4298028Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:22:43.4462155Z Ign:35 https://archive.ubuntu.com/ubuntu noble/main amd64 libtwolame0 amd64 0.4.0-2build3
+2026-11-19T12:22:43.4793417Z Err:34 https://security.ubuntu.com/ubuntu noble/main amd64 libtheora0 amd64 1.1.1+dfsg.1-16.1build3
+2026-11-19T12:22:43.4794364Z   Unable to connect to azure.archive.ubuntu.com:http: [IP: 52.252.75.106 80]
+2026-11-19T12:22:45.3685436Z ##[error]The action 'Install Playwright browsers' has timed out after 10 minutes.

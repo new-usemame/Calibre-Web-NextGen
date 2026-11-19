@@ -96,7 +96,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'See your password as you type it',
         body: 'Password fields now have a show and hide button, and the new-user, profile and change-password forms list the password rules before you type instead of after a rejected save.',
         category: 'Account',
-        link: { to: '/account', label: 'Your account' },
+        link: { to: '/account', label: 'Open account settings' },
       },
       {
         title: 'Start a new user\'s My Library empty',

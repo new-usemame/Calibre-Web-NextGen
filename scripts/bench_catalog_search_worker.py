@@ -112,7 +112,7 @@ def measure():
                       "burst_statuses": statuses, "burst_probe_ms": burst_probe}), flush=True)
 
 
-def run():
+def run(scenario=None):
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         for name in ("config", "library", "ingest", "conversion"):
@@ -136,7 +136,10 @@ def run():
                         pass
                     time.sleep(0.25)
                 assert "Gevent server" in log.read_text(), "expected gevent listener"
-                measure()
+                if scenario is None:
+                    measure()
+                else:
+                    scenario(root)
             except Exception:
                 print(log.read_text()[-4000:], file=sys.stderr)
                 raise

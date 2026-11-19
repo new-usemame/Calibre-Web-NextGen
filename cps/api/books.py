@@ -1299,10 +1299,20 @@ def list_books():
         worker_enabled = os.environ.get("CWNG_EXPERIMENTAL_SEARCH_WORKER") == "1"
         if worker_enabled and search and (select_all or 0 < per_page <= 500):
             from ..services import catalog_search_worker
+            combined = None
+            if (not select_all and sort_context["sort"] == "new"
+                    and os.environ.get("CWNG_EXPERIMENTAL_SEARCH_SINGLE_SCAN") == "1"):
+                # Each ID has a single timestamp, even when the joins produce
+                # duplicates. Count the distinct, visible IDs before paging.
+                matches = query.with_entities(db.Books.id, db.Books.timestamp).order_by(None).distinct().subquery()
+                combined = select(matches.c.id, func.count().over()).order_by(
+                    matches.c.timestamp.desc(), matches.c.id.desc()
+                ).offset(offset).limit(per_page)
             try:
                 result = catalog_search_worker.select_page(
                     query.session, select(func.count()).select_from(counts.subquery()),
                     id_query.order_by(*order).offset(offset).limit(per_page).statement, request.environ,
+                    combined=combined,
                 )
             except catalog_search_worker.SearchBusy:
                 return jsonify({"error": {"code": "search_busy",

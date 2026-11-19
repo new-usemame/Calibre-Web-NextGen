@@ -6567,6 +6567,10 @@ msgstr "Erstelle…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Zuschneiden und ausfüllen – kein Rand, die Kanten werden abgeschnitten"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Aktuell"

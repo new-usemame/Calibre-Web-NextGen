@@ -6426,6 +6426,10 @@ msgstr "Aanmaken…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Bijsnijden om te vullen — geen rand, snijdt de randen bij"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr "CrossPoint"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Huidig"
@@ -19538,10 +19542,6 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
-
-#: cps/spa_strings.py
-msgid "CrossPoint"
-msgstr "CrossPoint"
 
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."

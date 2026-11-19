@@ -56,6 +56,67 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.71',
+    date: '2026-11-19',
+    items: [
+      {
+        title: 'New uploads show up in the library on their own',
+        body: 'The library used to refresh the moment an upload finished, before the import had run, so a new book only appeared after reloading the page. The app now follows the import and adds books to the library as they arrive, whether you uploaded one file or a few hundred.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload books' },
+      },
+      {
+        title: 'Pick which e-reader addresses to send to',
+        body: 'With several e-reader addresses saved, Send to e-reader put them all in one field, so sending to just one meant deleting the rest by hand. Each saved address now has its own tickbox, all ticked to start, and the free-text field is still there for one-off recipients.',
+        category: 'Reading',
+      },
+      {
+        title: 'A Kobo shelf shows the right percentage for a shared place',
+        body: 'The web reader and a Kobo measure a book differently, so the same place could read 26% in one and 16% on the Kobo shelf. A place sent to a Kobo now carries the percentage the Kobo itself would show for that page.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'KOReader: one swipe turns one library page',
+        body: 'With a plugin such as Simple UI installed, every swipe in the CWNG Sync library skipped two pages. It now turns one. A KOReader setup copied onto a different kind of e-reader also shows up as its own device instead of sharing the first one\'s place. Update the plugin from KOReader\'s Updates Manager to get both.',
+        category: 'Sync',
+      },
+      {
+        title: 'The Devices page says when smart shelves add nothing',
+        body: 'When the server\'s smart-shelf sync setting is off, a smart shelf picked for an e-reader added no books, and nothing said so. Those choices are now disabled with a note explaining the setting.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'See your password as you type it',
+        body: 'Password fields now have a show and hide button, and the new-user, profile and change-password forms list the password rules before you type instead of after a rejected save.',
+        category: 'Account',
+        link: { to: '/account', label: 'Your account' },
+      },
+      {
+        title: 'Start a new user\'s My Library empty',
+        body: 'Switching an account to My Library used to fill it with every book it could see. An administrator can now choose "Start My Library empty" so the user builds their own shelf from the global library.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Admin' },
+      },
+      {
+        title: 'Better metadata matches by ISBN',
+        body: 'Automatic metadata fetch now checks an ISBN\'s check digit before using it, matches an ISBN-10 to the same edition\'s ISBN-13, and no longer writes a provider\'s invalid ISBN to your book. The Google Scholar source also loads again on fresh installs.',
+        category: 'Library',
+      },
+      {
+        title: 'Account changes made elsewhere apply right away',
+        body: 'A password or role changed by an admin script or another process used to wait for a restart. It now takes effect on the next request, including for OPDS and reverse-proxy logins.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Security updates and more ways to run it',
+        body: 'Images are now read with Pillow 13, which fixes critical decoder advisories, and the web reader\'s bundled XML parser is updated. NextGen can also run on NixOS without Docker, retained originals can live on another disk with CWA_PROCESSED_BOOKS_DIR, and Windows installs start cleanly.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.70',
     date: '2026-11-15',
     items: [

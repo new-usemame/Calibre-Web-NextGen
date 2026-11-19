@@ -865,3 +865,26 @@ def test_an_identified_koreader_pulls_shared_clippings_and_excludes_foreign_ones
     body = pulled.get_json()
     assert [p["annotation_id"] for p in body["annotations"]] == ["a" * 32]
     assert body["foreign_annotation_ids"] == ["b" * 32]
+
+
+# -- accounts stay apart -------------------------------------------------------
+
+@pytest.mark.parametrize("device_id", ["shared-xteink", None])
+def test_another_account_cannot_read_delete_or_overwrite_a_clipping(world, device_id):
+    # Two accounts on the same server, on one reader (same device id) or with no device header.
+    world.add_user("bob")
+    alice, bob = dict(world.basic("alice")), dict(world.basic("bob"))
+    if device_id:
+        alice["X-CWNG-Device-ID"] = bob["X-CWNG-Device-ID"] = device_id
+    assert world.client.put(URL, headers=alice, json={"items": [item()]}).status_code == 200
+
+    seen = world.client.get(URL + "?format=reader", headers=bob)
+    assert seen.status_code == 200 and seen.get_json()["items"] == []
+
+    # bob sends a delete and then his own text for alice's clipping id
+    assert world.client.put(URL, headers=bob, json={"items": [{"id": "a" * 32, "deleted": 1}]}).status_code == 200
+    assert world.client.put(URL, headers=bob, json={"items": [item(text="bob text")]}).status_code == 200
+
+    mine = world.client.get(URL + "?format=reader", headers=alice).get_json()["items"]
+    assert [(c["deleted"], c["text"]) for c in mine] == [(0, item()["text"])]
+    assert "So we beat" not in world.client.get("/kosync/syncs/annotations/%d" % BOOK, headers=bob).get_data(as_text=True)

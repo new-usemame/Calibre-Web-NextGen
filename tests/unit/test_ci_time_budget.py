@@ -154,10 +154,40 @@ def test_a_stuck_kill_asks_for_the_code_fix_and_names_the_test():
     assert v.recommended is None
 
 
-def test_shorten_needs_twenty_quiet_runs_and_cuts_to_headroom_over_the_slowest():
-    v = ctb.judge(_limit(60, None), _samples([3.0] * 19 + [4.2]))
-    assert v.verdict == "shorten" and v.recommended == 10    # 1.5 x 4.2 = 6.3 -> 10
+def test_shorten_needs_twenty_quiet_runs_and_never_cuts_below_half_the_limit():
+    quiet = [3.0] * 19 + [4.2]
+    assert ctb.judge(_limit(60, None), _samples(quiet)).recommended == 30   # not 10: half of 60
+    assert ctb.judge(_limit(30, None), _samples(quiet)).recommended == 15   # the next pass halves again
+    v = ctb.judge(_limit(20, None), _samples(quiet))
+    assert v.verdict == "shorten" and v.recommended == 10    # 1.5 x 4.2 = 6.3 -> 10, at the floor
+    # one cold build in the window sets the cut, not the cache-hit p95
+    assert ctb.judge(_limit(60, None), _samples([3.0] * 19 + [25.0])).recommended == 40
     assert ctb.judge(_limit(60, None), _samples([3.0] * 18 + [4.2])).verdict == "ok"
+
+
+def _shortened(minutes=10, frm=60, on="2026-11-01"):
+    limit = _limit(minutes, None)
+    limit.shortened_on, limit.shortened_from = on, frm
+    return limit
+
+
+def test_an_advancing_kill_soon_after_our_own_shorten_restores_the_old_limit():
+    # a cold build at >3x the cache-hit median would otherwise be an outlier -> fix-code
+    samples = _samples([3.0] * 15, killed=1, limit=10)
+    v = ctb.judge(_shortened(), samples, today=ctb.dt.date(2026, 11, 19))
+    assert v.verdict == "raise" and v.recommended == 60
+    late = ctb.judge(_shortened(), _samples([3.0] * 15, killed=1, limit=10), today=ctb.dt.date(2026, 12, 15))
+    assert late.verdict == "fix-code"
+
+
+def test_a_shorten_marker_written_by_apply_is_read_back_as_the_value_to_restore():
+    limits = ctb.parse_workflow(WORKFLOW, "t.yml")
+    job = limits[0]
+    v = ctb.judge(job, _samples([3.0] * 19 + [4.2]))
+    assert (v.verdict, v.recommended) == ("shorten", 15)
+    after = ctb.apply_changes(WORKFLOW, [(job, 15, ctb.change_comment(v, "2026-11-19"))])
+    reread = ctb.parse_workflow(after, "t.yml")[0]
+    assert (reread.minutes, reread.shortened_on, reread.shortened_from) == (15, "2026-11-19", 25)
 
 
 def test_a_pin_or_a_growing_window_blocks_shortening():

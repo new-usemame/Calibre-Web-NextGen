@@ -79,6 +79,14 @@ class Thresholds:
     # new limit = headroom x p95, rounded up to the step below.
     headroom: float = 1.5
     round_to_minutes: int = 5
+    # one shorten never cuts below this share of the current limit, so a
+    # window of cache-hit builds converges in steps (60 -> 30 -> 15) instead
+    # of jumping straight under a cold build it never saw.
+    shorten_floor_fraction: float = 0.5
+    # an advancing kill (grew or outlier) within this many days of this
+    # tool's own shorten restores the pre-shorten value: the cut was wrong,
+    # and the outlier rule must not blame the code for it.
+    shorten_regret_days: int = 30
     # a run counts as killed by its limit when it ended failed/cancelled
     # within this many seconds of the wall (API timestamps are whole seconds).
     kill_slack_seconds: float = 15.0
@@ -111,6 +119,7 @@ THRESHOLDS = Thresholds()
 _TIMEOUT_RE = re.compile(r"^(?P<indent>\s*)(?P<dash>-\s+)?timeout-minutes:\s*(?P<value>\d+)\b")
 _KEY_RE = re.compile(r"^(?P<indent>\s*)(?P<dash>-\s+)?(?P<key>[A-Za-z0-9_-]+):\s*(?P<rest>.*)$")
 MARKER = "# ci-time-budget"
+_SHORTEN_MARK_RE = re.compile(r"#\s*ci-time-budget (\d{4}-\d\d-\d\d): shorten (\d+) -> (\d+) min")
 _PIN_RE = re.compile(r"#\s*ci-time-budget:\s*keep\b\s*(.*)$")
 
 
@@ -142,6 +151,8 @@ class Limit:
     minutes: int
     line: int                # 0-based line index of the timeout-minutes line
     pinned: str | None = None  # reason from a "# ci-time-budget: keep ..." comment
+    shortened_on: str | None = None   # date of this tool's last shorten, from its marker
+    shortened_from: int | None = None  # the value before that shorten
 
     @property
     def key(self) -> str:
@@ -264,6 +275,9 @@ def parse_workflow(text: str, workflow: str) -> list[Limit]:
         flush_job()
     for limit in limits:
         limit.pinned = _pin_for(lines, limit.line)
+        mark = _SHORTEN_MARK_RE.search(lines[limit.line - 1]) if limit.line else None
+        if mark and int(mark.group(3)) == limit.minutes:
+            limit.shortened_on, limit.shortened_from = mark.group(1), int(mark.group(2))
     limits.sort(key=lambda l: l.line)
     return limits
 
@@ -588,7 +602,7 @@ class Verdict:
 
 
 def judge(limit: Limit, samples: list[Sample], growth: dict | None = None,
-          th: Thresholds = THRESHOLDS) -> Verdict:
+          th: Thresholds = THRESHOLDS, today: dt.date | None = None) -> Verdict:
     """One verdict for one limit, with the numbers behind it."""
     healthy_main = [s for s in samples if s.on_main and s.conclusion == "success"]
     healthy = healthy_main
@@ -605,6 +619,10 @@ def judge(limit: Limit, samples: list[Sample], growth: dict | None = None,
     for k in kill_info:
         if k["kind"] == "grew" and p50 and limit.minutes > th.outlier_factor * p50:
             k["kind"], k["cause"] = "stuck", "outlier"
+    advancing = [k for k in kill_info if k["kind"] == "grew" or k.get("cause") == "outlier"]
+    today = today or dt.date.today()
+    regret = bool(limit.shortened_on and advancing and limit.shortened_from
+                  and (today - dt.date.fromisoformat(limit.shortened_on)).days <= th.shorten_regret_days)
     grew_kills = [k for k in kill_info if k["kind"] == "grew"]
     stuck_kills = [k for k in kill_info if k["kind"] == "stuck"]
     failing_kills = [k for k in kill_info if k["kind"] == "failing"]
@@ -632,16 +650,22 @@ def judge(limit: Limit, samples: list[Sample], growth: dict | None = None,
 
     # A limit whose only kills were stuck runs needs the code fixed first:
     # raising it would only make the same hang wait longer.
-    order = ["raise", "fix-code", "shorten"] if grew_kills else ["fix-code", "raise", "shorten"]
+    if regret:
+        reasons = {"raise": f"{len(advancing)} advancing kill(s) after this tool shortened it on "
+                            f"{limit.shortened_on}; restoring {limit.shortened_from}"}
+    order = ["raise", "fix-code", "shorten"] if grew_kills or regret else ["fix-code", "raise", "shorten"]
     found = [v for v in order if v in reasons]
     verdict = found[0] if found else "ok"
     recommended = None
-    if verdict == "raise":
+    if verdict == "raise" and regret:
+        recommended = max(limit.shortened_from, limit.minutes + th.round_to_minutes)
+    elif verdict == "raise":
         base = max([p95 or 0.0] + ([float(limit.minutes)] if grew_kills else []))
         recommended = max(round_up(th.headroom * base, th.round_to_minutes),
                           limit.minutes + th.round_to_minutes)
     elif verdict == "shorten":
-        recommended = round_up(th.headroom * mx, th.round_to_minutes)
+        recommended = max(round_up(th.headroom * mx, th.round_to_minutes),
+                          round_up(limit.minutes * th.shorten_floor_fraction, th.round_to_minutes))
         if recommended >= limit.minutes:
             verdict, recommended = "ok", None
             reasons.pop("shorten")

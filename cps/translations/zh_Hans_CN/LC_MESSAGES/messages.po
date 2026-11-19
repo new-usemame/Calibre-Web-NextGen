@@ -1446,8 +1446,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "重复扫描已完成（回退模式）"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "处理策略无效"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -6022,6 +6031,10 @@ msgid "Could not open the synced position."
 msgstr "无法打开已同步的阅读位置。"
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "无法读取此漫画压缩包。"
 
@@ -6056,6 +6069,10 @@ msgstr "无法向此设备请求删除。"
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "无法重置密码。"
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6286,6 +6303,10 @@ msgstr "默认设置位于“管理 → 配置 → Kobo 同步”。"
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "删除书籍"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7236,6 +7257,26 @@ msgid "Keep connection"
 msgstr "保留连接"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "密钥文件路径"
 
@@ -7554,6 +7595,10 @@ msgstr "最高评分"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "成员用户筛选"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7951,6 +7996,10 @@ msgid "Nothing requested yet."
 msgstr "还没有请求。"
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "尚无可预览的内容。"
 
@@ -8287,6 +8336,10 @@ msgstr "预览此位置"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "正在预览 {source}。其保存的阅读位置不会改变。"
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "上一个"
@@ -8617,6 +8670,15 @@ msgstr "重置 {name} 的密码吗？其当前密码将失效，新密码将通�
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "恢复默认设置"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9334,6 +9396,10 @@ msgstr "原厂 Kobo 同步 URL"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller 已配置，但无法连接。"
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -9940,6 +10006,12 @@ msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
 msgstr "此页面遇到错误，无法显示。您的书库没有问题，重新加载通常即可解决。"
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -10623,6 +10695,11 @@ msgstr "「{query}」的 {count} 个结果"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} / {total}"
 
@@ -10737,6 +10814,11 @@ msgstr "已初始化 {seeded} 本书的同步数据，共 {total} 本"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "…and {count} more groups"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -10941,6 +11023,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "微软雅黑"
 
@@ -10959,6 +11045,12 @@ msgstr "仅您的账户可见，不会更改共享的“简介”。"
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "在这里记录您对这本书的想法。"
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -10983,6 +11075,11 @@ msgstr "删除书评"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "删除您的书评吗？"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."

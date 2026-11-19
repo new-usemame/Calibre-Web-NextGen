@@ -1575,8 +1575,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "S'ha completat la cerca de duplicats (mètode alternatiu)."
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Estratègia de resolució no vàlida"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -6341,6 +6350,10 @@ msgid "Could not open the synced position."
 msgstr "No s'ha pogut obrir la posició sincronitzada."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "No s'ha pogut llegir aquest arxiu de còmics."
 
@@ -6375,6 +6388,10 @@ msgstr "No s'ha pogut sol·licitar la supressió d'aquest dispositiu."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "No s'ha pogut restablir la contrasenya."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6610,6 +6627,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Suprimeix llibres"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7604,6 +7625,26 @@ msgid "Keep connection"
 msgstr "Mantén la connexió"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Camí del fitxer de claus"
 
@@ -7931,6 +7972,10 @@ msgstr "Valoració màxima"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Filtre d'usuaris membres"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8346,6 +8391,10 @@ msgid "Nothing requested yet."
 msgstr "Encara no s'ha demanat res."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Encara no hi ha res per previsualitzar."
 
@@ -8696,6 +8745,10 @@ msgstr "Previsualitza aquest punt"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "S'està previsualitzant {source}. La posició desada no canviarà."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Anterior"
@@ -9034,6 +9087,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Restableix els valors predeterminats"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9779,6 +9841,10 @@ msgstr "URL de sincronització estàndard de Kobo"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller està configurat però no s'ha pogut contactar."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10457,6 +10523,12 @@ msgid ""
 msgstr ""
 "Aquesta pàgina ha tingut un error i no s'ha pogut mostrar. La biblioteca no "
 "s'ha vist afectada; normalment n'hi ha prou de tornar-la a carregar."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11177,6 +11249,11 @@ msgstr "{count} resultats per a «{query}»"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} de {total}"
 
@@ -11294,6 +11371,11 @@ msgstr "{seeded} de {total} llibres incorporats"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "…and {count} more groups"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -11506,6 +11588,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11524,6 +11610,12 @@ msgstr "Privat al vostre compte. Això no canvia la descripció compartida."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Conserveu aquí els vostres pensaments sobre aquest llibre."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11548,6 +11640,11 @@ msgstr "Suprimeix la ressenya"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Voleu suprimir la vostra ressenya?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."

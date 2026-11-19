@@ -20,6 +20,7 @@ from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
 from .cw_login import current_user
 from sqlalchemy.exc import OperationalError, IntegrityError, InterfaceError, InvalidRequestError
+from sqlalchemy.orm import with_parent
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.sql.expression import func
 
@@ -2601,7 +2602,7 @@ def remove_objects(db_book_object, db_session, del_elements):
             # ~40 s per deleted book on a 190k-book library.
             db_session.flush()
             still_used = (db_session.query(db.Books.id)
-                          .with_parent(del_element, type(del_element).books)
+                          .filter(with_parent(del_element, type(del_element).books))
                           .limit(1)
                           .first())
             if still_used is None:

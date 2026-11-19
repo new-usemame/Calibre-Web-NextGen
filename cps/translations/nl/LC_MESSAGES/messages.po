@@ -6965,12 +6965,22 @@ msgid "Mail is not configured yet. Enter an SMTP server and save."
 msgstr "E-mail is nog niet ingesteld. Voer een SMTP-server in en sla op."
 
 #: cps/spa_strings.py
-msgid "Gmail (OAuth) is selected but not authorised, so mail is switched off. Use standard SMTP below, or authorise Gmail in the classic settings."
-msgstr "Gmail (OAuth) is geselecteerd maar niet geautoriseerd, dus e-mail staat uit. Gebruik hieronder standaard SMTP, of autoriseer Gmail in de klassieke instellingen."
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+"Gmail (OAuth) is geselecteerd maar niet geautoriseerd, dus e-mail staat uit. "
+"Gebruik hieronder standaard SMTP, of autoriseer Gmail in de klassieke "
+"instellingen."
 
 #: cps/spa_strings.py
-msgid "Mail currently sends through Gmail (OAuth), which is set up in the classic settings. The SMTP settings below are not used."
-msgstr "E-mail wordt nu via Gmail (OAuth) verzonden, dat in de klassieke instellingen is ingesteld. De SMTP-instellingen hieronder worden niet gebruikt."
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+"E-mail wordt nu via Gmail (OAuth) verzonden, dat in de klassieke "
+"instellingen is ingesteld. De SMTP-instellingen hieronder worden niet "
+"gebruikt."
 
 #: cps/spa_strings.py
 msgid "Use standard SMTP instead"
@@ -6985,8 +6995,10 @@ msgid "Save and send test email"
 msgstr "Opslaan en testmail verzenden"
 
 #: cps/spa_strings.py
+#, python-brace-format
 msgid "Test email queued for {email}. Check Tasks for the result."
-msgstr "Testmail in de wachtrij voor {email}. Bekijk de taken voor het resultaat."
+msgstr ""
+"Testmail in de wachtrij voor {email}. Bekijk de taken voor het resultaat."
 
 #: cps/spa_strings.py
 msgid "Could not send the test email."

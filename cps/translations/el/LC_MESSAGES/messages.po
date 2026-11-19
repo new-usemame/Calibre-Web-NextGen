@@ -6719,6 +6719,47 @@ msgstr ""
 msgid "Email settings saved."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr ""

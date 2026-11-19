@@ -1537,8 +1537,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Skenovanie duplicít dokončené (náhradný režim)"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Neplatná stratégia riešenia"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -6241,6 +6250,10 @@ msgid "Could not open the synced position."
 msgstr "Synchronizovanú pozíciu sa nepodarilo otvoriť."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Tento archív komiksu sa nepodarilo prečítať."
 
@@ -6275,6 +6288,10 @@ msgstr "Zmazanie z tohto zariadenia sa nepodarilo vyžiadať."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Heslo sa nepodarilo obnoviť."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6507,6 +6524,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Mazať knihy"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7489,6 +7510,26 @@ msgid "Keep connection"
 msgstr "Ponechať pripojenie"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Cesta k súboru kľúča"
 
@@ -7815,6 +7856,10 @@ msgstr "Maximálne hodnotenie"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Filter členských používateľov"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8223,6 +8268,10 @@ msgid "Nothing requested yet."
 msgstr "Zatiaľ nebolo nič vyžiadané."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Zatiaľ nie je čo zobraziť."
 
@@ -8569,6 +8618,10 @@ msgstr "Náhľad tohto miesta"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Náhľad {source}. Jeho uložená pozícia sa nezmení."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Predchádzajúci"
@@ -8905,6 +8958,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Obnoviť predvolené"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9641,6 +9703,10 @@ msgstr "Pôvodná URL synchronizácie Kobo"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller je nakonfigurovaný, ale nie je dostupný."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10303,6 +10369,12 @@ msgid ""
 msgstr ""
 "Na tejto stránke sa vyskytla chyba a nedala sa zobraziť. S vašou knižnicou "
 "je všetko v poriadku — opätovné načítanie to zvyčajne vyrieši."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11007,6 +11079,11 @@ msgstr "Výsledky pre „{query}“: {count}"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} z {total}"
 
@@ -11124,6 +11201,11 @@ msgstr "Naplnené knihy: {seeded} z {total}"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "…and {count} more groups"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -11333,6 +11415,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11351,6 +11437,12 @@ msgstr "Súkromné pre váš účet. Zdieľaný Popis sa tým nemení."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Tu si uchovajte svoje myšlienky o tejto knihe."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11375,6 +11467,11 @@ msgstr "Zmazať recenziu"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Zmazať vašu recenziu?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."

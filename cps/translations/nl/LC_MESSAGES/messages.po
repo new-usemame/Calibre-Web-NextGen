@@ -1524,9 +1524,20 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Duplicaten scan voltooid"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr "Ongeldig oplossingsverzoek"
+
+#: cps/duplicates.py
 #, fuzzy
 msgid "Invalid resolution strategy"
 msgstr "Ongeldige rol"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
+"De duplicaatgroepen zijn gewijzigd. Bekijk het voorbeeld van de oplossing "
+"opnieuw voordat je verwijdert."
 
 #: cps/editbooks.py
 msgid ""
@@ -6250,6 +6261,10 @@ msgid "Could not open the synced position."
 msgstr "De gesynchroniseerde leespositie kon niet worden geopend."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr "Kan het voorbeeld van de oplossing niet laden."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Kan dit comic-archief niet lezen."
 
@@ -6284,6 +6299,10 @@ msgstr "Verwijdering van dit apparaat kon niet worden aangevraagd."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Kan wachtwoord niet herstellen."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr "Kan de duplicaten niet oplossen."
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6516,6 +6535,10 @@ msgstr "Standaardwaarden staan onder Beheer → Configuratie → Kobo sync."
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Boeken verwijderen"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr "Duplicaten verwijderen"
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7544,6 +7567,26 @@ msgid "Keep connection"
 msgstr "Verbinding behouden"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr "Beste formaat behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr "Grootste bestanden behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr "Meest complete metadata behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr "Nieuwste exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr "Oudste exemplaar behouden"
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Pad naar sleutelbestand"
 
@@ -7871,6 +7914,10 @@ msgstr "Maximale beoordeling"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Lid gebruiker filter"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr "Formaten samenvoegen in het nieuwste exemplaar"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8277,6 +8324,10 @@ msgid "Nothing requested yet."
 msgstr "Nog niets aangevraagd."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr "Niets te verwijderen met deze strategie."
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Nog niets om te tonen."
 
@@ -8623,6 +8674,10 @@ msgstr "Deze positie bekijken"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Voorvertoning van {source}. De opgeslagen positie verandert niet."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr "Voorbeeld laden…"
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Vorige"
@@ -8961,6 +9016,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Standaardwaarden herstellen"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr "Automatisch oplossen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr "{groups} groepen opgelost en {deleted} boeken verwijderd."
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9699,6 +9763,10 @@ msgstr "Synchronisatie-URL voor Kobo met standaardsoftware"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller is ingesteld maar kon niet worden bereikt."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr "Strategie"
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10376,6 +10444,14 @@ msgid ""
 msgstr ""
 "Deze pagina liep tegen een fout aan en kon niet worden weergegeven. Jouw "
 "bibliotheek is in orde — herladen lost het meestal op."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
+"Hiermee worden de extra exemplaren definitief uit je bibliotheek verwijderd. "
+"Dit kan niet ongedaan worden gemaakt."
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11092,6 +11168,11 @@ msgstr "{count} resultaten voor \"{query}\""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr "{deleted} boeken in {groups} groepen zouden worden verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} van {total}"
 
@@ -11210,6 +11291,11 @@ msgstr "{seeded} van {total} boeken geïnitialiseerd"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "…and {count} more groups"
+msgstr "… en nog {count} groepen"
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -11424,6 +11510,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr "Behouden"
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11443,6 +11533,14 @@ msgstr "Privé voor jouw account. Dit wijzigt de gedeelde Beschrijving niet."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Bewaar hier je gedachten over dit boek."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
+"Behoudt één boek per groep en verwijdert de andere exemplaren, volgens de "
+"gekozen strategie."
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11467,6 +11565,11 @@ msgstr "Recensie verwijderen"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Jouw recensie verwijderen?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr "{count} dubbele boeken verwijderen?"
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."

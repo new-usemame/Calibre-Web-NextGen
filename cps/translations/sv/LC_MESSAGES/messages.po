@@ -1513,8 +1513,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Dubblettsökning slutförd (reservläge)"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Ogiltig lösningsstrategi"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -6192,6 +6201,10 @@ msgid "Could not open the synced position."
 msgstr "Kunde inte öppna den synkroniserade positionen."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Kunde inte läsa detta seriearkiv."
 
@@ -6226,6 +6239,10 @@ msgstr "Kunde inte begära borttagning från den här enheten."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Kunde inte återställa lösenordet."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6458,6 +6475,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Ta bort böcker"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7422,6 +7443,26 @@ msgid "Keep connection"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Sökväg till nyckelfil"
 
@@ -7734,6 +7775,10 @@ msgstr "Högsta betyg"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Användarfilter för medlemmar"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8133,6 +8178,10 @@ msgid "Nothing requested yet."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Det finns inget att förhandsvisa ännu."
 
@@ -8473,6 +8522,10 @@ msgstr "Förhandsvisa den här platsen"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Förhandsvisar {source}. Den sparade positionen ändras inte."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Föregående"
@@ -8807,6 +8860,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Återställ till standardvärden"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9529,6 +9591,10 @@ msgstr "Standardwebbadress för Kobo-synkronisering"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller är konfigurerad men kunde inte nås."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10136,6 +10202,12 @@ msgid ""
 msgstr ""
 "Det uppstod ett fel på sidan och den kunde inte visas. Ditt bibliotek är "
 "intakt — det brukar lösa sig om du läser in sidan igen."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -10815,6 +10887,11 @@ msgstr "{count} resultat för \"{query}\""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} av {total}"
 
@@ -10928,6 +11005,11 @@ msgstr "{seeded} av {total} böcker har fyllts på"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "…and {count} more groups"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11129,6 +11211,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr ""
 
@@ -11146,6 +11232,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
@@ -11170,6 +11262,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html

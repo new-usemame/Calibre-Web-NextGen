@@ -389,10 +389,15 @@
         {% endif %}
       </div>
       {% endif %}
+    </div>
+    {% endif %}
 
-      {% if not content.role_anonymous() and not simple %}
-      <div style="margin-top: 25px;">
-        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('Library contents')}}</label>
+    <!-- Library Contents Card: every existing account has these settings, and saving the form
+         writes them, so they must not depend on Kobo, Hardcover or OAuth being enabled. -->
+    {% if not content.role_anonymous() and not simple and not new_user %}
+    <div class="settings-container" style="max-width: none; margin-inline: 0rem;">
+      <h4 class="settings-section-header">{{ _('Library contents')}}</h4>
+      <div>
         <div style="background: #202c34a3; padding: 2rem;">
           <div>
             <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
@@ -428,7 +433,6 @@
           <label for="opds_only_shelves_sync">{{_('Expose only books in selected shelves to OPDS')}}</label>
         </div>
       </div>
-      {% endif %}
     </div>
     {% endif %}
     

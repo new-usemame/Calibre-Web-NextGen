@@ -1626,8 +1626,19 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Recherche de doublons terminée (méthode de repli)"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr "Demande de résolution invalide"
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Stratégie de résolution non valide"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
+"Les groupes de doublons ont changé. Affichez à nouveau l’aperçu de la "
+"résolution avant de supprimer."
 
 #: cps/editbooks.py
 msgid ""
@@ -5293,6 +5304,28 @@ msgstr ""
 "d’extension NextGen Sync sur cet appareil pour choisir."
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr "Aligner le pourcentage de cette Kobo sur CrossPoint"
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr "Impossible d’enregistrer le réglage du pourcentage. Réessayez."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+"Désactivé par défaut. Une fois activé, et si cette Kobo contient le KEPUB "
+"actuel, sa position est partagée avec le pourcentage que CrossPoint affiche "
+"à cet endroit, et non avec le nombre entier que la Kobo indique. KOReader, "
+"CrossPoint, Hardcover et la page du livre reçoivent ce pourcentage, donc la "
+"page affichée par Hardcover change. La Kobo conserve sa propre valeur."
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "Livres sur cet appareil"
 
@@ -6445,6 +6478,10 @@ msgid "Could not open the synced position."
 msgstr "Impossible d’ouvrir la position synchronisée."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr "Impossible d’afficher l’aperçu de la résolution."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Impossible de lire cette archive de bande dessinée."
 
@@ -6479,6 +6516,10 @@ msgstr "Impossible de demander la suppression sur cet appareil."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Impossible de réinitialiser le mot de passe."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr "Impossible de résoudre les doublons."
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6621,6 +6662,10 @@ msgstr "Création…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Rogner pour remplir — sans bordure, rogne les bords"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr "CrossPoint"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Actuelle"
@@ -6711,6 +6756,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Supprimer des livres"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr "Supprimer les doublons"
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7129,6 +7178,56 @@ msgstr "Serveur de messagerie"
 #: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "Paramètres de messagerie enregistrés."
+
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr "Le courrier est configuré et prêt à l'envoi."
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+"Le courrier n'est pas encore configuré. Saisissez un serveur SMTP et "
+"enregistrez."
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+"Gmail (OAuth) est sélectionné mais n'est pas autorisé, donc le courrier est "
+"désactivé. Utilisez le SMTP standard ci-dessous, ou autorisez Gmail dans les "
+"paramètres classiques."
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+"Le courrier passe actuellement par Gmail (OAuth), configuré dans les "
+"paramètres classiques. Les paramètres SMTP ci-dessous ne sont pas utilisés."
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr "Utiliser plutôt le SMTP standard"
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr "Le SMTP standard sera utilisé une fois enregistré."
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr "Enregistrer et envoyer un e-mail de test"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+"E-mail de test mis en file d'attente pour {email}. Consultez les tâches pour "
+"le résultat."
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr "Impossible d'envoyer l'e-mail de test."
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
@@ -7710,6 +7809,26 @@ msgid "Keep connection"
 msgstr "Conserver la connexion"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr "Conserver le meilleur format"
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr "Conserver les fichiers les plus volumineux"
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr "Conserver les métadonnées les plus complètes"
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr "Conserver l’exemplaire le plus récent"
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr "Conserver l’exemplaire le plus ancien"
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Chemin du fichier de clé"
 
@@ -8037,6 +8156,10 @@ msgstr "Note maximale"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Filtre des utilisateurs membres"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr "Fusionner les formats dans l’exemplaire le plus récent"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8451,6 +8574,10 @@ msgid "Nothing requested yet."
 msgstr "Aucune demande pour l'instant."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr "Rien à supprimer avec cette stratégie."
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Rien à prévisualiser pour l'instant."
 
@@ -8798,6 +8925,10 @@ msgstr "Prévisualiser cette position"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Aperçu de {source}. Sa position enregistrée ne changera pas."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr "Aperçu en cours…"
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Précédent"
@@ -9137,6 +9268,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Réinitialiser les valeurs par défaut"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr "Résoudre automatiquement"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr "{groups} groupes résolus et {deleted} livres supprimés."
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9884,6 +10024,10 @@ msgstr "URL de synchronisation de la liseuse Kobo avec logiciel d’origine"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller est configuré, mais reste inaccessible."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr "Stratégie"
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10565,6 +10709,14 @@ msgid ""
 msgstr ""
 "Cette page a rencontré une erreur et n’a pas pu être affichée. Votre "
 "bibliothèque n’est pas affectée — recharger suffit généralement."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
+"Cela supprime définitivement les exemplaires en trop de votre bibliothèque. "
+"Cette action est irréversible."
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11287,6 +11439,11 @@ msgstr "{count} résultats pour « {query} »"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr "{deleted} livres répartis dans {groups} groupes seraient supprimés."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} sur {total}"
 
@@ -11619,6 +11776,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr "Conserver"
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11639,6 +11800,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Gardez ici vos impressions sur ce livre."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
+"Conserve un livre par groupe et supprime les autres exemplaires, selon la "
+"stratégie choisie."
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11663,6 +11832,11 @@ msgstr "Supprimer l’avis"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Supprimer votre avis ?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr "Supprimer {count} livres en double ?"
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."
@@ -20339,6 +20513,10 @@ msgstr "Exposer les étagères sélectionnées dans OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#, python-brace-format
+#~ msgid "…and {count} more groups"
+#~ msgstr "… et {count} autres groupes"
 
 #~ msgid "Progress is not being saved."
 #~ msgstr "La progression n’est pas enregistrée."

@@ -60,6 +60,9 @@ NON_SHIPPING_PATHS = frozenset(
         "scripts/alias-e2e-image.sh",
         "scripts/check_changelog_diff.py",
         "scripts/check-e2e-image-producer.py",
+        # Judges the workflows' timeout-minutes from Actions history; run by the
+        # autopilot, never by the application.
+        "scripts/ci_time_budget.py",
         "scripts/resolve-e2e-image.sh",
     }
 )

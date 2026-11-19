@@ -1440,8 +1440,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "重複掃描完成（fallback）"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "無效的解析策略"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -4862,6 +4871,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -5943,6 +5969,10 @@ msgid "Could not open the synced position."
 msgstr "無法開啟同步的進度。"
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "無法讀取此漫畫封存檔。"
 
@@ -5977,6 +6007,10 @@ msgstr "無法向此裝置請求刪除。"
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "無法重設密碼。"
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6115,6 +6149,10 @@ msgstr "正在建立…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "裁剪填滿—無邊框，裁切邊緣"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "目前"
@@ -6201,6 +6239,10 @@ msgstr "預設設定位於 管理 → 設定 → Kobo 同步。"
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "刪除書籍"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -6594,6 +6636,47 @@ msgstr "電子郵件伺服器"
 #: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "電子郵件設定已儲存。"
+
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
@@ -7141,6 +7224,26 @@ msgid "Keep connection"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "金鑰檔案路徑"
 
@@ -7453,6 +7556,10 @@ msgstr "最高評分"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "成員使用者篩選"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7845,6 +7952,10 @@ msgid "Nothing requested yet."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "尚無可預覽的內容。"
 
@@ -8166,6 +8277,10 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Previewing {source}. Its saved position will not change."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Previewing…"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
@@ -8494,6 +8609,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reset to defaults"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9201,6 +9325,10 @@ msgstr "原廠 Kobo 同步 URL"
 msgid "Storyteller is configured but could not be reached."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -9786,6 +9914,12 @@ msgstr ""
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10439,6 +10573,11 @@ msgstr "「{query}」的 {count} 個結果"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} / {total}"
 
@@ -10753,6 +10892,10 @@ msgid "KaiTi"
 msgstr "標楷體"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr ""
 
@@ -10770,6 +10913,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
@@ -10794,6 +10943,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html

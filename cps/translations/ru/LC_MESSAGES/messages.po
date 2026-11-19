@@ -1572,8 +1572,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Сканирование дубликатов завершено (резервный режим)"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Неверная стратегия обработки"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -5164,6 +5173,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -6289,6 +6315,10 @@ msgid "Could not open the synced position."
 msgstr "Не удалось открыть синхронизированную позицию."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Не удалось прочитать этот архив комикса."
 
@@ -6323,6 +6353,10 @@ msgstr "Не удалось запросить удаление с этого у
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Не удалось сбросить пароль."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6464,6 +6498,10 @@ msgstr "Создание…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Обрезать до заполнения — без рамок, обрезает края"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Текущий"
@@ -6553,6 +6591,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Удалить книги"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -6971,6 +7013,47 @@ msgstr "Почтовый сервер"
 #: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "Настройки электронной почты сохранены."
+
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
 
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
@@ -7546,6 +7629,26 @@ msgid "Keep connection"
 msgstr "Сохранить подключение"
 
 #: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Key file path"
 msgstr "Путь к файлу ключа"
 
@@ -7869,6 +7972,10 @@ msgstr "Максимальная оценка"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Фильтр пользователей-участников"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8278,6 +8385,10 @@ msgid "Nothing requested yet."
 msgstr "Пока ничего не запрошено."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Пока нет данных для предпросмотра."
 
@@ -8627,6 +8738,10 @@ msgstr "Предпросмотр этого места"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Предпросмотр {source}. Его сохранённая позиция не изменится."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Предыдущий"
@@ -8964,6 +9079,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Сбросить по умолчанию"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9706,6 +9830,10 @@ msgstr "URL для стандартной синхронизации Kobo"
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller настроен, но недоступен."
 
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
@@ -10380,6 +10508,12 @@ msgid ""
 msgstr ""
 "На этой странице произошла ошибка, и её не удалось отобразить. С вашей "
 "библиотекой всё в порядке — обычно помогает перезагрузка страницы."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11090,6 +11224,11 @@ msgstr "Результатов для «{query}»: {count}"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} из {total}"
 
@@ -11418,6 +11557,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11436,6 +11579,12 @@ msgstr "Приватно для вашего аккаунта. Это не из�
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Сохраняйте свои мысли об этой книге здесь."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11460,6 +11609,11 @@ msgstr "Удалить отзыв"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Удалить ваш отзыв?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."

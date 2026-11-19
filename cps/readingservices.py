@@ -1235,15 +1235,17 @@ class EpubProgressCalculator:
             return None
 
         normalized_chapter = chapter_filename.replace('\\', '/')
-        target_chapter_index = None
-        
-        for idx, spine_item in enumerate(self.spine_items):
-            if normalized_chapter in spine_item or spine_item.endswith(normalized_chapter):
-                target_chapter_index = idx
-                break
-        
-        if target_chapter_index is None:
+        matches = [idx for idx, item in enumerate(self.spine_items)
+                   if item == normalized_chapter]
+        if not matches:
+            # Kobo may omit the OPF directory. Match complete path components;
+            # c1.html must not match intro-c1.html, and an ambiguous basename
+            # supplies no trustworthy position.
+            matches = [idx for idx, item in enumerate(self.spine_items)
+                       if item.endswith('/' + normalized_chapter)]
+        if len(matches) != 1:
             return None
+        target_chapter_index = matches[0]
         
         chars_before = sum(self.chapter_lengths[:target_chapter_index])
         chars_in_chapter = self.chapter_lengths[target_chapter_index]

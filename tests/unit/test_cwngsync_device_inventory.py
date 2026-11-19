@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Phase 1 device-inventory contract for the CWNGSync KOReader plugin."""
 
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
 from flask import Flask
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from cps import ub
+import cps
+from cps import db, ub
 
 
 UNKNOWN_CHECKSUM = "0123456789abcdef0123456789abcdef"
@@ -33,15 +35,13 @@ def inventory_protocol(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: True)
     monkeypatch.setattr(module, "authenticate_user", lambda: current_user)
 
-    matches = {
-        EPUB_CHECKSUM: (42, "EPUB", "Same work", "Author/Same work", "koreader"),
-        MOBI_CHECKSUM: (42, "MOBI", "Same work", "Author/Same work", "koreader"),
-    }
-    monkeypatch.setattr(
-        module,
-        "get_book_by_checksum",
-        lambda checksum: matches.get(checksum, (None, None, None, None, None)),
-    )
+    db.Books.__table__.create(engine)
+    db.BookFormatChecksum.__table__.create(engine)
+    session.execute(db.Books.__table__.insert().values(id=42, title="Same work"))
+    session.add_all([db.BookFormatChecksum(42, "EPUB", EPUB_CHECKSUM),
+                     db.BookFormatChecksum(42, "MOBI", MOBI_CHECKSUM)])
+    session.commit()
+    monkeypatch.setattr(cps, "calibre_db", SimpleNamespace(session=session))
 
     app = Flask(__name__)
     app.secret_key = "inventory-test-secret"
@@ -139,6 +139,63 @@ def test_different_format_checksums_converge_on_the_same_work(inventory_protocol
     assert {item.checksum for item in items} == {EPUB_CHECKSUM, MOBI_CHECKSUM}
     # A client-supplied hint is never authoritative over checksum resolution.
     assert all(item.book_id != 999 for item in items)
+
+
+@pytest.mark.unit
+def test_inventory_keeps_observations_when_checksum_table_is_unavailable(inventory_protocol):
+    client, session, _user = inventory_protocol
+    db.BookFormatChecksum.__table__.drop(session.get_bind())
+
+    response = _report(client, [_entry("One.epub", EPUB_CHECKSUM)])
+    assert response.status_code == 200
+    assert response.get_json()["matched"] == 0
+    assert session.query(ub.DeviceInventoryItem).one().checksum == EPUB_CHECKSUM
+
+
+@pytest.mark.unit
+def test_inventory_prefers_newest_live_checksum_and_counts_each_path(inventory_protocol):
+    client, session, _user = inventory_protocol
+    session.execute(db.Books.__table__.insert().values(id=43, title="Another copy"))
+    latest = db.BookFormatChecksum(43, "PDF", EPUB_CHECKSUM)
+    latest.created = datetime(2090, 1, 1)
+    stale = db.BookFormatChecksum(999, "PDF", EPUB_CHECKSUM)
+    stale.created = datetime(2091, 1, 1)
+    session.add_all([latest, stale])
+    session.commit()
+
+    response = _report(client, [_entry("One.epub", EPUB_CHECKSUM), _entry("Two.epub", EPUB_CHECKSUM)])
+    assert response.status_code == 200
+    assert response.get_json()["matched"] == 2
+    assert [item.book_id for item in session.query(ub.DeviceInventoryItem)] == [43, 43]
+
+
+@pytest.mark.unit
+def test_refreshing_1000_known_files_batches_the_inventory_lookups(inventory_protocol):
+    client, session, _user = inventory_protocol
+    entries = [_entry(f"Books/{i}.epub", f"{i:032x}") for i in range(1000)]
+    session.add_all([db.BookFormatChecksum(42, "EPUB", entry["checksum"])
+                     for entry in entries])
+    session.commit()
+    assert _report(client, entries).get_json()["matched"] == len(entries)
+    first = session.query(ub.DeviceInventoryItem).filter_by(lpath=entries[0]["lpath"]).one()
+    first_seen = first.first_seen_at
+    selects = []
+
+    @event.listens_for(session.get_bind(), "before_cursor_execute")
+    def count_inventory_selects(_conn, _cursor, sql, _params, _ctx, _many):
+        if sql.startswith("SELECT") and any(
+                table in sql for table in ("book_format_checksums", "device_inventory_item")):
+            selects.append(sql)
+
+    entries[0]["size"] += 100
+    result = _report(client, entries)
+    assert result.status_code == 200
+    assert result.get_json()["matched"] == len(entries)
+    assert len(selects) <= 5, f"{len(selects)} inventory SELECTs"
+    session.refresh(first)
+    assert first.size == entries[0]["size"]
+    assert first.first_seen_at == first_seen
+    assert first.last_report_id == result.get_json()["report_id"]
 
 
 @pytest.mark.unit

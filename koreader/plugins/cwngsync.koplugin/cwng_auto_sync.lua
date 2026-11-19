@@ -387,6 +387,8 @@ end
 -- Checking the delivery queue scans the device and uploads its inventory.
 -- A tiny timestamp on disk shares the cooldown across book opens and restarts.
 function AutoSync:checkDeliveriesIfDue()
+    -- Wi-Fi may have disconnected while the pending reading updates flushed.
+    if not NetworkMgr:isConnected() then return end
     local owner = require("ffi/sha2").md5(self:accountOwner())
     local path = require("datastorage"):getSettingsDir() .. "/cwngsync_delivery_" .. owner
     local now = os.time()

@@ -132,7 +132,14 @@ local function testAutomaticDeliveryCooldown()
         }, { __index = require("cwng_auto_sync") })
     end
     local reader = instance("first")
+    local network = require("ui/network/manager")
+    local connected = network.isConnected
+    network.isConnected = function() return false end
     reader:checkDeliveriesIfDue()
+    assertEqual(checks, 0, "a queued callback after disconnect skips the inventory")
+    network.isConnected = connected
+    reader:checkDeliveriesIfDue()
+    assertEqual(checks, 1, "the first online check is still due")
     now = now + 299
     package.loaded["cwng_auto_sync"] = nil
     local browser = instance("first")

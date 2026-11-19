@@ -222,3 +222,87 @@ def test_metadata_edit_keeps_reading_state_separate_and_is_not_new_for_known_dev
     [state] = [item["ChangedReadingState"]["ReadingState"]
                for item in items if "ChangedReadingState" in item]
     assert state["CurrentBookmark"]["ProgressPercent"] == 42.0
+
+
+def test_file_replaced_between_two_synced_title_edits_gets_full_delivery(metadata_sync):
+    """A file change splits the metadata-edit run even after the device synced the first edit."""
+    harness, cursor = metadata_sync
+    book = harness.book
+    book.title = "First edit"
+    helper.mark_book_modified(book, set_dirty=False, metadata_only=True)
+    harness.session.commit()
+    first = harness.sync(cursor)
+    assert any("ChangedProductMetadata" in item for item in first.get_json())
+    cursor = first.headers["x-kobo-synctoken"]
+
+    book.data[0].uncompressed_size += 10
+    helper.mark_book_modified(book, set_dirty=False)
+    harness.session.commit()
+    book.title = "Second edit"
+    helper.mark_book_modified(book, set_dirty=False, metadata_only=True)
+    harness.session.commit()
+
+    items = harness.sync(cursor).get_json()
+    assert not any("ChangedProductMetadata" in item for item in items)
+    [entitlement] = [item["ChangedEntitlement"] for item in items if "ChangedEntitlement" in item]
+    assert entitlement["BookMetadata"]["Title"] == "Second edit"
+
+
+def _classic_save(harness, url="/admin/book/{}", **form):
+    data = {"authors": "Author", "comments": "", "pubdate": "2019-01-01", "detail_view": "1"}
+    data.update(form)
+    response = harness.app.test_client().post(url.format(harness.book.id), data=data)
+    assert response.status_code == 302
+
+
+def _assert_full_delivery(harness, cursor, title):
+    items = harness.sync(cursor).get_json()
+    assert not any("ChangedProductMetadata" in item for item in items)
+    entitlements = [item.get("ChangedEntitlement") or item.get("NewEntitlement")
+                    for item in items if "ChangedEntitlement" in item or "NewEntitlement" in item]
+    assert [e["BookMetadata"]["Title"] for e in entitlements] == [title]
+
+
+def test_classic_save_with_a_format_upload_is_not_metadata_only(classic_editor, monkeypatch):
+    """A title edit saved together with a new book file must re-deliver the file."""
+    harness, cursor = classic_editor
+    written = []
+
+    def upload_book_formats(files, book, book_id, no_cover=True):
+        book.data[0].uncompressed_size += 10
+        written.append(files)
+        return editbooks.request.form.to_dict(), False, True
+
+    monkeypatch.setattr(editbooks, "upload_book_formats", upload_book_formats)
+    harness.app.add_url_rule(
+        "/admin/book/<int:book_id>/with-format", endpoint="edit_with_format", methods=["POST"],
+        view_func=lambda book_id: editbooks.do_edit_book(book_id, upload_formats=["new.epub"]),
+    )
+    _classic_save(harness, "/admin/book/{}/with-format", title="Retitled with file")
+    assert written == [["new.epub"]]
+    assert harness.session.query(db.BookMetadataEdit).count() == 0
+    _assert_full_delivery(harness, cursor, "Retitled with file")
+
+
+def test_classic_save_with_a_cover_upload_is_not_metadata_only(classic_editor, monkeypatch):
+    """A title edit saved together with a replacement cover must not be a metadata-only change."""
+    harness, cursor = classic_editor
+    harness.book.has_cover = 1
+    harness.session.commit()
+    published = []
+
+    class _Stage:
+        def publish(self):
+            published.append(True)
+            return True, None
+
+        def discard(self):
+            raise AssertionError("a published cover must not be discarded")
+
+    monkeypatch.setattr(editbooks, "upload_cover", lambda _request, _book: _Stage())
+    # Directory renames have their own suite; keep the title edit in this save.
+    monkeypatch.setattr(helper, "update_dir_structure", lambda *_a, **_kw: False)
+    _classic_save(harness, title="Retitled with cover")
+    assert published == [True]
+    assert harness.session.query(db.BookMetadataEdit).count() == 0
+    _assert_full_delivery(harness, cursor, "Retitled with cover")

@@ -1659,6 +1659,17 @@ def _handle_check_for_changes():
     outbound_entries = _filter_check_for_changes_entries(entries, filtered_ids)
     if not outbound_entries:
         return jsonify([])
+    if not config.config_kobo_proxy:
+        # With the store proxy off the device's bearer token is one CWNG issued
+        # on /oauth/token, which readingservices.kobo.com always rejects with
+        # 401 (#2958), and a 401 surfaces on the device as a sync error. "[]"
+        # is the answer measured safe on hardware: Nickel then sends no
+        # annotations GET and keeps its local highlights for these books.
+        log.debug(
+            "Kobo store proxy is off; answering checkforchanges locally for "
+            "%d non-library content id(s)", len(outbound_entries),
+        )
+        return jsonify([])
 
     outbound_body = json.dumps(
         outbound_entries, separators=(",", ":")

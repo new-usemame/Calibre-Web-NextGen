@@ -13,6 +13,16 @@ from flask import Flask, jsonify, make_response
 import cps.readingservices as rs
 
 
+@pytest.fixture(autouse=True)
+def _kobo_store_proxy_on(monkeypatch):
+    """These cases pin forwarding, which only happens with the store proxy on.
+
+    With it off, checkforchanges is answered locally (#2958,
+    test_2958_proxy_off_checkforchanges.py).
+    """
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", True, raising=False)
+
+
 OWNED = "9e5251ad-d530-4e58-9121-8b8336099fdd"
 FOREIGN = "kobo-store-content"
 

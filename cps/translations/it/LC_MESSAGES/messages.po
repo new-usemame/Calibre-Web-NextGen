@@ -6423,6 +6423,10 @@ msgstr "Creazione in corso…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Ritaglio a tutto schermo — senza bordo, ritaglia i bordi"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Attuale"

@@ -4937,6 +4937,23 @@ msgstr ""
 "始终共享阅读位置。请在此设备上安装或更新 NextGen Sync 插件，以便自行选择。"
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "此设备上的书籍"
 

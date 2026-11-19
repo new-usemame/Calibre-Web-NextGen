@@ -5987,13 +5987,37 @@ def HandleAuthRequest():
 
 
 
+def _kobo_device_url_for(endpoint, **values):
+    """Absolute URL a Kobo should use to reach ``endpoint``.
+
+    A request that did not come through a reverse proxy reaches us on whatever
+    port the device used, and ``url_for(_external=True)`` builds the URL from
+    the ``Host`` header, so a Host without a port gives a URL on port 80.
+    ``HandleInitRequest`` already rebuilds ``library_sync``, ``image_host`` and
+    ``reading_services_host`` on ``config_external_port`` for that case; the
+    OAuth URLs have to agree with them, or the device follows the first URLs
+    to the app and the OAuth ones to whatever is listening on port 80.
+    """
+    if current_app.wsgi_app.is_proxied:
+        return url_for(endpoint, _external=True, **values)
+    if ':' in request.host and not request.host.endswith(']'):
+        host = "".join(request.host.split(':')[:-1])
+    else:
+        host = request.host
+    return "{scheme}://{host}:{port}{path}".format(
+        scheme=request.scheme,
+        host=host,
+        port=config.config_external_port,
+        path=url_for(endpoint, **values),
+    )
+
+
 @csrf.exempt
 @kobo.route('/oauth/.well-known/openid-configuration', methods=['GET', 'POST'])
 @requires_kobo_auth
 def HandleOidcDiscovery():
-    base_url = url_for("kobo.HandleOauthRequest",
-                       auth_token=get_auth_token(),
-                       _external=True).rsplit("/oauth", 1)[0]
+    base_url = _kobo_device_url_for("kobo.HandleOauthRequest",
+                                    auth_token=get_auth_token()).rsplit("/oauth", 1)[0]
     payload = {
         'issuer': base_url,
         'authorization_endpoint': base_url + '/oauth/authorize',
@@ -6138,9 +6162,8 @@ def HandleInitRequest():
     # When not proxying Kobo Store requests, point oauth_host to CWA and
     # serve dummy OAuth responses for unregistered devices.
     if not config.config_kobo_proxy:
-        oauth_token_url = url_for("kobo.HandleOauthRequest",
-                                  auth_token=kobo_auth.get_auth_token(),
-                                  _external=True)
+        oauth_token_url = _kobo_device_url_for("kobo.HandleOauthRequest",
+                                               auth_token=kobo_auth.get_auth_token())
         kobo_resources["oauth_host"] = oauth_token_url.rsplit("/oauth", 1)[0] + "/oauth"
 
     response = make_response(jsonify({"Resources": kobo_resources}))

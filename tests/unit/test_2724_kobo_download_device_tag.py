@@ -142,7 +142,9 @@ def test_a_kobo_that_downloads_its_own_sync_url_is_sent_the_shared_place(
     _download(monkeypatch, sw, _url_from_sync(sw, sw.libra))
 
     bookmark = _bookmark(sw, sw.libra)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert bookmark.get("ProgressPercent") == pytest.approx(
+        kepub_alignment.kobo_progress_percent(sw.kepub, sw.exact["Source"], sw.exact["Value"]),
+        abs=0.01)
     assert location_of(bookmark) == sw.exact
     assert sw.synced_location(sw.libra) == sw.exact
 

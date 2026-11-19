@@ -11349,11 +11349,6 @@ msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "…and {count} more groups"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "← Back"
 msgstr "← Назад"
 

@@ -5312,8 +5312,18 @@ msgid "Could not save the percentage setting. Try again."
 msgstr "Impossible d’enregistrer le réglage du pourcentage. Réessayez."
 
 #: cps/spa_strings.py
-msgid "Off by default. When on, and this Kobo holds the current KEPUB, its place is shared as the percentage CrossPoint shows there, not the whole number the Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that percentage, so the page Hardcover shows changes. The Kobo keeps its own value."
-msgstr "Désactivé par défaut. Une fois activé, et si cette Kobo contient le KEPUB actuel, sa position est partagée avec le pourcentage que CrossPoint affiche à cet endroit, et non avec le nombre entier que la Kobo indique. KOReader, CrossPoint, Hardcover et la page du livre reçoivent ce pourcentage, donc la page affichée par Hardcover change. La Kobo conserve sa propre valeur."
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+"Désactivé par défaut. Une fois activé, et si cette Kobo contient le KEPUB "
+"actuel, sa position est partagée avec le pourcentage que CrossPoint affiche "
+"à cet endroit, et non avec le nombre entier que la Kobo indique. KOReader, "
+"CrossPoint, Hardcover et la page du livre reçoivent ce pourcentage, donc la "
+"page affichée par Hardcover change. La Kobo conserve sa propre valeur."
 
 #: cps/spa_strings.py
 msgid "Books on this device"
@@ -11552,11 +11562,6 @@ msgstr "{seeded} livres initialisés sur {total}"
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "…and {count} more groups"
-msgstr "… et {count} autres groupes"
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -20508,6 +20513,10 @@ msgstr "Exposer les étagères sélectionnées dans OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#, python-brace-format
+#~ msgid "…and {count} more groups"
+#~ msgstr "… et {count} autres groupes"
 
 #~ msgid "Progress is not being saved."
 #~ msgstr "La progression n’est pas enregistrée."

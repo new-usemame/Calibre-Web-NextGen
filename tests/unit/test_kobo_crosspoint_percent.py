@@ -297,11 +297,11 @@ def test_an_unchecked_report_does_not_rebind_a_retained_further_carrier(
     sw.download(device)
     _align(sw, device, True)
     rows = span_rows()
-    sw.put(device, rows[350]["source"], rows[350]["span"], 55, after_now(2))
+    sw.put(device, rows[315]["source"], rows[315]["span"], 55, after_now(2))
     carrier = sw.session.query(KOSyncProgress).filter_by(document=str(sw.book.id)).one()
     receipt, percentage = carrier.timestamp, carrier.percentage
-    # The native percent advances, but this earlier span has a lower aligned
-    # percentage. Legacy furthest-wins keeps the previous shared row.
+    # The native percent advances (55 to 56), but this earlier span's aligned percentage is lower
+    # (56.1 against 59.6; both within ALIGN_PERCENT_TOLERANCE). Legacy furthest-wins keeps the row.
     sw.put(device, rows[300]["source"], rows[300]["span"], DEVICE_PERCENT, after_now(4))
     sw.session.refresh(carrier)
     assert (carrier.timestamp, carrier.percentage) == (receipt, percentage)
@@ -376,3 +376,14 @@ def test_turning_the_setting_off_shares_the_devices_percentage_again(sw, kobo):
 
     assert sw.pull()[0] == pytest.approx(90)
     assert _shown(sw) == pytest.approx(90)
+
+
+def test_a_crosspoint_percentage_far_from_the_devices_is_not_shared(sw, kobo, hardcover_pushes):
+    # Row 300 is at about 56% by CrossPoint's measure. A Kobo reporting 20% there means the span
+    # matched the wrong place, and a furthest-wins row would then hold every reader 36 points ahead.
+    row = span_rows()[300]
+
+    sw.put(kobo, row["source"], row["span"], 20, after_now())
+
+    assert sw.pull()[0] == pytest.approx(20)
+    assert hardcover_pushes == [(sw.book.id, 20)]

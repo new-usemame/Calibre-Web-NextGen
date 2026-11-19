@@ -55,6 +55,12 @@ def test_unknown_ownership_is_contained_at_the_check_for_changes_boundary(
 
     import cps.readingservices as readingservices
 
+    # Forwarding only exists with the store proxy on. With it off the route
+    # answers [] locally for every id (#2958), which would satisfy the outage
+    # assertion below without the containment ever running. This interpreter
+    # is disposable, so the setting is not restored.
+    readingservices.config.config_kobo_proxy = True
+
     assert readingservices.resolve_entitlement_ownership(owned_book.uuid) is not None
     assert readingservices.resolve_entitlement_ownership(UNOWNED_CONTENT_ID) is None
 

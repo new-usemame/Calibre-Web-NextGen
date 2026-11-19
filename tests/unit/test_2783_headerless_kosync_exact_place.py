@@ -69,7 +69,9 @@ def test_a_headerless_app_save_moves_the_kobo_to_its_exact_place(account, rows):
     sw.push(rows["late"]["xpointer"], 40, **APP)
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert bookmark.get("ProgressPercent") == pytest.approx(
+        kepub_alignment.kobo_progress_percent(sw.kepub, rows["late"]["source"], rows["late"]["span"]),
+        abs=0.01)
     assert location_of(bookmark) == _expected(sw, rows["late"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["late"])
 
@@ -82,7 +84,9 @@ def test_a_headerless_app_still_cannot_move_the_kobo_backward(account, rows):
     sw.push(rows["early"]["xpointer"], 20, client_at=after_now(4), **APP)
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    assert bookmark.get("ProgressPercent") == pytest.approx(
+        kepub_alignment.kobo_progress_percent(sw.kepub, rows["late"]["source"], rows["late"]["span"]),
+        abs=0.01)
     assert location_of(bookmark) == _expected(sw, rows["late"])
 
 

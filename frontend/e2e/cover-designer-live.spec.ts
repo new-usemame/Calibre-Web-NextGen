@@ -90,18 +90,30 @@ test.describe('cover designer v2 (live backend, no fixtures)', () => {
     const samples = lettering.locator('img[data-font-sample]');
     await expect(samples.first()).toBeVisible({ timeout: FIRST_RENDER });
     // The strip is intentionally lazy: a phone should load the cards in view,
-    // not download every installed font before it can be used. Two loaded
-    // samples are enough to prove real distinct rendering here; the focused
-    // Python regression checks every catalogue image byte-for-byte.
+    // not download every installed font before it can be used. The three
+    // generic samples are enough to prove real distinct rendering here; the
+    // focused Python regression checks every catalogue image byte-for-byte.
     const loadedSamples = async () => samples.evaluateAll((imgs) => imgs
       .filter((img): img is HTMLImageElement => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)
       .map((img) => ({ id: img.dataset.fontSample ?? '', src: img.currentSrc })));
-    await expect.poll(async () => (await loadedSamples()).length, { timeout: FIRST_RENDER }).toBeGreaterThanOrEqual(2);
+    // The comparison below needs these three samples, so wait for exactly
+    // them. Waiting for "any two" let it run while one of them was still
+    // lazy, and a missing signature then compared as `undefined`. Bringing
+    // each card into view is what a reader scrolling the strip does.
+    const compared = ['serif', 'sans', 'mono'];
+    for (const fontId of compared) {
+      await lettering.locator(`img[data-font-sample="${fontId}"]`).scrollIntoViewIfNeeded();
+      await expect.poll(async () => (await loadedSamples()).some(({ id }) => id === fontId),
+        { timeout: FIRST_RENDER }).toBe(true);
+    }
+    // Back to the start, so the keyboard check below proves its own scroll.
+    await lettering.evaluate((el) => { el.scrollLeft = 0; });
+    await expect.poll(() => lettering.evaluate((el) => el.scrollLeft)).toBe(0);
 
     // Fetch the bytes from the logged-in live server. Distinct checksums prove
     // that the cards contain distinct server-rendered glyphs, rather than a
     // visual CSS stack or a repeated placeholder JPEG.
-    const loaded = await loadedSamples();
+    const loaded = (await loadedSamples()).filter(({ id }) => compared.includes(id));
     for (const { src } of loaded) {
       expect(new URL(src).searchParams.get('v')).toMatch(/^\d+$/);
     }
@@ -116,7 +128,9 @@ test.describe('cover designer v2 (live backend, no fixtures)', () => {
     // Generic names can intentionally resolve to their installed counterpart
     // (for example `serif` → Liberation Serif). The useful promise is that
     // different font families render different glyph pixels.
-    expect(new Set(['serif', 'sans', 'mono'].map((id) => signatureById.get(id))).size).toBe(3);
+    const compareSignatures = compared.map((fontId) => signatureById.get(fontId));
+    expect(compareSignatures).not.toContain(undefined);
+    expect(new Set(compareSignatures).size).toBe(3);
 
     const geometry = await lettering.evaluate((el) => ({
       clientWidth: el.clientWidth,

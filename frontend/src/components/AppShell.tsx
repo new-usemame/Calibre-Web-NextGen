@@ -7,6 +7,7 @@ import { ContextSidebar } from './ContextSidebar';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { SkipLink } from './SkipLink';
 import { UserNoticeBanner } from './UserNotices';
+import { UploadImportWatcher } from './UploadImportWatcher';
 import { contextSidebarForLocation } from '../lib/contextSidebars';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import styles from './AppShell.module.css';
@@ -46,6 +47,7 @@ function ShellContents({ userName, instanceName, onLogout, children }: AppShellP
       <SkipLink />
       <TopBar userName={userName} instanceName={instanceName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
       <UserNoticeBanner />
+      <UploadImportWatcher />
       <AnnouncementBanner />
       <div className={styles.body}>
         {contextSidebar ? (

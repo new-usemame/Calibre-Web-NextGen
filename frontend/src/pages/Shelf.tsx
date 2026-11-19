@@ -31,10 +31,11 @@ import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
-import { SORT_OPTIONS } from '../lib/bookSortOptions';
+import { SERIES_SORT_OPTIONS, SORT_OPTIONS } from '../lib/bookSortOptions';
 
 const SHELF_SORT_OPTIONS = [
   { label: 'Manual order', value: 'stored' },
+  ...SERIES_SORT_OPTIONS,
   ...SORT_OPTIONS,
 ] as const;
 const SHELF_SORT_VALUES = new Set<string>(SHELF_SORT_OPTIONS.map((option) => option.value));

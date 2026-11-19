@@ -45,7 +45,20 @@ async function uploadScenario(page: Page, options: { missingBaseline?: boolean; 
   });
   await expect(page.getByText('1 file queued for import', { exact: true })).toBeVisible();
   await expect.poll(() => probes).toBeGreaterThan(1);
-  return { title, arrive: () => { arrivals += 1; releaseProbe?.(); }, probes: () => probes };
+  // Probe requests the browser has issued but not finished. The fake clock
+  // only schedules a fetch; its request reaches the route in real time.
+  let inFlight = 0;
+  const isProbe = (request: { url(): string }) => new URL(request.url()).searchParams.get('per_page') === '1';
+  page.on('request', (request) => { if (isProbe(request)) inFlight += 1; });
+  for (const event of ['requestfinished', 'requestfailed'] as const) {
+    page.on(event, (request) => { if (isProbe(request)) inFlight -= 1; });
+  }
+  return {
+    title,
+    arrive: () => { arrivals += 1; releaseProbe?.(); },
+    probes: () => probes,
+    settled: () => expect.poll(() => inFlight).toBeLessThanOrEqual(0),
+  };
 }
 
 test('an arrival refreshes the cached library after leaving Upload, then polling stops', async ({ page }) => {
@@ -88,10 +101,16 @@ test('the watch reaches its stall deadline even when every probe fails', async (
   const scenario = await uploadScenario(page, { failedProbes: true });
   await page.clock.fastForward(5 * 60_000 + 1);
   await expect(page.getByText(/No new books have appeared for a while/)).toBeVisible();
-  // Let an already-running fetch settle, then verify no new interval starts.
-  await page.waitForLoadState('networkidle');
+  // Let a fetch already running at the deadline land, then verify nothing
+  // probes again: no new interval, and no retry of a failed probe either
+  // (react-query retries a failed query three times, 1s, 2s and 4s apart).
+  await scenario.settled();
   const stopped = scenario.probes();
   await page.clock.runFor(30_000);
+  // A retry the fake clock fired needs real time to reach the route. Waiting
+  // here can only let a late probe be counted, never invent one.
+  await page.waitForTimeout(1_000);
+  await scenario.settled();
   expect(scenario.probes()).toBe(stopped);
 });
 

@@ -82,6 +82,11 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         category: 'Sync',
       },
       {
+        title: 'CrossPoint readers can sync clippings',
+        body: 'A CrossPoint reader such as an Xteink with Sync Clippings turned on got an error from CWNG and stopped syncing progress too. CWNG now accepts those clippings, keeps each one as a highlight on the book, shows it in the web reader, and gives it back to the same reader after a fresh download. It needs a CrossPoint build that sends its login on clipping requests.',
+        category: 'Sync',
+      },
+      {
         title: 'The Devices page says when smart shelves add nothing',
         body: 'When the server\'s smart-shelf sync setting is off, a smart shelf picked for an e-reader added no books, and nothing said so. Those choices are now disabled with a note explaining the setting.',
         category: 'Sync',

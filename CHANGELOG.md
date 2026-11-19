@@ -30,6 +30,8 @@ is for things you can see or feel when running the app.
 
 - **NixOS can run NextGen without Docker.** The repository is now a Nix flake with a package and a NixOS module (`services.calibre-web-nextgen`) that runs the web app, the ingest watcher and the other background services as systemd units, creating `app.db` and an empty library on first start like the container does. The NixOS channel is community-maintained. See the README's NixOS section. Contributed by @BeatLink (#2404, #2411).
 
+- **CrossPoint's Sync Clippings works with CWNG.** An Xteink or other CrossPoint reader with Sync Clippings on asked for `/kosync/api/v1/clippings/...`, got an error, and stopped the whole Sync Progress. CWNG now speaks that API: each clipping is kept as a highlight on the book, placed where the reader made it (a short phrase that repeats in the book too), shown in the web reader with the reader's name, and given back to the same reader after it deletes and downloads the book again. Like Kobo highlights since v4.1.48, a clipping goes back only to the reader that made it. Keep the `X-CWNG-Device-ID` custom header on the reader so CWNG can tell your readers apart. CWNG checks the HTTP Basic login on these requests, as on every KOSync route, and CrossPoint 2.0.0 sends no Basic login on clipping requests, so it needs a CrossPoint build that does. Credit: @wolffshots (#2822).
+
 ### Changed
 
 - **The ingest service can run outside the container.** Its body moved from the s6 `run` file to `scripts/services/cwa-ingest-service.sh`, and the paths it used to hardcode under `/config` (`cwa.db`, the retry queue, status and batch files, the failed-books folder) follow `CALIBRE_DBPATH`. The container sets that to `/config` for this service, as it already does for the web app, so nothing moves there. Part of #2094; contributed by @BeatLink (#2410).
@@ -73,6 +75,10 @@ is for things you can see or feel when running the app.
 - **ISBNs are checked by their check digit before they are used.** In automatic metadata fetch, a book's ISBN-10 now finds the provider record carrying the same edition's ISBN-13, an ISBN that fails its check digit no longer picks a record, and a provider's invalid ISBN is no longer written to the book. The cover booster and cover picker no longer look up a cover by an invalid ISBN, Apple Books no longer treats one as an ISBN lookup, and Kobo results drop one. Hardcover matching and Goodreads' list of books you do not own also recognize both forms of a valid ISBN. Thanks to @splitsec2.
 
 - **Proxy-created accounts with an email address as their username get a usable profile email.** When the proxy sends an email address as the username, new accounts use that address if it is valid and available instead of adding a second `@localhost` and blocking profile saves. Separate `Remote-Email` and `X-Remote-Email` headers are ignored. An email already held by another account falls back to a placeholder; proxy login matches existing accounts by username only, never by their editable profile email. Thanks to @splitsec2. (#2426)
+
+- **The classic account form shows Library contents and OPDS Shelf Exposure on every server.** Both sat inside the "OAuth & API Integrations" card, which only appears when Kobo sync, Hardcover or an OAuth login is turned on. On a server with none of them, an administrator could not switch a user to My Library (or start it empty) from the classic user page, a user could not do it from their own profile, and every save of either form turned the account's "Expose only books in selected shelves to OPDS" off, because the form no longer sent the checkbox. They now have their own card.
+
+- **An upload watch that stalls on a failing server stops asking it.** When every check of the library failed, the watch reached its time limit but still retried its last check up to three times afterwards. It now cancels that retry when the watch ends.
 
 ### Security
 

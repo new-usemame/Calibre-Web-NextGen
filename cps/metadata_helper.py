@@ -526,9 +526,9 @@ _SERIES_KIND_WORDS = frozenset({
 _SERIES_FILL_LIMIT = 3
 
 # Series-capable providers the fill asks even when the configured order leaves
-# them out: both carry series data of their own. Any other provider (Amazon,
-# Goodreads and the rest scrape pages that throttle bots) is asked only when
-# the administrator put it in the order.
+# them out: both carry series data of their own. Other providers, including
+# the opt-in Wikidata service, are asked only when the administrator put them
+# in the order.
 _SERIES_FILL_EXTRAS = ("hardcover", "kobo")
 
 # The fill has not run yet for this book (None means it ran and found nothing).
@@ -648,7 +648,7 @@ def _find_missing_series_unguarded(book, search_query, applied_provider_id, prov
     for provider_id in ordered:
         provider = by_id[provider_id]
         if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
-                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)):
             continue
         if asked >= _SERIES_FILL_LIMIT:
             break

@@ -17,6 +17,7 @@ import { PasswordInput } from '../components/PasswordInput';
 import { PasswordPolicyHint } from '../components/PasswordPolicyHint';
 import { passwordRequirementsText } from '../lib/passwordPolicy';
 import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
+import { CoverFlagRepairAdmin } from '../components/CoverFlagRepairAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -398,6 +399,7 @@ export function Admin() {
       <IngestFolderLabels />
       <AdminConfigForm />
       <ReaderFontsAdmin />
+      <CoverFlagRepairAdmin />
       <MailConfigForm />
       <SecurityConfigForm />
     </div>

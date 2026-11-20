@@ -25,6 +25,7 @@ from sqlalchemy.sql.expression import func
 
 from . import constants, logger, isoLanguages, gdriveutils, uploader, helper, kobo_sync_status
 from . import user_book_data
+from . import hierarchy
 from .clean_html import clean_string
 from . import config, ub, db, calibre_db
 from .config_sql import uploads_enabled
@@ -88,6 +89,19 @@ def delete_book_from_details(book_id):
 @user_login_required
 def delete_book_ajax(book_id, book_format):
     return delete_book_from_table(book_id, book_format, False, request.form.to_dict().get('location', ""))
+
+
+@editbook.route("/ajax/get_cc_tree/<int:c_id>")
+@user_login_required
+@edit_required
+def get_cc_tree(c_id):
+    """Choices for the custom-column picker on the book-edit page.
+
+    Serves BOTH modes: a hierarchical column gets an indented tree, a flat
+    one a plain list. The response carries the mode explicitly so the client
+    never has to re-detect it.
+    """
+    return jsonify(cc_picker_values(c_id))
 
 
 @editbook.route("/admin/book/<int:book_id>", methods=['GET'])
@@ -247,6 +261,44 @@ def convert_bookformat(book_id):
     else:
         flash(_("There was an error converting this book: %(res)s", res=rtn), category="error")
     return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+
+
+def cc_picker_values(c_id):
+    """Choices from books this editor may access, independent of browse toggles.
+
+    Keep raw stored spellings for selection. Canonical paths determine only
+    indentation and virtual parents, otherwise Apply would rename old values.
+    """
+    cc = next((column for column in calibre_db.get_cc_columns(
+        config, filter_config_custom_read=False) if column.id == c_id
+        and column.datatype == 'text' and not column.mark_for_delete), None)
+    cc_class = db.cc_classes.get(c_id)
+    if cc is None or cc_class is None:
+        abort(404)
+    rel = getattr(db.Books, 'custom_column_' + str(c_id))
+    try:
+        rows = (calibre_db.session.query(cc_class.value)
+                .select_from(db.Books).join(rel)
+                .filter(calibre_db.common_filters(allow_show_archived=True,
+                                                 allow_show_hidden=True,
+                                                 allow_show_global=True))
+                .distinct().all())
+    except OperationalError:
+        log.error("Failed to read custom column %s values for the edit picker", c_id)
+        abort(503)
+    values = {value for (value,) in rows if value is not None and value.strip()}
+    hierarchical = not calibre_db.is_flat_cc_column(c_id)
+    entries = []
+    if hierarchical:
+        def flatten(nodes, depth):
+            for node in nodes:
+                for value in sorted(node['raw_values'] or {node['path']}, key=str.lower):
+                    entries.append({'value': value, 'depth': depth})
+                flatten(node['children'], depth + 1)
+        flatten(hierarchy.parse_tag_hierarchy(values), 0)
+    else:
+        entries = [{'value': value, 'depth': 0} for value in sorted(values, key=str.lower)]
+    return {'hierarchical': hierarchical, 'is_multiple': bool(cc.is_multiple), 'entries': entries}
 
 
 @editbook.route("/ajax/getcustomenum/<int:c_id>")
@@ -2024,6 +2076,25 @@ def render_edit_book(book_id):
         lang.language_name = isoLanguages.get_language_name(get_locale(), lang.lang_code)
 
     book.authors = calibre_db.order_authors([book])
+
+    # Every text custom column gets the picker button, in one of two modes.
+    # The detector is the single source of truth the browse surfaces already
+    # use (get_hierarchical_column_ids), so a column never offers a tree here
+    # while the browse page shows a flat list. Fail CLOSED on an error: an
+    # unknown mode must not silently offer a wrong-shaped list.
+    cc_picker_modes = {}
+    try:
+        hier_ids = calibre_db.get_hierarchical_column_ids()
+        eligible_ids = {column.id for column in calibre_db.get_cc_columns(
+            config, filter_config_custom_read=False) if not column.mark_for_delete}
+        for c in cc:
+            if c.datatype == 'text' and c.id in eligible_ids:
+                cc_picker_modes[c.id] = 'hierarchical' if c.id in hier_ids else 'flat'
+    except Exception as ex:  # noqa: BLE001 - a picker must never break the page
+        log.error("Could not classify custom columns for the edit picker: %s", ex)
+        cc_picker_modes = {}
+    for c in cc:
+        c.cc_picker_mode = cc_picker_modes.get(c.id)
 
     author_names = []
     for authr in book.authors:

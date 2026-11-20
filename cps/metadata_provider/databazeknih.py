@@ -337,6 +337,10 @@ class DatabazeKnih(Metadata):
 
     MAX_RESULTS = 8
     TIMEOUT = 15
+    # search() resolves "isbn:<isbn>" through the site's ISBN redirect, so
+    # the auto-fetch may retry this provider by the book's ISBN when the
+    # title search misses (e.g. a title stored without diacritics).
+    SUPPORTS_ISBN_QUERY = True
     HEADERS = {
         "User-Agent": (
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "

@@ -204,6 +204,7 @@
         </div>
       <a class="btn btn-default scheduledtasks" id="admin_edit_scheduled_tasks" href="{{url_for('admin.edit_scheduledtasks')}}">{{_('Edit Scheduled Tasks Settings')}}</a>
       <a class="btn btn-default" id="admin_refresh_cover_cache">{{_('Refresh Thumbnail Cache')}}</a>
+      <a class="btn btn-default" id="admin_restore_missing_covers" href="{{url_for('admin.cover_flag_repair_scan')}}">{{_('Restore missing covers')}}</a>
     </div>
   </div>
 {%  endif %}
@@ -226,6 +227,7 @@
   <div class="row form-group">
     <div class="btn btn-primary" id="hardcover_auto_fetch" data-toggle="modal" data-target="#StatusDialog" style="background-color: var(--color-primary); border-color: var(--color-primary); margin-left: 8px;">🔖 {{_('Run Hardcover Auto-Fetch')}}</div>
     <a href="{{url_for('admin.hardcover_review_matches')}}" class="btn btn-info" style="margin-left: 10px; background-color: #17a2b8; border-color: #17a2b8;">📋 {{_('Review Hardcover Matches')}}</a>
+    <a href="{{url_for('admin.hardcover_missing_ids')}}" class="btn btn-default" style="margin-left: 10px;">🔍 {{_('Books without a Hardcover ID')}}</a>
   </div>
 
   <div class="row form-group">

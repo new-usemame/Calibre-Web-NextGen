@@ -9,6 +9,7 @@ declare ``SUPPORTS_ISBN_QUERY`` get a second search with ``isbn:<isbn>``; the
 result still has to clear the same confidence gate.
 """
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -40,10 +41,10 @@ def _provider(answers, supports_isbn=True):
 def run(monkeypatch):
     applied = []
 
-    def _run(provider, isbn="978-80-8182-096-0"):
+    def _run(provider, isbn="978-80-8182-096-0", *, title="Babicka", author="Bozena Nemcova"):
         identifiers = [SimpleNamespace(type="isbn", val=isbn)] if isbn else []
-        book = SimpleNamespace(id=1, title="Babicka",
-                               authors=[SimpleNamespace(name="Bozena Nemcova")],
+        book = SimpleNamespace(id=1, title=title,
+                               authors=[SimpleNamespace(name=author)],
                                identifiers=identifiers)
         session = SimpleNamespace(close=lambda: None, rollback=lambda: None)
         cdb = SimpleNamespace(session=session, get_book=lambda _id: book)
@@ -51,7 +52,10 @@ def run(monkeypatch):
             "session_factory": True,
             "__new__": lambda cls, *a, **k: cdb,
         }))
-        settings = {"auto_metadata_fetch_enabled": True, "metadata_provider_hierarchy": '["p"]'}
+        settings = {
+            "auto_metadata_fetch_enabled": True,
+            "metadata_provider_hierarchy": json.dumps([provider.__id__]),
+        }
         monkeypatch.setattr(m, "CWA_DB", lambda: SimpleNamespace(get_cwa_settings=lambda: settings))
         monkeypatch.setattr(m, "metadata_providers", [provider])
         monkeypatch.setattr(m, "_apply_metadata_to_book",
@@ -112,3 +116,26 @@ def test_invalid_book_isbn_is_not_sent(run):
     provider, calls = _provider({})
     assert run(provider, isbn="978-80-8182-096-1") is False
     assert calls == ["Babicka Bozena Nemcova"]
+
+
+def test_databazeknih_retries_by_isbn_after_the_title_misses(run):
+    """Drive auto-fetch through the real provider and observe the captured edition applied."""
+    from cps.metadata_provider import databazeknih
+    from tests.unit.test_databazeknih_provider import _FakeResponse, _fixture, _provider
+
+    base = databazeknih.BASE_URL
+    isbn_url = f"{base}/search?q=9788081820960"
+    book_path = "/prehled-knihy/henry-chinaski-postovy-urad-499580"
+    book_url = f"{base}{book_path}"
+    details_url = f"{base}/book-detail-more-info/499580"
+    provider = _provider(databazeknih, {
+        isbn_url: _FakeResponse(isbn_url, status=302, location=book_path),
+        book_url: _FakeResponse(book_url, _fixture("book_499580.html")),
+        details_url: _FakeResponse(details_url, _fixture("more_info_499580.html")),
+    })
+
+    assert run(provider, title="Postovy urad", author="Charles Bukowski") is True
+    assert provider.session.calls[:3] == [
+        f"{base}/search?q=Postovy%20urad%20Charles%20Bukowski", isbn_url, book_url,
+    ]
+    assert [record.title for record in run.applied] == ["Poštový úrad"]

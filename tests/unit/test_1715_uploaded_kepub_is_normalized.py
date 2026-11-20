@@ -165,7 +165,8 @@ def _drive_upload(monkeypatch, tmp_path, filename, *, splittable=False,
         stored_dir.mkdir(parents=True, exist_ok=True)
         (stored_dir / ("Book (1)." + filename.rsplit('.', 1)[-1])).write_bytes(b"old")
 
-    editbooks.upload_book_formats([_Upload(source, filename)], _Book(), 1)
+    _metadata, _error, format_written = editbooks.upload_book_formats([_Upload(source, filename)], _Book(), 1)
+    assert format_written
 
     stored = library / "Author" / "Book (1)" / ("Book (1)." + filename.rsplit(".", 1)[-1])
     return stored, recorded

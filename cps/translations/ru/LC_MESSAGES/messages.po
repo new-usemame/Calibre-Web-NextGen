@@ -22124,9 +22124,6 @@ msgstr "Введите одно значение без запятых."
 msgid "Loading values..."
 msgstr "Загрузка значений..."
 
-msgid "New value"
-msgstr "Новое значение"
-
 msgid "No values match the filter."
 msgstr "Нет значений, соответствующих фильтру."
 

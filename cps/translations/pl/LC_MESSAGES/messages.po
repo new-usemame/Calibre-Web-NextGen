@@ -5607,6 +5607,14 @@ msgid "Basic settings"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr ""
 
@@ -5752,6 +5760,10 @@ msgid "Bulleted list"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "Ścieżka certyfikatu CA"
 
@@ -5855,6 +5867,16 @@ msgstr "Ścieżka certyfikatu"
 
 #: cps/spa_strings.py
 msgid "Change"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6166,6 +6188,10 @@ msgid "Could not load the device board."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr ""
 
@@ -6195,6 +6221,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6339,6 +6370,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "Zaktualizowano okładkę na podstawie wybranego wyniku."
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
 
 # | msgid "Create a Shelf"
 #: cps/spa_strings.py
@@ -6649,6 +6684,10 @@ msgid "Disabled books"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Zaktualizowano propozycje w Odkrywaj."
 
@@ -6730,6 +6769,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "Upuść pliki tutaj lub kliknij, aby wybrać"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6953,12 +7000,24 @@ msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Every filled field will replace each book's existing values."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7024,6 +7083,10 @@ msgid "Fetch metadata from web"
 msgstr "Pobierz metadane z internetu"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "Pliki"
 
@@ -7050,6 +7113,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Filter by device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Filter values"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7315,6 +7382,10 @@ msgid "Highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "Popularne"
 
@@ -7417,6 +7488,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Included"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Incoming value"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7819,6 +7894,14 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "Adres URL metadanych (automatyczne wykrywanie OIDC)"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "Min."
 
@@ -7845,6 +7928,10 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Most books first"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7994,6 +8081,10 @@ msgid "No approval needed"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
 msgstr ""
 
@@ -8090,6 +8181,10 @@ msgid "No registered devices."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr ""
 
@@ -8123,6 +8218,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No values match."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8181,6 +8280,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Notes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8283,8 +8386,20 @@ msgstr "Jedna kolumna"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8753,6 +8868,11 @@ msgid "Remove tag \"{tag}\""
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr ""
 
@@ -8767,6 +8887,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8905,6 +9030,11 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr ""
 
@@ -8954,6 +9084,14 @@ msgstr "Liczba wierszy na wczytanie"
 
 #: cps/spa_strings.py
 msgid "Rule group"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
 msgstr ""
 
 # ???
@@ -9019,6 +9157,10 @@ msgid "Save preset"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "Zapisz ustawienia bezpieczeństwa"
 
@@ -9028,6 +9170,10 @@ msgstr "Zapisz ustawienia"
 
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9558,6 +9704,10 @@ msgid "Sort order"
 msgstr "Kolejność sortowania"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "Szczegóły źródła"
 
@@ -9811,6 +9961,10 @@ msgid "The background scheduler is not running."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr ""
 
@@ -10029,6 +10183,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10362,6 +10520,10 @@ msgid "Undoing…"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Odkryj"
 
@@ -10391,6 +10553,10 @@ msgstr "Odblokuj okładkę, aby ją zmienić"
 
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10515,6 +10681,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Values in your library"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10926,6 +11096,16 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr ""
 
@@ -10947,6 +11127,11 @@ msgstr "znaleziono: {n}"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} highlights and notes"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
 msgstr ""
 
 #: cps/spa_strings.py

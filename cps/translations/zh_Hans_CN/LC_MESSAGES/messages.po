@@ -5494,6 +5494,14 @@ msgid "Basic settings"
 msgstr "基本设置"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "测试版"
 
@@ -5643,6 +5651,10 @@ msgid "Bulleted list"
 msgstr "项目符号清单"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "CA 证书路径"
 
@@ -5750,6 +5762,16 @@ msgstr "证书路径"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "更改"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -6061,6 +6083,10 @@ msgid "Could not load the device board."
 msgstr "无法加载设备面板。"
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr "无法加载此设备书库。"
 
@@ -6091,6 +6117,11 @@ msgstr "无法打开该搜索结果。"
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
 msgstr "无法打开已同步的阅读位置。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not preview the resolution."
@@ -6236,6 +6267,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "封面已从选取的结果更新。"
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create account"
@@ -6540,6 +6575,10 @@ msgid "Disabled books"
 msgstr "已禁用的书籍"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "发现页推荐已更新。"
 
@@ -6622,6 +6661,14 @@ msgstr "正在绘制封面…"
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "将文件拖放至此处，或点击选择"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6845,6 +6892,14 @@ msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
 msgstr "输入电子阅读器显示的代码，或用手机扫描其二维码。"
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr "每本书准备就绪后都会同步。您可以在下方排除个别书籍。"
@@ -6852,6 +6907,10 @@ msgstr "每本书准备就绪后都会同步。您可以在下方排除个别书
 #: cps/spa_strings.py
 msgid "Every filled field will replace each book's existing values."
 msgstr "每个填入的字段都会替换每本书的现有值。"
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exact place"
@@ -6916,6 +6975,10 @@ msgid "Fetch metadata from web"
 msgstr "从网络获取元数据"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "文件"
 
@@ -6941,6 +7004,10 @@ msgstr "筛选"
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "依设备筛选"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7209,6 +7276,10 @@ msgid "Highlights and notes"
 msgstr "高亮和笔记"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "热门"
 
@@ -7312,6 +7383,10 @@ msgstr "不活跃"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "已包含"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
@@ -7718,6 +7793,14 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "元数据网址（OIDC 自动发现）"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "最小"
 
@@ -7745,6 +7828,10 @@ msgstr "更多"
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "{name} 更多操作"
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -7895,6 +7982,10 @@ msgid "No approval needed"
 msgstr "无需批准"
 
 #: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
 msgstr "尚无书籍就绪—就绪后会显示在这里。"
 
@@ -7991,6 +8082,10 @@ msgid "No registered devices."
 msgstr "无已注册设备。"
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr "还没有保存的阅读位置。"
 
@@ -8025,6 +8120,10 @@ msgstr "在扫描的文本中未找到有效 ISBN。"
 #: cps/spa_strings.py
 msgid "No values in this column yet"
 msgstr "此列还没有值"
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8083,6 +8182,10 @@ msgstr "笔记 {label}"
 #: cps/spa_strings.py
 msgid "Notes"
 msgstr "笔记"
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8190,11 +8293,23 @@ msgstr "单栏"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
 "只同步您在下方选中的书籍。切换到此模式后，初始没有选中任何书籍，需要您逐本选"
 "择。"
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8665,6 +8780,11 @@ msgid "Remove tag \"{tag}\""
 msgstr "移除标签“{tag}”"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr "移除这些项目"
 
@@ -8680,6 +8800,11 @@ msgstr "已移除的设备"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "已从“正在阅读”中移除。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -8816,6 +8941,11 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "已为 {accounts} 个账户还原之前的书库模式。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "正在还原…"
 
@@ -8870,6 +9000,14 @@ msgstr "每次加载行数"
 #: cps/spa_strings.py
 msgid "Rule group"
 msgstr "规则组"
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -8933,6 +9071,10 @@ msgid "Save preset"
 msgstr "保存预设"
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "保存安全设置"
 
@@ -8943,6 +9085,10 @@ msgstr "保存设置"
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "保存文件，安全弹出 Kobo，然后重启设备。"
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9473,6 +9619,10 @@ msgid "Sort order"
 msgstr "排序方式"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "来源详情"
 
@@ -9735,6 +9885,10 @@ msgid "The background scheduler is not running."
 msgstr "后台调度器未运行。"
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr "书籍仍在打开中。请稍后重试。"
 
@@ -9963,6 +10117,10 @@ msgstr "传输未完成。"
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
 msgstr "此服务器上还没有其他账户。"
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
@@ -10309,6 +10467,10 @@ msgid "Undoing…"
 msgstr "正在撤销…"
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "取消隐藏"
 
@@ -10339,6 +10501,10 @@ msgstr "解锁封面以变更"
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
 msgstr "取消固定侧边栏"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -10463,6 +10629,10 @@ msgstr "使用候选值只会替换此表单中的 ISBN 标识符。请保存更
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
 msgstr "正在使用该 Google 链接指向的图片"
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -10889,6 +11059,16 @@ msgstr "{n} 个已指派到 {name}。"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "最新清单中有 {n} 本书"
 
@@ -10911,6 +11091,11 @@ msgstr "找到 {n} 个"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} 条高亮和笔记"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format

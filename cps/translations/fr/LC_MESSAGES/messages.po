@@ -4137,6 +4137,15 @@ msgid "Delete book"
 msgstr "Supprimer le livre"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Delete \"{title}\"? This permanently removes the book and all its files from "
+"your library. This cannot be undone."
+msgstr ""
+"Supprimer « {title} » ? Le livre et tous ses fichiers seront définitivement "
+"retirés de votre bibliothèque. Cette action est irréversible."
+
+#: cps/spa_strings.py
 msgid "Deleting…"
 msgstr "Suppression…"
 
@@ -18581,6 +18590,11 @@ msgstr "Démasqué"
 
 #: cps/templates/detail.html
 #, python-format
+msgid "Remove \"%(title)s\" from your library?"
+msgstr "Retirer « %(title)s » de votre bibliothèque ?"
+
+#: cps/templates/detail.html
+#, python-format
 msgid "It also leaves these shelves: %(shelves)s."
 msgstr "Il est également retiré de ces étagères : %(shelves)s."
 
@@ -20045,6 +20059,11 @@ msgstr "Aucun résultat trouvé"
 #: cps/templates/search.html
 msgid "Search Term:"
 msgstr "Terme recherché :"
+
+#: cps/templates/search.html
+#, python-format
+msgid "Search the global library for \"%(query)s\" instead"
+msgstr "Rechercher plutôt « %(query)s » dans la bibliothèque globale"
 
 #: cps/templates/search.html
 msgid "Results for:"
@@ -22289,6 +22308,7 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
 
 # Book-edit custom-column value picker (#2434).
 

@@ -3953,6 +3953,15 @@ msgid "Delete book"
 msgstr "Boek verwijderen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Delete \"{title}\"? This permanently removes the book and all its files from "
+"your library. This cannot be undone."
+msgstr ""
+"Verwijder \"{title}\"? Dit verwijdert het boek en alle bijbehorende "
+"bestanden permanent uit je bibliotheek. Dit kan niet ongedaan worden gemaakt."
+
+#: cps/spa_strings.py
 msgid "Deleting…"
 msgstr "Bezig met verwijderen…"
 
@@ -17870,6 +17879,11 @@ msgstr ""
 
 #: cps/templates/detail.html
 #, python-format
+msgid "Remove \"%(title)s\" from your library?"
+msgstr "‘%(title)s’ uit je bibliotheek verwijderen?"
+
+#: cps/templates/detail.html
+#, python-format
 msgid "It also leaves these shelves: %(shelves)s."
 msgstr "Het verdwijnt ook van deze boekenplanken: %(shelves)s."
 
@@ -19290,6 +19304,11 @@ msgstr "Geen resultaten gevonden"
 #: cps/templates/search.html
 msgid "Search Term:"
 msgstr "Zoekterm:"
+
+#: cps/templates/search.html
+#, python-format
+msgid "Search the global library for \"%(query)s\" instead"
+msgstr "In plaats daarvan in de globale bibliotheek naar ‘%(query)s’ zoeken"
 
 #: cps/templates/search.html
 msgid "Results for:"
@@ -21279,6 +21298,7 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
 
 # Book-edit custom-column value picker (#2434).
 

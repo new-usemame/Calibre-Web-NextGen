@@ -20859,3 +20859,112 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr "Boeken zonder Hardcover-ID"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr "Fout bij het tonen van boeken zonder Hardcover-ID: %(error)s"
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+"Het zoeken naar Hardcover-overeenkomsten is gestart voor alle boeken zonder "
+"Hardcover-ID. Bekijk Taken voor de voortgang."
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+"Bij de volgende automatische Hardcover-zoekopdracht wordt dit boek opnieuw "
+"gezocht."
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr "Fout: %(error)s"
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books"
+" that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+"Leesvoortgang, leesstatus en annotaties worden alleen naar Hardcover "
+"verstuurd voor boeken met een Hardcover-ID. Deze %(total)s boek(en) hebben "
+"er geen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Waiting for review"
+msgstr "Wacht op beoordeling"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Rejected"
+msgstr "Afgewezen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Skipped"
+msgstr "Overgeslagen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Not matched yet"
+msgstr "Nog niet gekoppeld"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting"
+" for review. Rejected books are skipped."
+msgstr ""
+"Zoekt opnieuw op Hardcover voor alle hier getoonde boeken, ook boeken die op"
+" beoordeling wachten. Afgewezen boeken worden overgeslagen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr "Nu opnieuw koppelen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+"Hardcover-synchronisatie is uitgeschakeld. Schakel deze in via de "
+"basisconfiguratie of met HARDCOVER_SYNC_ENABLED."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+"Geen Hardcover-token beschikbaar. Stel de omgevingsvariabele HARDCOVER_TOKEN"
+" in of configureer het token in de basisconfiguratie."
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr "Pagina %(page)s van %(pages)s"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by "
+"hand."
+msgstr ""
+"Haal op de bewerkpagina metadata op van Hardcover om de ID handmatig toe te "
+"voegen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr "Opnieuw proberen toestaan"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr "Niets om te tonen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr "Geen enkel boek zonder Hardcover-ID voldoet aan dit filter."

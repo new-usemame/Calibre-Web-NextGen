@@ -274,6 +274,12 @@ msgid "Settings DB is not Writeable"
 msgstr "Instellingen database is niet schrijfbaar."
 
 #: cps/admin.py
+#, python-brace-format
+msgid ""
+"Could not save the custom column hierarchy setting for {count} column(s)."
+msgstr ""
+
+#: cps/admin.py
 #, python-format
 msgid "Invalid OPDS filename template: %(error)s"
 msgstr "Ongeldig OPDS-bestandsnaamsjabloon: %(error)s"
@@ -3078,11 +3084,11 @@ msgstr "Kan label niet hernoemen"
 msgid "Tag renamed to {name}"
 msgstr "Label hernoemd naar {name}"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You must be signed in"
 msgstr "Je moet ingelogd zijn"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You are not allowed to edit metadata"
 msgstr "Je bent niet gemachtigd metagegevens aan te passen"
 
@@ -3942,9 +3948,10 @@ msgstr "Donker thema"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/admin.html cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/duplicates.html
-#: cps/templates/modal_dialogs.html cps/templates/read.html
-#: cps/templates/user_edit.html cps/templates/user_table.html
+#: cps/templates/book_table.html cps/templates/cc_value_editor.html
+#: cps/templates/duplicates.html cps/templates/modal_dialogs.html
+#: cps/templates/read.html cps/templates/user_edit.html
+#: cps/templates/user_table.html
 msgid "Delete"
 msgstr "Verwijderen"
 
@@ -4105,7 +4112,7 @@ msgid "Mark unread"
 msgstr "Markeren als ongelezen"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/duplicates.html
+#: cps/templates/cc_value_editor.html cps/templates/duplicates.html
 msgid "Merge"
 msgstr "Samenvoegen"
 
@@ -4620,6 +4627,7 @@ msgid "Customize navigation"
 msgstr "Navigatie aanpassen"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
+#: cps/templates/cc_value_editor.html
 msgid "Done"
 msgstr "Klaar"
 
@@ -5315,6 +5323,10 @@ msgstr "1 annotatie toegewezen aan deze bron"
 msgid "1 annotation from this source"
 msgstr "1 annotatie uit deze bron"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "1 level"
+msgstr "1 niveau"
+
 #: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 geselecteerd."
@@ -5354,8 +5366,8 @@ msgstr ""
 "klaar is."
 
 #: cps/spa_strings.py
-msgid "A few random picks from your library"
-msgstr "Enkele willekeurige keuzes uit je bibliotheek"
+msgid "A few random picks from your Discover source"
+msgstr "Een paar willekeurige suggesties uit je bron voor ontdekken"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5375,6 +5387,23 @@ msgid ""
 msgstr ""
 "Er is een eenmalige volledige duplicatenscan nodig. Gebruik hierboven "
 "\"Zoeken naar duplicaten\" om deze uit te voeren."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into itself"
+msgstr "Een waarde kan niet in zichzelf worden geplakt"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into one of its own sub-values"
+msgstr "Een waarde kan niet in een van haar eigen subwaarden worden geplakt"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid ""
+"A value created beside another stays on the same level, so its name cannot "
+"contain a dot. Use the Create new button for a sub-value."
+msgstr ""
+"Een waarde die u naast een andere maakt, blijft op hetzelfde niveau. De naam "
+"mag daarom geen punt bevatten. Gebruik de knop Nieuw maken voor een "
+"subwaarde."
 
 #: cps/spa_strings.py
 msgid "API endpoint"
@@ -5409,12 +5438,29 @@ msgstr ""
 "controleren."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Acties voor {title}"
+
+#: cps/spa_strings.py
 msgid "Active"
 msgstr "Actief"
 
 #: cps/spa_strings.py
 msgid "Add a connection"
 msgstr "Een verbinding toevoegen"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Add a review"
+msgstr "Recensie toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr "Boeken toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr "Boeken aan boekenplank toevoegen"
 
 #: cps/spa_strings.py
 msgid "Add connection"
@@ -5427,6 +5473,15 @@ msgstr "Groep toevoegen"
 #: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "Identificatiecode toevoegen"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"Voeg namen van importsubmappen toe aan boeklabels of een bestaande "
+"aangepaste kolom. Bestaande waarden blijven behouden; bestanden in de "
+"hoofdmap krijgen geen labels."
 
 #: cps/spa_strings.py
 msgid "Add link"
@@ -5443,6 +5498,10 @@ msgstr ""
 "bestaande regel:"
 
 #: cps/spa_strings.py
+msgid "Add selected"
+msgstr "Selectie toevoegen"
+
+#: cps/spa_strings.py
 msgid "Add to existing"
 msgstr "Toevoegen aan bestaande waarden"
 
@@ -5453,6 +5512,12 @@ msgstr "Toevoegen aan favorieten"
 #: cps/spa_strings.py
 msgid "Add to library"
 msgstr "Toevoegen aan bibliotheek"
+
+# Grid-to-shelf drag (#946).
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr "{title} aan een plank toevoegen"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
@@ -5516,9 +5581,21 @@ msgstr ""
 msgid "All catalogs"
 msgstr "Alle catalogi"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "All levels"
+msgstr "Alle niveaus"
+
 #: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Alle boekenplanken"
+
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "All tags"
+msgstr "Alle labels"
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "Voltooide DRM-vrije MOBI 6-boeken toestaan"
 
 #: cps/spa_strings.py
 msgid "Allow remote (magic-link) login"
@@ -5539,6 +5616,14 @@ msgstr "Toegestane groepen (door komma's gescheiden)"
 #: cps/spa_strings.py
 msgid "Allowed torrent tracker origins"
 msgstr "Toegestane origins van torrenttrackers"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already first at this level"
+msgstr "Staat al bovenaan op dit niveau"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already last at this level"
+msgstr "Staat al onderaan op dit niveau"
 
 #: cps/spa_strings.py
 msgid "Also add the book to My Library"
@@ -5589,6 +5674,21 @@ msgstr "Elke reeks"
 msgid "Any tags"
 msgstr "Elk label"
 
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr "Toegepast op het apparaat"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+"Is alleen van toepassing op deze downloadclient. De instelling voor "
+"uploadformaten op de server moet MOBI ook toestaan. De normale conversie-"
+"instellingen zijn van toepassing; zonder conversie kan MOBI worden "
+"gedownload, maar niet worden geopend in de weblezer."
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
@@ -5636,6 +5736,10 @@ msgstr "Archiveren"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "Gearchiveerd"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Arial"
+msgstr "Arial"
 
 #: cps/spa_strings.py
 msgid "Arrangement"
@@ -5702,6 +5806,15 @@ msgstr "Gebruikers automatisch aanmaken"
 #: cps/spa_strings.py
 msgid "Auto-create users on first login"
 msgstr "Gebruikers automatisch aanmaken bij eerste aanmelding"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Automatic"
+msgstr "Automatisch"
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+"Automatisch vult het scherm als er alleen een smalle rand zou wegvallen."
 
 #: cps/spa_strings.py
 msgid "Available to users"
@@ -5772,6 +5885,10 @@ msgid "Bold"
 msgstr "Vet"
 
 #: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Boek toegevoegd aan je activiteit."
+
+#: cps/spa_strings.py
 msgid "Book category ID"
 msgstr "Boekcategorie-ID"
 
@@ -5790,6 +5907,10 @@ msgstr "Download van de boekenlijst gestart."
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Boekvolgorde"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Boek aangevraagd. Een beheerder moet het goedkeuren."
 
 #: cps/spa_strings.py
 msgid "Book sources"
@@ -6004,10 +6125,6 @@ msgid "Catalogs and download clients"
 msgstr "Catalogi en downloadclients"
 
 #: cps/spa_strings.py
-msgid "Categories"
-msgstr "Categorieën"
-
-#: cps/spa_strings.py
 msgid "Center"
 msgstr "Gecentreerd"
 
@@ -6022,6 +6139,10 @@ msgstr "Certificaatpad"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "Wijzigen"
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Bron voor ontdekken wijzigen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6051,6 +6172,10 @@ msgid "Checking…"
 msgstr "Controleren…"
 
 #: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Kies een boek uit deze download"
+
+#: cps/spa_strings.py
 msgid "Choose a cover"
 msgstr "Kies een omslag"
 
@@ -6062,9 +6187,23 @@ msgstr "Kies een omslagafbeelding om te uploaden"
 msgid "Choose a download client connection"
 msgstr "Kies een verbinding met een downloadclient"
 
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr ""
+"Kies een labelgroep om boeken uit die groep en de onderliggende labels te "
+"bekijken."
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr "Kies een afbeelding"
+
 #: cps/spa_strings.py
 msgid "Choose an image…"
 msgstr "Kies een afbeelding…"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Nog een boek kiezen"
 
 #: cps/spa_strings.py
 msgid "Choose another place"
@@ -6073,6 +6212,15 @@ msgstr "Een andere positie kiezen"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "Kies velden"
+
+# Uploaded reader fonts (#915).
+#: cps/spa_strings.py
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files stay "
+"in the configuration volume across upgrades."
+msgstr ""
+"Kies lettertypen die u met de lezers op deze server mag delen. De bestanden "
+"blijven bij updates op het configuratievolume staan."
 
 #: cps/spa_strings.py
 msgid "Choose visible columns"
@@ -6190,6 +6338,10 @@ msgstr ""
 "controleren of de e-reader verbinding met je bibliotheek kan maken."
 
 #: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr "Verbind dit apparaat en gebruik Nu synchroniseren in KOReader."
+
+#: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr ""
 "De verbinding is gewijzigd. Laad de instellingen opnieuw voordat u opslaat."
@@ -6255,8 +6407,30 @@ msgid "Copy sync URL"
 msgstr "Synchronisatie-URL kopiëren"
 
 #: cps/spa_strings.py
+msgid "Correct the minimum books value to see results."
+msgstr "Corrigeer de waarde voor minimum aantal boeken om resultaten te zien."
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr ""
+"Boeken konden niet aan de plank worden toegevoegd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr ""
+"De geselecteerde boeken konden niet worden toegevoegd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr "Het slaapscherm kon niet worden toegepast"
+
+#: cps/spa_strings.py
 msgid "Could not assign."
 msgstr "Toewijzen is mislukt."
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
 #: cps/spa_strings.py
 msgid "Could not complete the action."
@@ -6267,12 +6441,24 @@ msgid "Could not copy. Select the address and copy it manually."
 msgstr "Kopiëren mislukt. Selecteer het adres en kopieer het handmatig."
 
 #: cps/spa_strings.py
+msgid "Could not create"
+msgstr "Maken mislukt"
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr "Kan boekenplank niet aanmaken."
 
 #: cps/spa_strings.py
 msgid "Could not create the shelf."
 msgstr "Kan de boekenplank niet aanmaken."
+
+#: cps/spa_strings.py
+msgid "Could not delete"
+msgstr "Verwijderen mislukt"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not delete review."
+msgstr "Recensie kon niet worden verwijderd."
 
 #: cps/spa_strings.py
 msgid "Could not delete shelf."
@@ -6291,8 +6477,16 @@ msgid "Could not export the book list. Please try again."
 msgstr "De boekenlijst kon niet worden geëxporteerd. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "Kan bronnen voor ontdekken niet laden."
+
+#: cps/spa_strings.py
 msgid "Could not load books"
 msgstr "Boeken konden niet worden geladen"
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr "Boeken konden niet worden geladen."
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -6323,8 +6517,16 @@ msgid "Could not load highlights and notes."
 msgstr "Kan markeringen en notities niet laden."
 
 #: cps/spa_strings.py
+msgid "Could not load ingest folder settings."
+msgstr "De instellingen voor importmappen konden niet worden geladen."
+
+#: cps/spa_strings.py
 msgid "Could not load pairing details."
 msgstr "De koppelingsgegevens konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "Could not load reader fonts."
+msgstr "De lettertypen voor de leesweergave konden niet worden geladen."
 
 #: cps/spa_strings.py
 msgid "Could not load reading places."
@@ -6341,6 +6543,10 @@ msgstr "Kan de verwijderingsdetails niet laden. Probeer het opnieuw."
 #: cps/spa_strings.py
 msgid "Could not load stats."
 msgstr "Kan statistieken niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "De labels konden niet worden geladen. Probeer het opnieuw."
 
 #: cps/spa_strings.py
 msgid "Could not load tasks."
@@ -6366,9 +6572,29 @@ msgstr "Kan dit tekstbestand niet laden."
 msgid "Could not load users."
 msgstr "Kan gebruikers niet laden."
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not load your rating."
+msgstr "Je beoordeling kan niet worden geladen."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not load your review."
+msgstr "Jouw recensie kon niet worden geladen."
+
 #: cps/spa_strings.py
 msgid "Could not look up who asked"
 msgstr "Kon niet opzoeken wie het heeft aangevraagd"
+
+#: cps/spa_strings.py
+msgid "Could not merge"
+msgstr "Samenvoegen mislukt"
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "Kan deze boeken niet samenvoegen."
+
+#: cps/spa_strings.py
+msgid "Could not move"
+msgstr "Verplaatsen mislukt"
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
@@ -6403,6 +6629,10 @@ msgstr "Kan dit comic-archief niet lezen."
 msgid "Could not reload metadata"
 msgstr "Kan metagegevens niet opnieuw laden"
 
+#: cps/spa_strings.py
+msgid "Could not remove font."
+msgstr "Het lettertype kon niet worden verwijderd."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not remove this book from Currently Reading."
 msgstr "Dit boek kon niet uit Momenteel aan het lezen worden verwijderd."
@@ -6410,6 +6640,10 @@ msgstr "Dit boek kon niet uit Momenteel aan het lezen worden verwijderd."
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "Kan deze bron niet verwijderen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not rename"
+msgstr "Hernoemen mislukt"
 
 #: cps/spa_strings.py
 msgid "Could not rename shelf."
@@ -6439,6 +6673,14 @@ msgstr "Kan de duplicaten niet oplossen."
 msgid "Could not restore this source. Try again."
 msgstr "Kan deze bron niet herstellen. Probeer het opnieuw."
 
+#: cps/spa_strings.py cps/web.py
+msgid "Could not save Discover source. Please try again."
+msgstr "Kan de bron voor ontdekken niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not save ingest folder settings."
+msgstr "De instellingen voor importmappen konden niet worden opgeslagen."
+
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
 msgstr "Kan volgorde niet opslaan."
@@ -6446,6 +6688,14 @@ msgstr "Kan volgorde niet opslaan."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Kan lezersinstellingen niet opslaan."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not save review."
+msgstr "Recensie kon niet worden opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr "Het slaapscherm kon niet worden opgeslagen. Probeer het opnieuw."
 
 #: cps/spa_strings.py
 msgid "Could not save that highlight."
@@ -6471,6 +6721,10 @@ msgstr "Kan de boekenplank niet opslaan."
 msgid "Could not save title."
 msgstr "Kan titel niet opslaan."
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not save your rating."
+msgstr "Je beoordeling kan niet worden opgeslagen."
+
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Kan je leespositie niet opslaan."
@@ -6495,13 +6749,25 @@ msgstr "Kan de duplicatenscan niet starten."
 msgid "Could not update pairing details."
 msgstr "De koppelingsgegevens konden niet worden bijgewerkt."
 
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "De leesstatus kon niet worden bijgewerkt. Probeer het opnieuw."
+
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Kan boekenplank niet bijwerken."
 
 #: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr "Dit boek kon niet worden bijgewerkt. Probeer het opnieuw."
+
+#: cps/spa_strings.py
 msgid "Could not update your account setting."
 msgstr "Kan je accountinstelling niet bijwerken."
+
+#: cps/spa_strings.py
+msgid "Could not upload font."
+msgstr "Het lettertype kon niet worden geüpload."
 
 #: cps/spa_strings.py
 msgid "Couldn’t start a magic link. Please try again."
@@ -6538,6 +6804,15 @@ msgstr ""
 msgid "Cover updated from the selected result."
 msgstr "Omslag bijgewerkt vanuit het geselecteerde resultaat."
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Create a value just below this one"
+msgstr "Maak een waarde direct onder deze waarde"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Create a value just below {name}"
+msgstr "Maak een waarde direct onder {name}"
+
 #: cps/spa_strings.py
 msgid "Covered by a rule"
 msgstr "Valt onder een regel"
@@ -6554,6 +6829,10 @@ msgstr "Een account aanmaken"
 msgid "Create failed."
 msgstr "Aanmaken mislukt."
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Create new"
+msgstr "Nieuw maken"
+
 #: cps/spa_strings.py
 msgid "Create shelf"
 msgstr "Plank maken"
@@ -6565,6 +6844,20 @@ msgstr "Boekenplank aanmaken en boek toevoegen"
 #: cps/spa_strings.py
 msgid "Create user"
 msgstr "Gebruiker aanmaken"
+
+#: cps/spa_strings.py
+msgid "Create value"
+msgstr "Waarde maken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name}"
+msgstr "{name} is gemaakt"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name} just below {anchor}"
+msgstr "{name} is direct onder {anchor} gemaakt"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6591,6 +6884,10 @@ msgstr "Huidig"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current cover"
 msgstr "Huidige omslag"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Current library"
+msgstr "Huidige bibliotheek"
 
 #: cps/spa_strings.py
 msgid "Current password"
@@ -6621,6 +6918,27 @@ msgstr "Aangepaste kleuren"
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "Aangepaste kolommen"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+"Aangepaste kolommen moeten al bestaan en tekst met komma’s bevatten, zoals "
+"labels. Maak ze eerst in Calibre op de computer."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut"
+msgstr "Knippen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut a value first, then choose where it should go"
+msgstr "Knip eerst een waarde en kies waar die moet komen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Cut {name}"
+msgstr "{name} knippen"
 
 #: cps/spa_strings.py
 msgid "Data hoarder? This will help users organize their accounts!"
@@ -6683,6 +7001,10 @@ msgstr "Verwijderen mislukt."
 msgid "Delete from device"
 msgstr "Van apparaat verwijderen"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete review"
+msgstr "Recensie verwijderen"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete shelf \"{name}\"? This cannot be undone."
@@ -6734,6 +7056,14 @@ msgstr ""
 "worden verwijderd."
 
 #: cps/spa_strings.py
+msgid "Delete values"
+msgstr "Waarden verwijderen"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete your review?"
+msgstr "Jouw recensie verwijderen?"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Delete {name}"
 msgstr "{name} verwijderen"
@@ -6756,6 +7086,11 @@ msgstr "Verwijderd apparaat"
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "Label {name} verwijderd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Deleted {count} values"
+msgstr "{count} waarde(n) verwijderd"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6848,12 +7183,20 @@ msgstr ""
 "het opslaan van leesvoortgang of annotaties."
 
 #: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr "Niet uitgelezen en Gepauzeerd behouden je leespositie."
+
+#: cps/spa_strings.py
 msgid "Different edition"
 msgstr "Andere editie"
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
 msgstr "Standaard wachtwoordlogin uitschakelen"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Disabled"
+msgstr "Uitgeschakeld"
 
 #: cps/spa_strings.py
 msgid "Disabled books"
@@ -6866,6 +7209,14 @@ msgstr "Verwerpen"
 #: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Verkennen-keuzes bijgewerkt."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Discover source"
+msgstr "Bron voor ontdekken"
+
+#: cps/spa_strings.py cps/web.py
+msgid "Discover source saved."
+msgstr "Bron voor ontdekken opgeslagen."
 
 #: cps/spa_strings.py
 msgid "Discover — Random Picks"
@@ -6887,6 +7238,10 @@ msgstr "Deze groep afwijzen"
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Display"
 msgstr "Weergeven"
+
+#: cps/spa_strings.py
+msgid "Display name (optional)"
+msgstr "Weergavenaam (optioneel)"
 
 #: cps/spa_strings.py
 msgid "Documentation"
@@ -6938,6 +7293,10 @@ msgstr "Gedownload, wacht op importeren"
 #: cps/spa_strings.py
 msgid "Downloading"
 msgstr "Downloaden"
+
+#: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Sleep naar een plank of kies een plank"
 
 #: cps/spa_strings.py
 msgid "Drawing the cover…"
@@ -7047,6 +7406,10 @@ msgstr "Notitie bewerken"
 msgid "Edit public shelves"
 msgstr "Openbare boekenplanken bewerken"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Edit review"
+msgstr "Recensie bewerken"
+
 #: cps/spa_strings.py
 msgid "Edit shared library cover"
 msgstr "Gedeelde bibliotheekomslag bewerken"
@@ -7059,6 +7422,11 @@ msgstr "Slimme boekenplank bewerken"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Titel bewerken voor {title}"
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+#: cps/templates/cc_value_editor.html
+msgid "Edit values"
+msgstr "Waarden bewerken"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7172,6 +7540,10 @@ msgid "Encryption"
 msgstr "Encryptie"
 
 #: cps/spa_strings.py
+msgid "Enter a whole number of at least 1."
+msgstr "Voer een geheel getal van minstens 1 in."
+
+#: cps/spa_strings.py
 msgid "Enter at least 2 characters"
 msgstr "Voer ten minste 2 tekens in"
 
@@ -7188,6 +7560,26 @@ msgstr "Voer het adres in als http://host:poort of https://host."
 msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
 msgstr ""
 "Voer de code in die de e-reader toont, of scan de QR-code met je telefoon."
+
+#: cps/spa_strings.py
+msgid ""
+"Every action is on the row it applies to. Renaming renames everything below "
+"the value. To move a value, tick it and press Cut, then tick the value it "
+"should go under and press Paste."
+msgstr ""
+"Elke actie staat op de rij waarop die van toepassing is. Als u een waarde "
+"hernoemt, wijzigt ook de naam van alle onderliggende waarden. Vink een "
+"waarde aan en klik op Knippen om die te verplaatsen. Vink daarna de "
+"bovenliggende waarde op de bestemming aan en klik op Plakken."
+
+#: cps/spa_strings.py
+msgid ""
+"Every action is on the row it applies to. To merge, tick two or more values, "
+"then use Merge on the one that should survive."
+msgstr ""
+"Elke actie staat op de rij waarop die van toepassing is. Vink twee of meer "
+"waarden aan en klik op Samenvoegen op de rij van de waarde die u wilt "
+"behouden."
 
 #: cps/spa_strings.py
 msgid "Enter the value to match."
@@ -7215,6 +7607,10 @@ msgstr "Elke waarde valt onder een regel."
 #: cps/spa_strings.py
 msgid "Exact place"
 msgstr "Exacte positie"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "Voorbeeld:"
 
 #: cps/spa_strings.py
 msgid "Excluded"
@@ -7268,6 +7664,10 @@ msgstr "Mislukt"
 msgid "Failed to load."
 msgstr "Laden mislukt."
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Favorite"
+msgstr "Favoriet"
+
 #: cps/spa_strings.py
 msgid "Feature"
 msgstr "Functie"
@@ -7275,6 +7675,10 @@ msgstr "Functie"
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
 msgstr "Metagegevens van het web ophalen"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "Velden en voorbeelden voor bestandsnaamsjablonen"
 
 #: cps/spa_strings.py
 msgid "Field"
@@ -7300,6 +7704,10 @@ msgstr "Bestanden die niet konden worden gelezen: {formats}"
 #: cps/templates/cover_picker.html
 msgid "Fill style"
 msgstr "Opvulstijl"
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr "Scherm vullen"
 
 #: cps/spa_strings.py
 msgid "Filter"
@@ -7340,6 +7748,15 @@ msgid "Finish or cancel outstanding requests before editing this connection."
 msgstr ""
 "Voltooi of annuleer lopende aanvragen voordat u deze verbinding bewerkt."
 
+#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
+#: cps/templates/search_form.html
+msgid "Finished"
+msgstr "Voltooid"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "Eerste teken:"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Follow link: {label}"
@@ -7352,6 +7769,22 @@ msgstr "Lettertype"
 #: cps/spa_strings.py
 msgid "Font family"
 msgstr "Lettertypefamilie"
+
+#: cps/spa_strings.py
+msgid "Font file"
+msgstr "Lettertypebestand"
+
+#: cps/spa_strings.py
+msgid "Font file is too large."
+msgstr "Het lettertypebestand is te groot."
+
+#: cps/spa_strings.py
+msgid "Font is available in both EPUB readers."
+msgstr "Het lettertype is beschikbaar in beide EPUB-lezers."
+
+#: cps/spa_strings.py
+msgid "Font removed."
+msgstr "Lettertype verwijderd."
 
 #: cps/spa_strings.py
 msgid "Font size"
@@ -7368,6 +7801,14 @@ msgid ""
 msgstr ""
 "Voor een e-reader die je op deze computer kunt aansluiten. De plug-in kent "
 "je server en account al: je hoeft niets in te typen op de e-reader."
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+"Bijvoorbeeld: ingest/James/scifi voegt standaard James toe. Neem geneste "
+"mappen mee om ook scifi toe te voegen."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Force full kobo sync"
@@ -7402,6 +7843,11 @@ msgstr "Formaten — opnemen"
 #: cps/spa_strings.py
 msgid "Formatting is kept where the book page supports it."
 msgstr "Opmaak blijft behouden waar de boekpagina dit ondersteunt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "{count} beschikbare boeken gevonden."
 
 #: cps/spa_strings.py
 msgid "From address"
@@ -7544,6 +7990,10 @@ msgid "Hide Discover section"
 msgstr "Verkennen-sectie verbergen"
 
 #: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Beschikbare boeken verbergen"
+
+#: cps/spa_strings.py
 msgid "Hide device details"
 msgstr "Apparaatgegevens verbergen"
 
@@ -7596,6 +8046,14 @@ msgstr "Populair"
 #: cps/spa_strings.py
 msgid "Hot — Most Downloaded"
 msgstr "Populair — Meest gedownload"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Household average"
+msgstr "Gemiddelde van het huishouden"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "How many levels of values to show"
+msgstr "Aantal weer te geven waardeniveaus"
 
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
@@ -7654,6 +8112,10 @@ msgstr ""
 "blijven beperkt tot hun oorspronkelijke oorsprong."
 
 #: cps/spa_strings.py
+msgid "Image fit"
+msgstr "Afbeeldingsweergave"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Afbeelding van {source}"
@@ -7667,6 +8129,15 @@ msgstr "Importeren"
 msgid "Import and export"
 msgstr "Importeren en exporteren"
 
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Dit boek importeren"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Dit boek importeren: {filename}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Geïmporteerd als"
@@ -7678,6 +8149,11 @@ msgstr "Geïmporteerd in de bibliotheek"
 #: cps/spa_strings.py
 msgid "Importing"
 msgstr "Importeren"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+"Schakel in KOReader Serverbestandsnamen gebruiken in voor de OPDS-catalogus."
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -7695,6 +8171,10 @@ msgstr ""
 msgid "Inactive"
 msgstr "Inactief"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Include nested folders"
+msgstr "Geneste mappen meenemen"
+
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Inbegrepen"
@@ -7706,6 +8186,15 @@ msgstr "Binnenkomende waarde"
 #: cps/spa_strings.py
 msgid "Indexer preset"
 msgstr "Indexervoorinstelling"
+
+# Ingest folder labels (#1495).
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Ingest folder labels"
+msgstr "Labels uit importmappen"
+
+#: cps/spa_strings.py
+msgid "Ingest folder settings saved."
+msgstr "Instellingen voor importmappen opgeslagen."
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -7749,9 +8238,21 @@ msgstr "KOReader-voortgang"
 msgid "KOReader sync is not enabled on this server."
 msgstr "KOReader-synchronisatie is niet ingeschakeld op deze server."
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "KaiTi"
+msgstr "KaiTi"
+
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "Verbinding behouden"
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "Dit exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Keep your thoughts about this book here."
+msgstr "Bewaar hier je gedachten over dit boek."
 
 #: cps/spa_strings.py
 msgid "Keep the best format"
@@ -7866,6 +8367,29 @@ msgstr "Laatst gesynchroniseerd"
 msgid "Leave a field empty to use its default."
 msgstr "Laat een veld leeg om de standaardwaarde te gebruiken."
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+"Laat leeg om de huidige bestandsnaam met titel en eerste auteur te behouden. "
+"Voeg geen bestandsextensie toe."
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Leave blank to keep the existing filename. Example: {series} #{series_index} "
+"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
+"the file extension is added automatically."
+msgstr ""
+"Laat leeg om de bestaande bestandsnaam te behouden. Voorbeeld: {series} "
+"#{series_index} - {title}. Velden: {title}, {authors}, {series} en "
+"{series_index}; de bestandsextensie wordt automatisch toegevoegd."
+
+#: cps/spa_strings.py
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr "Laat leeg om elk aantal boeken te tonen. Het minimum is inclusief."
+
 #: cps/spa_strings.py
 msgid ""
 "Leave the credential blank to keep it. Saving switches the connection off "
@@ -7915,6 +8439,11 @@ msgstr ""
 msgid "Lettering"
 msgstr "Letters"
 
+#: cps/spa_strings.py cps/templates/detail.html
+#: cps/templates/library_rating.html
+msgid "Library rating"
+msgstr "Bibliotheekbeoordeling"
+
 #: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Bibliotheekinstellingen"
@@ -7950,6 +8479,10 @@ msgstr "Meer laden"
 #: cps/templates/read.html
 msgid "Loading"
 msgstr "Bezig met laden"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Beschikbare boeken laden…"
 
 #: cps/spa_strings.py
 msgid "Loading device annotations…"
@@ -8103,13 +8636,53 @@ msgid "Member user filter"
 msgstr "Lid gebruiker filter"
 
 #: cps/spa_strings.py
+msgid "Merge and rename"
+msgstr "Samenvoegen en hernoemen"
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "Samenvoegen in het behouden exemplaar"
+
+#: cps/spa_strings.py
 msgid "Merge formats into the newest copy"
 msgstr "Formaten samenvoegen in het nieuwste exemplaar"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Merge into {name}"
 msgstr "Samenvoegen met {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"Eén exemplaar samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna wordt dat exemplaar verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merge the other selected values into {name}"
+msgstr "Voeg de andere geselecteerde waarden samen met {name}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Merge the selected values into {name}"
+msgstr "Voeg de geselecteerde waarden samen met {name}"
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "Dit exemplaar samenvoegen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden "
+"gekopieerd, daarna worden die exemplaren verwijderd."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8117,8 +8690,23 @@ msgid "Merged into {name}"
 msgstr "Samengevoegd met {name}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr "Samengevoegd in ‘{title}’."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged {count} values into {name}, moving {books} book(s)"
+msgstr ""
+"{count} waarde(n) samengevoegd met {name} en {books} boek(en) verplaatst"
+
+#: cps/spa_strings.py
 msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "Metadata URL (OIDC automatische detectie)"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr "Microsoft YaHei"
 
 #: cps/spa_strings.py
 msgid "Metadata clean-up"
@@ -8139,8 +8727,20 @@ msgid "Mine"
 msgstr "Van mij"
 
 #: cps/spa_strings.py
+msgid "Minimum books"
+msgstr "Minimum aantal boeken"
+
+#: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "Minimale beoordeling"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"Ontbrekende metadata wordt lege tekst. Titel en reeks gebruiken hun "
+"sorteernamen. Schuine strepen worden onderstrepingstekens, geen mappen."
 
 #: cps/spa_strings.py
 msgid "Mixed lettering — set per line in Advanced."
@@ -8163,11 +8763,11 @@ msgstr "Meer acties voor {name}"
 msgid "Most books first"
 msgstr "Meeste boeken eerst"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move down"
 msgstr "Naar beneden"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move up"
 msgstr "Naar boven"
 
@@ -8176,10 +8776,30 @@ msgstr "Naar boven"
 msgid "Move {name} down"
 msgstr "{name} omlaag verplaatsen"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} down one place"
+msgstr "Verplaats {name} één plaats omlaag"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Move {name} up"
 msgstr "{name} omhoog verplaatsen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} up one place"
+msgstr "Verplaats {name} één plaats omhoog"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} to the top level"
+msgstr "{name} is naar het hoogste niveau verplaatst"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} under {parent}"
+msgstr "{name} is onder {parent} geplaatst"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8233,11 +8853,26 @@ msgstr "Nieuwe functie!"
 
 #: cps/spa_strings.py
 msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
+"library."
+msgstr ""
+"Nieuwe accounts synchroniseren alleen geselecteerde planken. Als er geen "
+"boeken verschijnen, voeg dan boeken toe aan een plank en schakel de e-"
+"readersynchronisatie in. Vink dit uit om je hele bibliotheek te "
+"synchroniseren."
+
+#: cps/spa_strings.py
+msgid ""
 "New authors, tags, publishers, and languages will be added after each book's "
 "existing values. Filled single-value fields will be replaced."
 msgstr ""
 "Nieuwe auteurs, labels, uitgevers en talen worden toegevoegd na de bestaande "
 "waarden van elk boek. Ingevulde velden met één waarde worden vervangen."
+
+#: cps/spa_strings.py
+msgid "New name"
+msgstr "Nieuwe naam"
 
 #: cps/spa_strings.py
 msgid "New password"
@@ -8258,6 +8893,10 @@ msgstr "Nieuwe slimme boekenplank"
 #: cps/spa_strings.py
 msgid "New user"
 msgstr "Nieuwe gebruiker"
+
+#: cps/spa_strings.py
+msgid "New value"
+msgstr "Nieuwe waarde"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "New: My Library"
@@ -8312,6 +8951,10 @@ msgstr "Geen enkel toegestaan uploadformaat staat EPUB of PDF toe."
 #: cps/spa_strings.py
 msgid "No approval needed"
 msgstr "Geen goedkeuring nodig"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "Er zijn geen boeken beschikbaar in deze download."
 
 #: cps/spa_strings.py
 msgid "No book would change with the saved rules."
@@ -8393,8 +9036,8 @@ msgstr "Geen resultaten gevonden in dit boek."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "No matching {items} for \"{query}\"."
-msgstr "Geen overeenkomende {items} voor \"{query}\"."
+msgid "No matching {items} for the selected filters."
+msgstr "Geen {items} gevonden met de gekozen filters."
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
@@ -8450,6 +9093,14 @@ msgstr "Geen ondersteund boekbestand kon worden gescand."
 #: cps/spa_strings.py
 msgid "No tasks running."
 msgstr "Geen actieve taken."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "No unread books in this Discover source."
+msgstr "Geen ongelezen boeken in deze bron voor ontdekken."
+
+#: cps/spa_strings.py
+msgid "No uploaded fonts yet."
+msgstr "Er zijn nog geen lettertypen geüpload."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "No valid ISBN found in the scanned text."
@@ -8575,6 +9226,10 @@ msgstr "Genummerde lijst"
 msgid "OPDS catalog"
 msgstr "OPDS-catalogus"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "Bestandsnaamsjabloon voor OPDS-downloads"
+
 #: cps/spa_strings.py
 msgid ""
 "Off by default. Nothing is fetched and no permission changes until you turn "
@@ -8582,6 +9237,16 @@ msgid ""
 msgstr ""
 "Standaard uit. Er wordt niets opgehaald en er verandert geen enkel recht "
 "totdat je dit aanzet."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. If "
+"you are the only person sharing a rating for a book, the average is your "
+"score."
+msgstr ""
+"Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden "
+"gedeeld tellen mee, en namen worden nooit getoond. Als u als enige een "
+"beoordeling voor een boek deelt, is het gemiddelde uw score."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8606,6 +9271,10 @@ msgid ""
 msgstr ""
 "Scan op een ander apparaat waarop je al bent aangemeld deze code of open de "
 "onderstaande link om dit apparaat te autoriseren."
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr "Op boekenplank"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8636,6 +9305,26 @@ msgstr "Op dit apparaat"
 msgid "One column"
 msgstr "Éé kolom"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+"Alleen de suggesties voor ontdekken veranderen; boeken blijven in je "
+"bibliotheek."
+
+#: cps/spa_strings.py
+msgid ""
+"Only the books you pick below sync. Switching here starts from none picked — "
+"you choose each book yourself."
+msgstr ""
+"Alleen de boeken die je hieronder kiest, synchroniseren. Overschakelen "
+"begint met niets gekozen — je kiest elk boek zelf."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Only values without sub-values can be deleted. Move or rename it first."
+msgstr ""
+"U kunt alleen waarden zonder subwaarden verwijderen. Verplaats of hernoem "
+"deze waarde eerst."
+
 #: cps/spa_strings.py
 msgid ""
 "One map per field. A rule turns a value into another (rename), several "
@@ -8648,14 +9337,6 @@ msgstr ""
 "hoofdletters en accenten. Waarden waarvoor geen regel geldt, blijven zoals "
 "ze zijn. Er verandert niets in de bibliotheek totdat je het voorbeeld "
 "toepast."
-
-#: cps/spa_strings.py
-msgid ""
-"Only the books you pick below sync. Switching here starts from none picked — "
-"you choose each book yourself."
-msgstr ""
-"Alleen de boeken die je hieronder kiest, synchroniseren. Overschakelen "
-"begint met niets gekozen — je kiest elk boek zelf."
 
 #: cps/spa_strings.py
 msgid "Only values without a rule"
@@ -8777,6 +9458,10 @@ msgstr "eReaders van andere gebruikers:"
 msgid "PDF reader"
 msgstr "PDF-lezer"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "Opgevuld reeksnummer:"
+
 #: cps/spa_strings.py
 msgid "Page margins"
 msgstr "Paginamarges"
@@ -8823,6 +9508,23 @@ msgstr "Wachtwoord"
 #: cps/spa_strings.py
 msgid "Password (leave blank to keep)"
 msgstr "Wachtwoord (laat leeg om te behouden)"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Paste"
+msgstr "Plakken"
+
+#: cps/spa_strings.py
+msgid "Paste at top level"
+msgstr "Op het hoogste niveau plakken"
+
+#: cps/spa_strings.py
+msgid "Paste cancelled."
+msgstr "Plakken geannuleerd."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Paste under {name}"
+msgstr "Onder {name} plakken"
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
@@ -8940,6 +9642,14 @@ msgstr "Vorige"
 msgid "Previous page"
 msgstr "Vorige pagina"
 
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr "Vorige instellingen hersteld"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Private to your account. This does not change the shared Description."
+msgstr "Privé voor jouw account. Dit wijzigt de gedeelde Beschrijving niet."
+
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
 msgstr "Voortgang"
@@ -8974,10 +9684,6 @@ msgid "Rating"
 msgstr "Beoordeling"
 
 #: cps/spa_strings.py
-msgid "Rating (stars)"
-msgstr "Beoordeling (sterren)"
-
-#: cps/spa_strings.py
 msgid ""
 "Re-enter the credential when changing the connection to a different server."
 msgstr ""
@@ -8997,8 +9703,19 @@ msgid "Read status filter"
 msgstr "Gelezen/ongelezen status filter"
 
 #: cps/spa_strings.py
+msgid "Reader fonts"
+msgstr "Lettertypen voor de leesweergave"
+
+#: cps/spa_strings.py
 msgid "Reader settings saved."
 msgstr "Lezerinstellingen opgeslagen."
+
+#: cps/spa_strings.py
+msgid ""
+"Readers using this font return to Book default when they next open a book."
+msgstr ""
+"Lezers die dit lettertype gebruiken, krijgen weer het standaardlettertype "
+"van het boek wanneer ze een boek opnieuw openen."
 
 #: cps/spa_strings.py
 msgid "Reading app"
@@ -9027,6 +9744,14 @@ msgstr "Leesposities"
 #: cps/spa_strings.py
 msgid "Reading positions"
 msgstr "Leesposities"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Reading status"
+msgstr "Leesstatus"
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "Leesstatus bijgewerkt"
 
 #: cps/spa_strings.py
 msgid "Ready to run requests."
@@ -9096,8 +9821,21 @@ msgid "Remember me"
 msgstr "Onthoud mij"
 
 #: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr "Verwijdering wacht op synchronisatie"
+
+#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
+msgid "Remove"
+msgstr "Verwijderen"
+
+#: cps/spa_strings.py
 msgid "Remove device"
 msgstr "Apparaat verwijderen"
+
+#: cps/spa_strings.py
+msgid "Remove font"
+msgstr "Lettertype verwijderen"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from Currently Reading"
@@ -9136,6 +9874,10 @@ msgid "Remove rule"
 msgstr "Regel verwijderen"
 
 #: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr "Slaapscherm verwijderen"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag \"{tag}\""
 msgstr "Label \"{tag}\" verwijderen"
@@ -9148,6 +9890,14 @@ msgstr "De regel voor {value} verwijderen"
 #: cps/spa_strings.py
 msgid "Remove these"
 msgstr "Deze verwijderen"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
+"Deze afbeelding verwijderen? Je vorige KOReader-slaapscherminstellingen "
+"worden na de volgende synchronisatie hersteld."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9167,14 +9917,32 @@ msgstr "Verwijderd uit Momenteel aan het lezen."
 msgid "Removed {n} values no book uses now."
 msgstr "{n} waarden die geen boek meer gebruikt zijn verwijderd."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Rename"
 msgstr "Hernoemen"
 
 #: cps/spa_strings.py
+msgid "Rename value"
+msgstr "Waarde hernoemen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Rename {name}"
 msgstr "{name} hernoemen"
+
+#: cps/spa_strings.py
+msgid "Rename, merge, delete, move or create values"
+msgstr "Waarden hernoemen, samenvoegen, verwijderen, verplaatsen of maken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed and merged {count} values"
+msgstr "{count} waarde(n) hernoemd en samengevoegd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed {name}"
+msgstr "{name} is hernoemd"
 
 #: cps/spa_strings.py
 msgid "Reorder"
@@ -9234,9 +10002,22 @@ msgid "Request release"
 msgstr "Release aanvragen"
 
 #: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Dit boek aanvragen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Dit boek aanvragen: {filename}"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
 msgstr "{format} aanvragen"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Aangevraagd"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
@@ -9254,6 +10035,10 @@ msgstr "Aangevraagd. Een beheerder moet het goedkeuren."
 #: cps/spa_strings.py
 msgid "Requests are paused"
 msgstr "Aanvragen zijn gepauzeerd"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr "Aanvragen zijn gepauzeerd. Je kunt de beschikbare boeken nog bekijken."
 
 #: cps/spa_strings.py
 msgid "Requests cannot run yet:"
@@ -9346,6 +10131,18 @@ msgstr "Opnieuw proberen."
 msgid "Reverse-proxy header login"
 msgstr "Reverse-proxy header aanmelding"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review deleted."
+msgstr "Recensie verwijderd."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review or note"
+msgstr "Recensie of notitie"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review saved."
+msgstr "Recensie opgeslagen."
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
@@ -9408,6 +10205,10 @@ msgstr "Dezelfde map met voltooide downloads binnen CWNG"
 msgid "Save"
 msgstr "Opslaan"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Save Discover source"
+msgstr "Bron voor ontdekken opslaan"
+
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "Opslaan als voorinstelling"
@@ -9425,6 +10226,10 @@ msgid "Save for the whole library"
 msgstr "Opslaan voor de hele bibliotheek"
 
 #: cps/spa_strings.py
+msgid "Save ingest folder settings"
+msgstr "Instellingen voor importmappen opslaan"
+
+#: cps/spa_strings.py
 msgid "Save name"
 msgstr "Naam opslaan"
 
@@ -9435,6 +10240,14 @@ msgstr "Notitie opslaan"
 #: cps/spa_strings.py
 msgid "Save preset"
 msgstr "Voorinstelling opslaan"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Save rating"
+msgstr "Beoordeling opslaan"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Save review"
+msgstr "Recensie opslaan"
 
 #: cps/spa_strings.py
 msgid "Save rules"
@@ -9506,6 +10319,10 @@ msgid "Search inside book"
 msgstr "Zoeken in het boek"
 
 #: cps/spa_strings.py
+msgid "Search library"
+msgstr "Bibliotheek doorzoeken"
+
+#: cps/spa_strings.py
 msgid "Search remaining catalogs"
 msgstr "Overige catalogi doorzoeken"
 
@@ -9524,6 +10341,10 @@ msgstr "Dit boek doorzoeken"
 #: cps/spa_strings.py
 msgid "Search this catalog"
 msgstr "Zoek in deze catalogus"
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr "Zoek op titel, auteur, reeks…"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -9744,6 +10565,10 @@ msgstr "Instellingen voor {name}"
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Share my ratings in the household average"
+msgstr "Mijn beoordelingen meetellen in het gemiddelde van het huishouden"
+
 #: cps/spa_strings.py
 msgid "Share with everyone"
 msgstr "Delen met iedereen"
@@ -9776,7 +10601,13 @@ msgstr "Plankinstellingen"
 msgid "Shelf visibility saved."
 msgstr "Zichtbaarheid van de plank opgeslagen."
 
-#: cps/spa_strings.py cps/templates/readcbr.html
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Shelf: {name}"
+msgstr "Boekenplank: {name}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#: cps/templates/readcbr.html
 msgid "Show"
 msgstr "Toon"
 
@@ -9822,6 +10653,10 @@ msgstr "Apparaatgegevens tonen"
 msgid "Show e-reader previews on each candidate"
 msgstr "E-reader-voorvertoningen tonen bij elke kandidaat"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Show every value again"
+msgstr "Alle waarden weer tonen"
+
 #: cps/spa_strings.py
 msgid "Show fewer tags"
 msgstr "Minder labels tonen"
@@ -9838,21 +10673,30 @@ msgstr "Tonen in mijn OPDS-feed"
 msgid "Show less"
 msgstr "Minder tonen"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show library rating"
+msgstr "Bibliotheekbeoordeling tonen"
+
 #: cps/spa_strings.py
 msgid "Show more"
 msgstr "Meer tonen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Show only {name} and its sub-values"
+msgstr "Toon alleen {name} en de bijbehorende subwaarden"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Wachtwoord tonen"
 
 #: cps/spa_strings.py
-msgid "Show shelf tags"
-msgstr "Boekenplanklabels tonen"
-
-#: cps/spa_strings.py
 msgid "Show shelf drag handles"
 msgstr "Sleepgrepen voor boekenplanken tonen"
+
+#: cps/spa_strings.py
+msgid "Show shelf tags"
+msgstr "Boekenplanklabels tonen"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9863,6 +10707,14 @@ msgstr ""
 "De globale bibliotheek weer tonen? Je selectie blijft precies zoals je hem "
 "achterliet — schakel gerust terug, hij blijft bewaard. Bij de volgende "
 "update synchroniseert je e-reader de globale bibliotheek."
+
+#: cps/spa_strings.py
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr "De herkenbare Calibre-beoordeling naast je eigen beoordeling tonen."
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr "Hele afbeelding tonen"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9897,30 +10749,13 @@ msgstr ""
 "weergegeven."
 
 #: cps/spa_strings.py
-msgid "Minimum books"
-msgstr "Minimum aantal boeken"
-
-#: cps/spa_strings.py
-msgid "Leave blank to show any number of books. The minimum is inclusive."
-msgstr "Laat leeg om elk aantal boeken te tonen. Het minimum is inclusief."
-
-#: cps/spa_strings.py
-msgid "Enter a whole number of at least 1."
-msgstr "Voer een geheel getal van minstens 1 in."
-
-#: cps/spa_strings.py
-msgid "Correct the minimum books value to see results."
-msgstr "Corrigeer de waarde voor minimum aantal boeken om resultaten te zien."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "No matching {items} for the selected filters."
-msgstr "Geen {items} gevonden met de gekozen filters."
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} {items}."
 msgstr "Weergave van {shown} van {total} {items}."
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr "Wordt getoond wanneer dit apparaat in KOReader in slaapstand gaat."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -9950,6 +10785,10 @@ msgstr "Aanmelding"
 msgid "Signing in…"
 msgstr "Inloggen…"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "SimSun"
+msgstr "SimSun"
+
 #: cps/spa_strings.py
 msgid "Site title"
 msgstr "Websitetitel"
@@ -9959,12 +10798,31 @@ msgid "Size (pt)"
 msgstr "Grootte (pt)"
 
 #: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr "Slaapscherm"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr "Slaapscherm voor {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr "Voorbeeld van het slaapscherm voor {name}"
+
+#: cps/spa_strings.py
 msgid "Smart shelf"
 msgstr "Slimme plank"
 
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Slimme boekenplank niet gevonden."
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Smart shelf: {name}"
+msgstr "Slimme boekenplank: {name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9989,6 +10847,10 @@ msgstr "Effen: meest voorkomende kleur in de omslag"
 #: cps/spa_strings.py
 msgid "Some sources need a key for better covers"
 msgstr "Sommige bronnen hebben een sleutel nodig voor betere omslagen"
+
+#: cps/spa_strings.py
+msgid "Something is already there. Move it first."
+msgstr "Op die plek staat al een waarde. Verplaats die eerst."
 
 #: cps/spa_strings.py
 msgid "Something went wrong"
@@ -10125,6 +10987,11 @@ msgid "Sync to e-readers"
 msgstr "Synchroniseren met e-readers"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr "TTF, OTF, WOFF of WOFF2, maximaal {n} MiB per bestand."
+
+#: cps/spa_strings.py
 msgid "Table view"
 msgstr "Tabelweergave"
 
@@ -10204,12 +11071,28 @@ msgstr ""
 "local- en cloudmetadata-adressen zijn nooit toegestaan."
 
 #: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Die boekkeuze was verouderd. De lijst wordt vernieuwd…"
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "Die boekkeuze was verouderd. De lijst is vernieuwd; kies opnieuw."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Dat boek kon niet worden aangevraagd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
 msgid "That catalog no longer exists."
 msgstr "Die catalogus bestaat niet meer."
 
 #: cps/spa_strings.py
 msgid "That choice expired. Refresh the page and pick the file again."
 msgstr "Die keuze is verlopen. Vernieuw de pagina en kies het bestand opnieuw."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "That name cannot be used"
+msgstr "Die naam kan niet worden gebruikt"
 
 #: cps/spa_strings.py
 msgid "That page expired. Go back to the top and try again."
@@ -10240,6 +11123,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "That request is no longer waiting."
 msgstr "Die aanvraag staat niet meer te wachten."
+
+#: cps/spa_strings.py
+msgid "That value is already at the bottom of its level."
+msgstr "Die waarde staat al onderaan op dit niveau."
+
+#: cps/spa_strings.py
+msgid "That value is already at the top of its level."
+msgstr "Die waarde staat al bovenaan op dit niveau."
 
 #: cps/spa_strings.py
 msgid "The Calibre library folder could not be found."
@@ -10285,6 +11176,10 @@ msgstr ""
 "geselecteerd boek verwijderd. Boeken zonder deze waarden blijven ongewijzigd."
 
 #: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "De beschikbare boeken konden niet worden geladen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
 msgid "The background scheduler is not running."
 msgstr "De achtergrondplanner draait niet."
 
@@ -10295,6 +11190,14 @@ msgstr "De boekbestanden worden ook bijgewerkt."
 #: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr "Het boek wordt nog geopend. Probeer het zo opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Het boek of de voltooide download is gewijzigd. Herstel de oorspronkelijke "
+"bestanden voordat je het opnieuw probeert."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
@@ -10320,6 +11223,22 @@ msgstr "De catalogi konden niet worden geladen."
 
 #: cps/spa_strings.py
 msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"De keuze was verouderd en de beschikbare boeken konden niet worden "
+"vernieuwd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Het gekozen boek staat niet meer in de voltooide download. Herstel het "
+"oorspronkelijke bestand voordat je het opnieuw probeert."
+
+#: cps/spa_strings.py
+msgid ""
 "The completed download contains multiple books. A single-book release is "
 "required."
 msgstr ""
@@ -10329,6 +11248,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "The completed download contains no usable EPUB or PDF."
 msgstr "De voltooide download bevat geen bruikbare EPUB of PDF."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
+"De voltooide download overschrijdt de veilige bestandslimieten. Kies een "
+"kleinere uitgave."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10438,6 +11365,10 @@ msgid "The list of people could not be loaded."
 msgstr "De lijst met personen kon niet worden geladen."
 
 #: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr "Het oorspronkelijke Kindle-vergrendelscherm blijft ongewijzigd."
+
+#: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "De wijziging van de voorinstelling is mislukt. Probeer het opnieuw."
 
@@ -10466,6 +11397,24 @@ msgstr "De aanvraag kon niet worden gestopt."
 msgid "The scan reached its limit. More ISBNs may be present in the file."
 msgstr ""
 "De scan heeft zijn limiet bereikt. Het bestand kan meer ISBN’s bevatten."
+
+#: cps/spa_strings.py
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+"De gekozen kolom is niet beschikbaar. Kies een ander doel of schakel "
+"maplabels uit voordat je importeert."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"The selected values are removed from {count} book(s). The books are kept — "
+"they simply lose the value. There is no undo."
+msgstr ""
+"De geselecteerde waarden worden bij {count} boek(en) verwijderd. De boeken "
+"blijven behouden en verliezen alleen deze waarden. U kunt dit niet ongedaan "
+"maken."
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -10574,6 +11523,20 @@ msgstr ""
 "Deze instellingen konden niet worden vernieuwd, dus wat je ziet kan "
 "verouderd zijn."
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"These values are folded into {name}. Their books keep a value, but the "
+"values themselves are gone. There is no undo."
+msgstr ""
+"Deze waarden worden samengevoegd met {name}. De bijbehorende boeken krijgen "
+"de waarde {name} en de samengevoegde waarden verdwijnen. U kunt dit niet "
+"ongedaan maken."
+
+#: cps/spa_strings.py cps/templates/index.html cps/web.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr "Deze bron voor ontdekken is niet beschikbaar. Kies een andere bron."
+
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
 "This account can't download books, so its Kobo will be refused when it "
@@ -10648,6 +11611,10 @@ msgid ""
 msgstr ""
 "Deze database bevat rechten uit de oude experimentele Store. Die moeten "
 "worden nagekeken voordat boekbronnen kunnen worden aangezet."
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr "Dit apparaat kan geen aangepast KOReader-slaapscherm tonen."
 
 #: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
@@ -10756,6 +11723,10 @@ msgid "This release’s download address is not trusted by this connection."
 msgstr ""
 "Het downloadadres van deze uitgave wordt niet vertrouwd door deze verbinding."
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "This removes your private review or note for this book."
+msgstr "Hiermee verwijder je jouw privérecensie of notitie voor dit boek."
+
 #: cps/spa_strings.py
 msgid ""
 "This request came from a different network than the one you are using. If "
@@ -10768,6 +11739,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
 msgstr "Deze aanvraag moet opnieuw door een beheerder worden goedgekeurd."
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr ""
+"Deze regel kan hier niet worden bewerkt. Hij blijft behouden tenzij u hem "
+"verwijdert."
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -10788,6 +11765,50 @@ msgid ""
 msgstr ""
 "Deze torrent gebruikt een tracker buiten de origins die de beheerder heeft "
 "toegestaan."
+
+#: cps/spa_strings.py
+msgid "This value has sub-values, so they are renamed too."
+msgstr "Deze waarde heeft subwaarden die ook worden hernoemd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will be created at the same level as {name}, just below it."
+msgstr "Deze waarde komt op hetzelfde niveau als {name}, direct eronder."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. There is no undo."
+msgstr ""
+"Hiermee worden {count} waarde(n) samengevoegd met bestaande waarden. U kunt "
+"dit niet ongedaan maken."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick another value to merge into this one"
+msgstr "Vink een andere waarde aan om met deze waarde samen te voegen"
+
+#: cps/spa_strings.py
+msgid ""
+"Tick the value it should go under, then press Paste on that row. The valid "
+"rows are highlighted."
+msgstr ""
+"Vink de waarde aan waaronder deze moet komen en klik op Plakken op die rij. "
+"De beschikbare rijen zijn gemarkeerd."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before cutting it"
+msgstr "Vink deze waarde aan voordat u die knipt"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before moving it"
+msgstr "Vink deze waarde aan voordat u die verplaatst"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to merge the others into it"
+msgstr "Vink deze waarde aan om de andere ermee samen te voegen"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to paste into it"
+msgstr "Vink deze waarde aan om eronder te plakken"
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -10923,10 +11944,19 @@ msgstr ""
 msgid "Unarchive"
 msgstr "Dearchiveren"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+#, python-brace-format
+msgid "Unavailable column: {name}"
+msgstr "Kolom niet beschikbaar: {name}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #, python-brace-format
 msgid "Unavailable files: {formats}"
 msgstr "Niet-beschikbare bestanden: {formats}"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Unavailable source"
+msgstr "Bron niet beschikbaar"
 
 #: cps/spa_strings.py
 msgid "Undo"
@@ -10972,6 +12002,11 @@ msgstr "Ontgrendel de omslag om deze te wijzigen"
 msgid "Unpin sidebar"
 msgstr "Zijbalk losmaken"
 
+#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
+#: cps/web.py
+msgid "Unrated"
+msgstr "Niet beoordeeld"
+
 #: cps/spa_strings.py
 msgid "Unsaved changes to the rules."
 msgstr "Niet-opgeslagen wijzigingen in de regels."
@@ -10979,6 +12014,10 @@ msgstr "Niet-opgeslagen wijzigingen in de regels."
 #: cps/spa_strings.py
 msgid "Unseeded books"
 msgstr "Niet-geïnitialiseerde boeken"
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "Niet-ondersteunde regel"
 
 #: cps/spa_strings.py
 msgid "Untitled"
@@ -11005,6 +12044,14 @@ msgid "Update failed."
 msgstr "Bijwerken mislukt."
 
 #: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr "Werk de CWNG-plugin bij"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr "Werk de CWNG-plugin op dit apparaat bij en synchroniseer daarna."
+
+#: cps/spa_strings.py
 msgid "Upload a book"
 msgstr "Een boek uploaden"
 
@@ -11017,6 +12064,22 @@ msgid "Upload books"
 msgstr "Boeken uploaden"
 
 #: cps/spa_strings.py
+msgid "Upload font"
+msgstr "Lettertype uploaden"
+
+#: cps/spa_strings.py
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font choices "
+"stay available."
+msgstr ""
+"Upload lettertypen eenmalig voor iedereen die de EPUB-lezers gebruikt. De "
+"bestaande lettertypen blijven beschikbaar."
+
+#: cps/spa_strings.py
+msgid "Uploaded reader fonts"
+msgstr "Geüploade lettertypen voor de leesweergave"
+
+#: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "Uploaden is niet beschikbaar voor je account op deze server."
 
@@ -11024,6 +12087,10 @@ msgstr "Uploaden is niet beschikbaar voor je account op deze server."
 #, python-brace-format
 msgid "Use ISBN {isbn}"
 msgstr "ISBN {isbn} gebruiken"
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr "Gebruik een JPEG- of PNG-afbeelding van maximaal 10 MiB."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11053,6 +12120,14 @@ msgstr "Deze omslag gebruiken"
 #: cps/spa_strings.py
 msgid "Use this design"
 msgstr "Dit ontwerp gebruiken"
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Use {series:|(|) }{title} to omit the series prefix when no series is set."
+msgstr ""
+"Gebruik {series:|(|) }{title} om het serievoorvoegsel weg te laten als er "
+"geen serie is ingesteld."
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
@@ -11104,6 +12179,10 @@ msgstr ""
 msgid "Using the image behind that Google link"
 msgstr "De afbeelding achter die Google-link wordt gebruikt"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Value not found"
+msgstr "Waarde niet gevonden"
+
 #: cps/spa_strings.py
 msgid "Values in your library"
 msgstr "Waarden in je bibliotheek"
@@ -11146,8 +12225,20 @@ msgid "Waiting for approval"
 msgstr "Wacht op goedkeuring"
 
 #: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr "Wachten op apparaatgegevens"
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr "Wachten op de volgende synchronisatie"
+
+#: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
 msgstr "Wachten tot je autoriseert…"
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Wacht op je boekkeuze"
 
 #: cps/spa_strings.py
 msgid ""
@@ -11240,6 +12331,10 @@ msgstr "Een notitie schrijven"
 msgid "Write a note…"
 msgstr "Schrijf een notitie…"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Write subfolder names to"
+msgstr "Submapnamen schrijven naar"
+
 #: cps/spa_strings.py
 msgid "You are not allowed to edit this shelf"
 msgstr "Je mag deze plank niet bewerken"
@@ -11323,6 +12418,22 @@ msgstr ""
 msgid "Your personal digital library"
 msgstr "Jouw persoonlijke digitale bibliotheek"
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating"
+msgstr "Je beoordeling"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating saved."
+msgstr "Je beoordeling is opgeslagen."
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, highest first"
+msgstr "Je beoordeling, hoogste eerst"
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, lowest first"
+msgstr "Je beoordeling, laagste eerst"
+
 #: cps/spa_strings.py
 msgid "Your requests"
 msgstr "Je aanvragen"
@@ -11331,11 +12442,24 @@ msgstr "Je aanvragen"
 msgid "Your requests could not be loaded. They have not been lost."
 msgstr "Je aanvragen konden niet worden geladen. Ze zijn niet verloren."
 
+# Private book reviews (#917).
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Your review"
+msgstr "Jouw recensie"
+
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 "Jouw opgeslagen e-readeradres wordt getoond — wijzig het alleen voor deze "
 "verzending."
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid ""
+"Your score does not change the Calibre library rating. Sharing is off unless "
+"you opt in in your account."
+msgstr ""
+"Je beoordeling verandert de beoordeling in de Calibre-bibliotheek niet. "
+"Delen staat uit totdat je het in je account inschakelt."
 
 #: cps/spa_strings.py
 msgid "all rules"
@@ -11374,9 +12498,17 @@ msgstr "e-reader"
 msgid "e.g. Unread sci-fi"
 msgstr "bijv. Ongelezen sci-fi"
 
+#: cps/spa_strings.py cps/templates/email_edit.html
+msgid "eReader attachment filename template"
+msgstr "Bestandsnaamsjabloon voor eReader-bijlagen"
+
 #: cps/spa_strings.py
 msgid "eReader email subject"
 msgstr "eReader e-mailonderwerp"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "has sub-values"
+msgstr "heeft subwaarden"
 
 #: cps/spa_strings.py
 msgid "just now"
@@ -11428,13 +12560,12 @@ msgstr "{count} catalogi zijn nog niet doorzocht."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{count} column"
-msgstr "{count} kolom"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr "{count} kolommen"
+msgid ""
+"{count} existing value(s) will be merged into this one. You will be asked to "
+"confirm."
+msgstr ""
+"{count} bestaande waarde(n) worden met deze waarde samengevoegd. U wordt om "
+"bevestiging gevraagd."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11456,6 +12587,11 @@ msgstr "{count} bestanden in de wachtrij geplaatst voor import"
 msgid "{count} files rejected"
 msgstr "{count} bestanden afgewezen"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} levels"
+msgstr "{count} niveaus"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} matches"
@@ -11476,6 +12612,11 @@ msgstr "{count} resultaten"
 msgid "{count} results for \"{query}\""
 msgstr "{count} resultaten voor \"{query}\""
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} value(s) hidden by the filters above"
+msgstr "{count} waarde(n) verborgen door de filters hierboven"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{deleted} books in {groups} groups would be deleted."
@@ -11485,6 +12626,13 @@ msgstr "{deleted} boeken in {groups} groepen zouden worden verwijderd."
 #, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} van {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr ""
+"{failed} van {total} boeken konden niet worden toegevoegd. Ze blijven "
+"geselecteerd."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11500,6 +12648,21 @@ msgstr "{free} vrij van {total}"
 #, python-brace-format
 msgid "{name} hex value"
 msgstr "Hexwaarde van {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} is ready to paste. Choose where it should go."
+msgstr "{name} kan worden geplakt. Kies waar die waarde moet komen."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved down one place."
+msgstr "{name} is één plaats omlaag verplaatst."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved up one place."
+msgstr "{name} is één plaats omhoog verplaatst."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11554,6 +12717,11 @@ msgstr "{n} toegewezen aan {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr "{n} boek(en) toegevoegd aan {shelf}."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books"
 msgstr "{n} boeken"
 
@@ -11589,6 +12757,11 @@ msgstr "{n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} of {max} characters"
+msgstr "{n} van {max} tekens"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} skipped because they changed since the preview or were left out."
 msgstr ""
 "{n} overgeslagen, omdat ze sinds het voorbeeld zijn gewijzigd of zijn "
@@ -11611,13 +12784,41 @@ msgstr "{percent}% gelezen"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{rating} out of 5"
+msgstr "{rating} van 5"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{seeded} of {total} books seeded"
 msgstr "{seeded} van {total} boeken geïnitialiseerd"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} bytes"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+"{succeeded} toegevoegd aan {shelf}; {failed} mislukt. Mislukte boeken "
+"blijven geselecteerd om opnieuw te proberen."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"“{name}” has sub-values, so it cannot be merged away. Move or rename it "
+"instead."
+msgstr ""
+"‘{name}’ heeft subwaarden en kan daarom niet opgaan in een andere waarde. "
+"Verplaats of hernoem deze waarde."
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -11634,46 +12835,6 @@ msgstr "← Terug naar inloggen"
 #: cps/spa_strings.py
 msgid "← Library"
 msgstr "← Bibliotheek"
-
-#: cps/spa_strings.py
-msgid "Add books"
-msgstr "Boeken toevoegen"
-
-#: cps/spa_strings.py
-msgid "Add books to shelf"
-msgstr "Boeken aan boekenplank toevoegen"
-
-#: cps/spa_strings.py
-msgid "Add selected"
-msgstr "Selectie toevoegen"
-
-#: cps/spa_strings.py
-msgid "Could not add the selected books. Please try again."
-msgstr ""
-"De geselecteerde boeken konden niet worden toegevoegd. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid "Could not load books."
-msgstr "Boeken konden niet worden geladen."
-
-#: cps/spa_strings.py
-msgid "On shelf"
-msgstr "Op boekenplank"
-
-#: cps/spa_strings.py
-msgid "Search library"
-msgstr "Bibliotheek doorzoeken"
-
-#: cps/spa_strings.py
-msgid "Search title, author, series…"
-msgstr "Zoek op titel, auteur, reeks…"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{failed} of {total} books could not be added. They remain selected."
-msgstr ""
-"{failed} van {total} boeken konden niet worden toegevoegd. Ze blijven "
-"geselecteerd."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Password requirements:"
@@ -11714,147 +12875,8 @@ msgid "including {rules}"
 msgstr "waaronder {rules}"
 
 #: cps/spa_strings.py
-msgid ""
-"New accounts sync only selected shelves. If no books arrive, add books to a "
-"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
-"library."
-msgstr ""
-"Nieuwe accounts synchroniseren alleen geselecteerde planken. Als er geen "
-"boeken verschijnen, voeg dan boeken toe aan een plank en schakel de e-"
-"readersynchronisatie in. Vink dit uit om je hele bibliotheek te "
-"synchroniseren."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Acties voor {title}"
-
-#: cps/spa_strings.py
-msgid "Could not update this book. Try again."
-msgstr "Dit boek kon niet worden bijgewerkt. Probeer het opnieuw."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Favoriet"
-
-# Uploaded reader fonts (#915).
-#: cps/spa_strings.py
-msgid ""
-"Choose fonts you are allowed to share with this server’s readers. Files stay "
-"in the configuration volume across upgrades."
-msgstr ""
-"Kies lettertypen die u met de lezers op deze server mag delen. De bestanden "
-"blijven bij updates op het configuratievolume staan."
-
-#: cps/spa_strings.py
-msgid "Could not load reader fonts."
-msgstr "De lettertypen voor de leesweergave konden niet worden geladen."
-
-#: cps/spa_strings.py
-msgid "Could not remove font."
-msgstr "Het lettertype kon niet worden verwijderd."
-
-#: cps/spa_strings.py
-msgid "Could not upload font."
-msgstr "Het lettertype kon niet worden geüpload."
-
-#: cps/spa_strings.py
-msgid "Display name (optional)"
-msgstr "Weergavenaam (optioneel)"
-
-#: cps/spa_strings.py
-msgid "Font file"
-msgstr "Lettertypebestand"
-
-#: cps/spa_strings.py
-msgid "Font file is too large."
-msgstr "Het lettertypebestand is te groot."
-
-#: cps/spa_strings.py
-msgid "Font is available in both EPUB readers."
-msgstr "Het lettertype is beschikbaar in beide EPUB-lezers."
-
-#: cps/spa_strings.py
-msgid "Font removed."
-msgstr "Lettertype verwijderd."
-
-#: cps/spa_strings.py
-msgid "No uploaded fonts yet."
-msgstr "Er zijn nog geen lettertypen geüpload."
-
-#: cps/spa_strings.py
-msgid "Reader fonts"
-msgstr "Lettertypen voor de leesweergave"
-
-#: cps/spa_strings.py
-msgid ""
-"Readers using this font return to Book default when they next open a book."
-msgstr ""
-"Lezers die dit lettertype gebruiken, krijgen weer het standaardlettertype "
-"van het boek wanneer ze een boek opnieuw openen."
-
-#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
-#: cps/templates/user_table.html
-msgid "Remove"
-msgstr "Verwijderen"
-
-#: cps/spa_strings.py
-msgid "Remove font"
-msgstr "Lettertype verwijderen"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
-msgstr "TTF, OTF, WOFF of WOFF2, maximaal {n} MiB per bestand."
-
-#: cps/spa_strings.py
-msgid "Upload font"
-msgstr "Lettertype uploaden"
-
-#: cps/spa_strings.py
-msgid ""
-"Upload fonts once for everyone using the EPUB readers. Existing font choices "
-"stay available."
-msgstr ""
-"Upload lettertypen eenmalig voor iedereen die de EPUB-lezers gebruikt. De "
-"bestaande lettertypen blijven beschikbaar."
-
-#: cps/spa_strings.py
-msgid "Uploaded reader fonts"
-msgstr "Geüploade lettertypen voor de leesweergave"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "Arial"
-msgstr "Arial"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "KaiTi"
-msgstr "KaiTi"
-
-#: cps/spa_strings.py
 msgid "Keep"
 msgstr "Behouden"
-
-#: cps/spa_strings.py
-msgid "Microsoft YaHei"
-msgstr "Microsoft YaHei"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "SimSun"
-msgstr "SimSun"
-
-# Private book reviews (#917).
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Your review"
-msgstr "Jouw recensie"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Private to your account. This does not change the shared Description."
-msgstr "Privé voor jouw account. Dit wijzigt de gedeelde Beschrijving niet."
-
-#: cps/spa_strings.py
-msgid "Keep your thoughts about this book here."
-msgstr "Bewaar hier je gedachten over dit boek."
 
 #: cps/spa_strings.py
 msgid ""
@@ -11864,565 +12886,26 @@ msgstr ""
 "Behoudt één boek per groep en verwijdert de andere exemplaren, volgens de "
 "gekozen strategie."
 
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review or note"
-msgstr "Recensie of notitie"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Add a review"
-msgstr "Recensie toevoegen"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Edit review"
-msgstr "Recensie bewerken"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Save review"
-msgstr "Recensie opslaan"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete review"
-msgstr "Recensie verwijderen"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete your review?"
-msgstr "Jouw recensie verwijderen?"
-
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {count} duplicate books?"
 msgstr "{count} dubbele boeken verwijderen?"
 
 #: cps/spa_strings.py cps/templates/book_review.html
-msgid "This removes your private review or note for this book."
-msgstr "Hiermee verwijder je jouw privérecensie of notitie voor dit boek."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review saved."
-msgstr "Recensie opgeslagen."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review deleted."
-msgstr "Recensie verwijderd."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not load your review."
-msgstr "Jouw recensie kon niet worden geladen."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not save review."
-msgstr "Recensie kon niet worden opgeslagen."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not delete review."
-msgstr "Recensie kon niet worden verwijderd."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} of {max} characters"
-msgstr "{n} van {max} tekens"
-
-#: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review text exceeds 10000 characters"
 msgstr "De recensie bevat meer dan 10000 tekens"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Disabled"
-msgstr "Uitgeschakeld"
-
-# Ingest folder labels (#1495).
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Ingest folder labels"
-msgstr "Labels uit importmappen"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Add ingest subfolder names to book tags or an existing custom column. "
-"Existing values are kept; files in the ingest root add no labels."
-msgstr ""
-"Voeg namen van importsubmappen toe aan boeklabels of een bestaande "
-"aangepaste kolom. Bestaande waarden blijven behouden; bestanden in de "
-"hoofdmap krijgen geen labels."
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"For example, ingest/James/scifi adds James by default. Include nested "
-"folders to add scifi too."
-msgstr ""
-"Bijvoorbeeld: ingest/James/scifi voegt standaard James toe. Neem geneste "
-"mappen mee om ook scifi toe te voegen."
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Write subfolder names to"
-msgstr "Submapnamen schrijven naar"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Include nested folders"
-msgstr "Geneste mappen meenemen"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Custom columns must already exist and use comma-separated text, like tags. "
-"Create them in Calibre desktop first."
-msgstr ""
-"Aangepaste kolommen moeten al bestaan en tekst met komma’s bevatten, zoals "
-"labels. Maak ze eerst in Calibre op de computer."
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-#, python-brace-format
-msgid "Unavailable column: {name}"
-msgstr "Kolom niet beschikbaar: {name}"
-
-#: cps/spa_strings.py
-msgid ""
-"The selected column is unavailable. Choose another target or disable folder "
-"labels before importing."
-msgstr ""
-"De gekozen kolom is niet beschikbaar. Kies een ander doel of schakel "
-"maplabels uit voordat je importeert."
-
-#: cps/spa_strings.py
-msgid "Could not load ingest folder settings."
-msgstr "De instellingen voor importmappen konden niet worden geladen."
-
-#: cps/spa_strings.py
-msgid "Could not save ingest folder settings."
-msgstr "De instellingen voor importmappen konden niet worden opgeslagen."
-
-#: cps/spa_strings.py
-msgid "Ingest folder settings saved."
-msgstr "Instellingen voor importmappen opgeslagen."
-
-#: cps/spa_strings.py
-msgid "Save ingest folder settings"
-msgstr "Instellingen voor importmappen opslaan"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Discover source"
-msgstr "Bron voor ontdekken"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Current library"
-msgstr "Huidige bibliotheek"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Shelf: {name}"
-msgstr "Boekenplank: {name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Smart shelf: {name}"
-msgstr "Slimme boekenplank: {name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Unavailable source"
-msgstr "Bron niet beschikbaar"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Save Discover source"
-msgstr "Bron voor ontdekken opslaan"
-
-#: cps/spa_strings.py
-msgid "Change Discover source"
-msgstr "Bron voor ontdekken wijzigen"
-
-#: cps/spa_strings.py cps/web.py
-msgid "Discover source saved."
-msgstr "Bron voor ontdekken opgeslagen."
-
-#: cps/spa_strings.py
-msgid "Could not load Discover sources."
-msgstr "Kan bronnen voor ontdekken niet laden."
-
-#: cps/spa_strings.py cps/web.py
-msgid "Could not save Discover source. Please try again."
-msgstr "Kan de bron voor ontdekken niet opslaan. Probeer het opnieuw."
-
-#: cps/spa_strings.py cps/templates/index.html cps/web.py
-msgid "This Discover source is unavailable. Choose another source."
-msgstr "Deze bron voor ontdekken is niet beschikbaar. Kies een andere bron."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "No unread books in this Discover source."
-msgstr "Geen ongelezen boeken in deze bron voor ontdekken."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Only Discover picks change; books remain in your library."
-msgstr ""
-"Alleen de suggesties voor ontdekken veranderen; boeken blijven in je "
-"bibliotheek."
-
-#: cps/spa_strings.py
-msgid "A few random picks from your Discover source"
-msgstr "Een paar willekeurige suggesties uit je bron voor ontdekken"
-
-#: cps/spa_strings.py cps/templates/detail.html
-msgid "Reading status"
-msgstr "Leesstatus"
-
-#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
-#: cps/templates/search_form.html
-msgid "Finished"
-msgstr "Voltooid"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Update status"
 msgstr "Status bijwerken"
-
-#: cps/spa_strings.py
-msgid "Reading status updated"
-msgstr "Leesstatus bijgewerkt"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not update reading status."
 msgstr "De leesstatus kon niet worden bijgewerkt."
 
 #: cps/spa_strings.py
-msgid "Could not update reading status. Please try again."
-msgstr "De leesstatus kon niet worden bijgewerkt. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid "Did not finish and On hold keep your reading position."
-msgstr "Niet uitgelezen en Gepauzeerd behouden je leespositie."
-
-# Grid-to-shelf drag (#946).
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Add {title} to a shelf"
-msgstr "{title} aan een plank toevoegen"
-
-#: cps/spa_strings.py
-msgid "Drag to a shelf, or choose a shelf"
-msgstr "Sleep naar een plank of kies een plank"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} book(s) added to {shelf}."
-msgstr "{n} boek(en) toegevoegd aan {shelf}."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
-"for retry."
-msgstr ""
-"{succeeded} toegevoegd aan {shelf}; {failed} mislukt. Mislukte boeken "
-"blijven geselecteerd om opnieuw te proberen."
-
-#: cps/spa_strings.py
-msgid "Could not add books to the shelf. Please try again."
-msgstr ""
-"Boeken konden niet aan de plank worden toegevoegd. Probeer het opnieuw."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Example:"
-msgstr "Voorbeeld:"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Filename template fields and examples"
-msgstr "Velden en voorbeelden voor bestandsnaamsjablonen"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "First character:"
-msgstr "Eerste teken:"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "In KOReader, enable Use server filenames for the OPDS catalog."
-msgstr ""
-"Schakel in KOReader Serverbestandsnamen gebruiken in voor de OPDS-catalogus."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Leave blank to keep the current title and first-author filename. Do not "
-"include the file extension."
-msgstr ""
-"Laat leeg om de huidige bestandsnaam met titel en eerste auteur te behouden. "
-"Voeg geen bestandsextensie toe."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Missing metadata becomes empty text. Title and series use their sort names. "
-"Slashes become underscores, not folders."
-msgstr ""
-"Ontbrekende metadata wordt lege tekst. Titel en reeks gebruiken hun "
-"sorteernamen. Schuine strepen worden onderstrepingstekens, geen mappen."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "OPDS download filename template"
-msgstr "Bestandsnaamsjabloon voor OPDS-downloads"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Padded series number:"
-msgstr "Opgevuld reeksnummer:"
-
-#: cps/spa_strings.py
-msgid "Waiting for you to choose a book"
-msgstr "Wacht op je boekkeuze"
-
-#: cps/spa_strings.py
-msgid "Book requested. An administrator has to approve it."
-msgstr "Boek aangevraagd. Een beheerder moet het goedkeuren."
-
-#: cps/spa_strings.py
-msgid "Book added to your activity."
-msgstr "Boek toegevoegd aan je activiteit."
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. Refreshing the list…"
-msgstr "Die boekkeuze was verouderd. De lijst wordt vernieuwd…"
-
-#: cps/spa_strings.py
-msgid "Requests are paused. You can still view the available books."
-msgstr "Aanvragen zijn gepauzeerd. Je kunt de beschikbare boeken nog bekijken."
-
-#: cps/spa_strings.py
-msgid "That book could not be requested. Try again."
-msgstr "Dat boek kon niet worden aangevraagd. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid ""
-"The choice was out of date and the available books could not be refreshed. "
-"Try again."
-msgstr ""
-"De keuze was verouderd en de beschikbare boeken konden niet worden "
-"vernieuwd. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. The list was refreshed; choose again."
-msgstr "Die boekkeuze was verouderd. De lijst is vernieuwd; kies opnieuw."
-
-#: cps/spa_strings.py
-msgid "The available books could not be loaded. Try again."
-msgstr "De beschikbare boeken konden niet worden geladen. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Found {count} available books."
-msgstr "{count} beschikbare boeken gevonden."
-
-#: cps/spa_strings.py
-msgid "Choose a book from this download"
-msgstr "Kies een boek uit deze download"
-
-#: cps/spa_strings.py
-msgid "Hide available books"
-msgstr "Beschikbare boeken verbergen"
-
-#: cps/spa_strings.py
-msgid "Choose another book"
-msgstr "Nog een boek kiezen"
-
-#: cps/spa_strings.py
-msgid "Loading available books…"
-msgstr "Beschikbare boeken laden…"
-
-#: cps/spa_strings.py
-msgid "No books are available in this download."
-msgstr "Er zijn geen boeken beschikbaar in deze download."
-
-#: cps/spa_strings.py
-msgid "Import this book"
-msgstr "Dit boek importeren"
-
-#: cps/spa_strings.py
-msgid "Request this book"
-msgstr "Dit boek aanvragen"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Import this book: {filename}"
-msgstr "Dit boek importeren: {filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Request this book: {filename}"
-msgstr "Dit boek aanvragen: {filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{size} bytes"
-msgstr "{size} bytes"
-
-#: cps/spa_strings.py
-msgid "Requested"
-msgstr "Aangevraagd"
-
-#: cps/spa_strings.py
-msgid ""
-"The chosen book is no longer in the completed download. Restore its original "
-"file before trying again."
-msgstr ""
-"Het gekozen boek staat niet meer in de voltooide download. Herstel het "
-"oorspronkelijke bestand voordat je het opnieuw probeert."
-
-#: cps/spa_strings.py
-msgid ""
-"The book or completed download changed. Restore its original files before "
-"trying again."
-msgstr ""
-"Het boek of de voltooide download is gewijzigd. Herstel de oorspronkelijke "
-"bestanden voordat je het opnieuw probeert."
-
-#: cps/spa_strings.py
-msgid ""
-"The completed download exceeds the safe file limits. Choose a smaller "
-"release."
-msgstr ""
-"De voltooide download overschrijdt de veilige bestandslimieten. Kies een "
-"kleinere uitgave."
-
-#: cps/spa_strings.py
-msgid "Unsupported rule"
-msgstr "Niet-ondersteunde regel"
-
-#: cps/spa_strings.py
-msgid "This rule cannot be edited here. It will be kept unless you remove it."
-msgstr ""
-"Deze regel kan hier niet worden bewerkt. Hij blijft behouden tenzij u hem "
-"verwijdert."
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "All tags"
-msgstr "Alle labels"
-
-#: cps/spa_strings.py
-msgid "Could not load tags. Please try again."
-msgstr "De labels konden niet worden geladen. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid "Allow completed DRM-free MOBI 6 books"
-msgstr "Voltooide DRM-vrije MOBI 6-boeken toestaan"
-
-#: cps/spa_strings.py
-msgid ""
-"Applies only to this download client. The server upload-format setting must "
-"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
-"can be downloaded but cannot be opened in the web reader."
-msgstr ""
-"Is alleen van toepassing op deze downloadclient. De instelling voor "
-"uploadformaten op de server moet MOBI ook toestaan. De normale conversie-"
-"instellingen zijn van toepassing; zonder conversie kan MOBI worden "
-"gedownload, maar niet worden geopend in de weblezer."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not load your rating."
-msgstr "Je beoordeling kan niet worden geladen."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not save your rating."
-msgstr "Je beoordeling kan niet worden opgeslagen."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Household average"
-msgstr "Gemiddelde van het huishouden"
-
-#: cps/spa_strings.py cps/templates/detail.html
-#: cps/templates/library_rating.html
-msgid "Library rating"
-msgstr "Bibliotheekbeoordeling"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid ""
-"Off by default. Only opted-in ratings count, and names are never shown. If "
-"you are the only person sharing a rating for a book, the average is your "
-"score."
-msgstr ""
-"Standaard uitgeschakeld. Alleen beoordelingen die met toestemming worden "
-"gedeeld tellen mee, en namen worden nooit getoond. Als u als enige een "
-"beoordeling voor een boek deelt, is het gemiddelde uw score."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Save rating"
-msgstr "Beoordeling opslaan"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Share my ratings in the household average"
-msgstr "Mijn beoordelingen meetellen in het gemiddelde van het huishouden"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Show library rating"
-msgstr "Bibliotheekbeoordeling tonen"
-
-#: cps/spa_strings.py
-msgid "Show the labelled Calibre score alongside your own rating."
-msgstr "De herkenbare Calibre-beoordeling naast je eigen beoordeling tonen."
-
-#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
-#: cps/web.py
-msgid "Unrated"
-msgstr "Niet beoordeeld"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating"
-msgstr "Je beoordeling"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating saved."
-msgstr "Je beoordeling is opgeslagen."
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, highest first"
-msgstr "Je beoordeling, hoogste eerst"
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, lowest first"
-msgstr "Je beoordeling, laagste eerst"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid ""
-"Your score does not change the Calibre library rating. Sharing is off unless "
-"you opt in in your account."
-msgstr ""
-"Je beoordeling verandert de beoordeling in de Calibre-bibliotheek niet. "
-"Delen staat uit totdat je het in je account inschakelt."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{rating} out of 5"
-msgstr "{rating} van 5"
-
-#: cps/spa_strings.py
 msgid "Your rating (stars)"
 msgstr "Je beoordeling (sterren)"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-msgid "eReader attachment filename template"
-msgstr "Bestandsnaamsjabloon voor eReader-bijlagen"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Leave blank to keep the existing filename. Example: {series} #{series_index} "
-"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
-"the file extension is added automatically."
-msgstr ""
-"Laat leeg om de bestaande bestandsnaam te behouden. Voorbeeld: {series} "
-"#{series_index} - {title}. Velden: {title}, {authors}, {series} en "
-"{series_index}; de bestandsextensie wordt automatisch toegevoegd."
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr ""
-"Gebruik {series:|(|) }{title} om het serievoorvoegsel weg te laten als er "
-"geen serie is ingesteld."
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "Choose a tag group to browse books from it and its subtags."
-msgstr ""
-"Kies een labelgroep om boeken uit die groep en de onderliggende labels te "
-"bekijken."
-
-#: cps/spa_strings.py
-msgid "Sleep screen"
-msgstr "Slaapscherm"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Sleep screen for {name}"
-msgstr "Slaapscherm voor {name}"
 
 #: cps/spa_strings.py
 msgid "Set sleep screen"
@@ -12431,108 +12914,6 @@ msgstr "Slaapscherm instellen"
 #: cps/spa_strings.py
 msgid "Replace image"
 msgstr "Afbeelding vervangen"
-
-#: cps/spa_strings.py
-msgid "Remove sleep screen"
-msgstr "Slaapscherm verwijderen"
-
-#: cps/spa_strings.py
-msgid "Choose an image"
-msgstr "Kies een afbeelding"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Sleep screen preview for {name}"
-msgstr "Voorbeeld van het slaapscherm voor {name}"
-
-#: cps/spa_strings.py
-msgid "Shown when this device sleeps in KOReader."
-msgstr "Wordt getoond wanneer dit apparaat in KOReader in slaapstand gaat."
-
-#: cps/spa_strings.py
-msgid "The native Kindle lock screen is unchanged."
-msgstr "Het oorspronkelijke Kindle-vergrendelscherm blijft ongewijzigd."
-
-#: cps/spa_strings.py
-msgid "Waiting for next sync"
-msgstr "Wachten op de volgende synchronisatie"
-
-#: cps/spa_strings.py
-msgid "Applied on device"
-msgstr "Toegepast op het apparaat"
-
-#: cps/spa_strings.py
-msgid "Removal waiting for sync"
-msgstr "Verwijdering wacht op synchronisatie"
-
-#: cps/spa_strings.py
-msgid "Previous settings restored"
-msgstr "Vorige instellingen hersteld"
-
-#: cps/spa_strings.py
-msgid "Waiting for device details"
-msgstr "Wachten op apparaatgegevens"
-
-#: cps/spa_strings.py
-msgid "Update the CWNG plugin"
-msgstr "Werk de CWNG-plugin bij"
-
-#: cps/spa_strings.py
-msgid "Update the CWNG plugin on this device, then sync."
-msgstr "Werk de CWNG-plugin op dit apparaat bij en synchroniseer daarna."
-
-#: cps/spa_strings.py
-msgid "Connect this device and use Sync now in KOReader."
-msgstr "Verbind dit apparaat en gebruik Nu synchroniseren in KOReader."
-
-#: cps/spa_strings.py
-msgid "This device cannot show a custom KOReader sleep screen."
-msgstr "Dit apparaat kan geen aangepast KOReader-slaapscherm tonen."
-
-#: cps/spa_strings.py
-msgid "Use a JPEG or PNG image up to 10 MiB."
-msgstr "Gebruik een JPEG- of PNG-afbeelding van maximaal 10 MiB."
-
-#: cps/spa_strings.py
-msgid "Could not save sleep screen. Try again."
-msgstr "Het slaapscherm kon niet worden opgeslagen. Probeer het opnieuw."
-
-#: cps/spa_strings.py
-msgid "Could not apply sleep screen"
-msgstr "Het slaapscherm kon niet worden toegepast"
-
-#: cps/spa_strings.py
-msgid ""
-"Remove this image? Your previous KOReader sleep-screen settings will return "
-"after the next sync."
-msgstr ""
-"Deze afbeelding verwijderen? Je vorige KOReader-slaapscherminstellingen "
-"worden na de volgende synchronisatie hersteld."
-
-#: cps/spa_strings.py
-msgid "Image fit"
-msgstr "Afbeeldingsweergave"
-
-#: cps/spa_strings.py
-msgid "Automatic"
-msgstr "Automatisch"
-
-#: cps/spa_strings.py
-msgid "Fill the screen"
-msgstr "Scherm vullen"
-
-#: cps/spa_strings.py
-msgid "Show the whole image"
-msgstr "Hele afbeelding tonen"
-
-#: cps/spa_strings.py
-msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr ""
-"Automatisch vult het scherm als er alleen een smalle rand zou wegvallen."
-
-#: cps/spa_strings.py
-msgid "Could not change image fit. Try again."
-msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
 #: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid ""
@@ -12639,45 +13020,6 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
 msgstr "Mijn bibliotheek leeg starten"
-
-#: cps/spa_strings.py
-msgid "Keep this copy"
-msgstr "Dit exemplaar behouden"
-
-#: cps/spa_strings.py
-msgid "Merge this copy"
-msgstr "Dit exemplaar samenvoegen"
-
-#: cps/spa_strings.py
-msgid "Merge into the kept copy"
-msgstr "Samenvoegen in het behouden exemplaar"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
-"copy is deleted."
-msgstr ""
-"Eén exemplaar samenvoegen in ‘{title}’? Formaten die het mist worden "
-"gekopieerd, daarna wordt dat exemplaar verwijderd."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
-"those copies are deleted."
-msgstr ""
-"{n} exemplaren samenvoegen in ‘{title}’? Formaten die het mist worden "
-"gekopieerd, daarna worden die exemplaren verwijderd."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Merged into “{title}”."
-msgstr "Samengevoegd in ‘{title}’."
-
-#: cps/spa_strings.py
-msgid "Could not merge these books."
-msgstr "Kan deze boeken niet samenvoegen."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -13140,6 +13482,169 @@ msgstr "Ongeldige boek ID."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Name cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Value cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "One of the selected values no longer exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Delete those instead."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Move or rename it instead of merging."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into one of its sub-values"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value cannot be changed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a node to rename"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node name cannot contain a comma"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. Continue?"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value name is already in use"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be renamed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to move"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a direction to move it"
+msgstr ""
+
+#: cps/api/cc_values.py cps/templates/cc_value_editor.html
+msgid "The values for this column could not be loaded."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "That value is already at the {end} of its level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "top"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "bottom"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be moved"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose the value to merge into"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be merged"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be deleted"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "This column is a flat list; values cannot be moved."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose where to move it"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "Moving there would merge {count} value(s). Move them one at a time."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value with that name is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Name the value to create"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to place the new one after"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid ""
+"A new value can only be placed beside the one it was created from, not in a "
+"different level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value already exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be created"
 msgstr ""
 
 #: cps/api/magicshelves.py
@@ -14402,6 +14907,56 @@ msgstr ""
 msgid "Collapse all"
 msgstr ""
 
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"{name} is ready to paste. Tick the value it should go under, then press "
+"Paste on that row."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "New name for {name}"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "New value. Use dots for a hierarchy, e.g. Arts.Mystery."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"New value, placed just below {name}. Same level, so the name cannot contain "
+"a dot."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "This will merge into existing value(s). There is no undo. Continue?"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"Remove {name}? The books are kept — they simply lose the value. There is no "
+"undo."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"Renaming renames everything below the value. To move one, tick it and press "
+"Cut, then tick the value it should go under and press Paste."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"To merge, tick two or more values, then use Merge on the one that should "
+"survive."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "Number of books"
+msgstr ""
+
 #: cps/templates/config_db.html
 msgid "Troubleshooting your DB"
 msgstr ""
@@ -15612,8 +16167,32 @@ msgstr "Reguliere expressie om kolommen te negeren"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html
+#, fuzzy
+msgid "Magic Shelves"
+msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
+
 #: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
 msgid "Sort by"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Custom column hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Automatic follows the hierarchy preference in Calibre. Older libraries "
+"without that preference infer the hierarchy from their values. Choose an "
+"explicit mode to override it for this website."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Always a hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Never a hierarchy"
 msgstr ""
 
 #: cps/templates/config_view_edit.html
@@ -20166,7 +20745,27 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#~ msgid "A few random picks from your library"
+#~ msgstr "Enkele willekeurige keuzes uit je bibliotheek"
+
+#~ msgid "Categories"
+#~ msgstr "Categorieën"
+
 #, python-brace-format
+#~ msgid "No matching {items} for \"{query}\"."
+#~ msgstr "Geen overeenkomende {items} voor \"{query}\"."
+
+#~ msgid "Rating (stars)"
+#~ msgstr "Beoordeling (sterren)"
+
+#, python-brace-format
+#~ msgid "{count} column"
+#~ msgstr "{count} kolom"
+
+#, python-brace-format
+#~ msgid "{count} columns"
+#~ msgstr "{count} kolommen"
+
 #~ msgid "…and {count} more groups"
 #~ msgstr "… en nog {count} groepen"
 
@@ -20180,10 +20779,6 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #, fuzzy
 #~ msgid "Rating cleared"
 #~ msgstr "Met beoordeling hoger dan"
-
-#, fuzzy
-#~ msgid "Magic Shelves"
-#~ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 
 #, fuzzy
 #~ msgid "Books organized in magic shelves"

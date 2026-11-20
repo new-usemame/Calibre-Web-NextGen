@@ -45,7 +45,7 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config, get_custom_column_visibility_options
-from .custom_column_visibility import save_cc_visibility
+from .custom_column_visibility import load_browsable_columns, save_cc_visibility
 from .services import file_lock
 from .services.worker import WorkerThread
 from .services.opds_filename import validate_template as validate_opds_filename_template
@@ -75,6 +75,7 @@ from . import content_server
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
+from . import cc_sidecar
 from .services.restriction_columns import (
     BOOL_CHOICES,
     RESTRICTION_DATATYPES,
@@ -966,12 +967,28 @@ def view_configuration(opds_filename_template=None, opds_filename_error=None, dr
         .filter(db.CustomColumns.mark_for_delete == 0).all()
     # Display-ignore policy hides reader fields, not the administrator's choices.
     sortable_columns = load_eligible_columns() or []
+    # Every browsable column with its stored hierarchy verdict, so the admin can
+    # override the data-derived one. The verdict is a tri-state and is passed
+    # through as a string for exactly that reason: "automatic" is a real answer
+    # and collapsing it into a boolean would make it indistinguishable from
+    # "flat", which is the opposite.
+    cc_modes = []
+    for column in (load_browsable_columns() or []):
+        verdict = cc_sidecar.hierarchy_verdict(column.id)
+        cc_modes.append({
+            'id': column.id,
+            'name': column.name,
+            'mode': ('hierarchical' if verdict.value is True
+                     else 'flat' if verdict.value is False
+                     else 'auto'),
+        })
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     return render_title_template("config_view_edit.html", conf=draft_config or config,
                                  opds_filename_template=opds_filename_template,
                                  opds_filename_error=opds_filename_error, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
+                                 ccModes=cc_modes,
                                  restriction_is_bool=(restricted_column_datatype(
                                      (draft_config or config).config_restricted_column) == "bool"),
                                  languages=languages,
@@ -1307,11 +1324,58 @@ def update_table_settings():
     return ""
 
 
+def _save_cc_hierarchy_verdicts():
+    """Write the per-column hierarchy modes submitted with the UI config.
+
+    One field, ``cc_hierarchy_mode_<id>``, carrying one of ``auto`` /
+    ``hierarchical`` / ``flat``. ``auto`` is the third state and the only way
+    back to deriving the answer from the data -- which is what every install
+    does today -- so it is stored as NULL rather than as a boolean. Losing that
+    distinction would make "reset to automatic" indistinguishable from "declare
+    it flat", and those are opposites.
+
+    Columns absent from the submission are left alone rather than reset: this
+    form is also posted by partial clients, and a missing field means "not
+    mentioned", not "clear it".
+    """
+    saved, failed = 0, 0
+    for field, value in request.form.items():
+        if not field.startswith("cc_hierarchy_mode_"):
+            continue
+        # The field NAME carries the id, so it is attacker-controlled form input
+        # like any other. Reuse the sidecar's own bound rather than inventing a
+        # second one: it rejects anything that will not fit Calibre's signed
+        # INTEGER key, which is also what the cc_value_order table uses.
+        column_id = cc_sidecar.parse_column_id(field[len("cc_hierarchy_mode_"):])
+        if column_id is None:
+            log.error("Ignoring malformed custom-column id in %r", field)
+            continue
+        if value == "hierarchical":
+            verdict = True
+        elif value == "flat":
+            verdict = False
+        elif value in ("auto", ""):
+            verdict = None
+        else:
+            log.error("Ignoring unknown custom-column hierarchy mode %r for id %s",
+                      value, column_id)
+            continue
+        if cc_sidecar.set_hierarchy_verdict(column_id, verdict):
+            saved += 1
+        else:
+            failed += 1
+    if failed:
+        flash(_("Could not save the custom column hierarchy setting for {count} "
+                "column(s).").format(count=failed), category="error")
+    return saved
+
+
 @admi.route("/admin/viewconfig", methods=["POST"])
 @user_login_required
 @admin_required
 def update_view_configuration():
     to_save = request.form.to_dict()
+
     if "config_opds_filename_template" in to_save:
         try:
             validate_opds_filename_template(to_save["config_opds_filename_template"])
@@ -1432,6 +1496,7 @@ def update_view_configuration():
         config.config_support_url = support_url
         config.config_support_label = support_label
 
+    _save_cc_hierarchy_verdicts()
     config.save()
     flash(_("Calibre-Web NextGen configuration updated"), category="success")
     log.debug("Calibre-Web NextGen configuration updated")

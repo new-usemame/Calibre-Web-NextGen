@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link, useSearch } from 'wouter';
-import { ChevronLeft, ChevronRight, Folder, FolderOpen, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Folder, FolderOpen, Pencil, Tag } from 'lucide-react';
 import { useColumns, useCcTree, useCcBooks, useMe } from '../lib/queries';
 import { apiUrl, type CcNode } from '../lib/api';
 import { BookCard } from '../components/BookCard';
@@ -14,6 +14,7 @@ import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { clampPage } from '../lib/pagination';
 import { canReadBooks } from '../lib/permissions';
 import { usePersistentBool } from '../lib/usePersistentBool';
+import { CcValueEditor } from './CcValueEditor';
 import styles from './CcBrowse.module.css';
 
 /** True when `selected` is `nodePath` itself or a deeper descendant, so the
@@ -239,6 +240,10 @@ export function CcBrowse({ id }: { id?: string }) {
   const search = useSearch();
   const path = new URLSearchParams(search).get('path') ?? '';
   const [afterChildren, setAfterChildren] = usePersistentBool('cwng:cc-books-after-children', false);
+  // Edit mode replaces the books with a value editor: picking values and acting
+  // on them is a different job from reading them, and showing both at once just
+  // makes the page long.
+  const [editing, setEditing] = useState(false);
   // Hook order: both hooks run on both modes; only the relevant one is enabled.
   const { data: me } = useMe();
   const columns = useColumns(!id);
@@ -292,9 +297,10 @@ export function CcBrowse({ id }: { id?: string }) {
     ? <NodeBooks colId={id} path={path} variant="inset" />
     : null;
 
-  // Column mode: toolbar + values + books.
+  // Column mode: toolbar + values + books. Edit mode takes the full width --
+  // the value list is the page in that mode, and it is wide.
   return (
-    <div className={styles.container}>
+    <div className={editing ? `${styles.container} ${styles.containerFull}` : styles.container}>
       <Link href="/cc" className={styles.back}>
         <ChevronLeft size={16} aria-hidden="true" focusable={false} />
         {t('Custom columns')}
@@ -303,29 +309,56 @@ export function CcBrowse({ id }: { id?: string }) {
         <h1 className={styles.title}>
           {tree.data?.column.name ?? t('Browse by Column')}
         </h1>
-        <div className={styles.toolbar}>
-          <span className={styles.toolbarLabel} id="cc-books-placement-label">
-            {t('Books placement')}
-          </span>
-          <div className={styles.viewToggle} role="group" aria-labelledby="cc-books-placement-label">
-            <button type="button" aria-pressed={!afterChildren}
-              onClick={() => setAfterChildren(false)}>
-              {t('After tree')}
-            </button>
-            <button type="button" aria-pressed={afterChildren}
-              onClick={() => setAfterChildren(true)}>
-              {t('After children')}
-            </button>
+        {/* Books-placement only makes sense while browsing. */}
+        {!editing && (
+          <div className={styles.toolbar}>
+            <span className={styles.toolbarLabel} id="cc-books-placement-label">
+              {t('Books placement')}
+            </span>
+            <div className={styles.viewToggle} role="group" aria-labelledby="cc-books-placement-label">
+              <button type="button" aria-pressed={!afterChildren}
+                onClick={() => setAfterChildren(false)}>
+                {t('After tree')}
+              </button>
+              <button type="button" aria-pressed={afterChildren}
+                onClick={() => setAfterChildren(true)}>
+                {t('After children')}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+        {/* Editing values is a metadata write: every action in the editor POSTs
+            through _require_metadata_editor(). Without this gate a signed-in
+            user WITHOUT the edit role was shown a fully working Cut / Paste /
+            Merge / Rename / Delete / Create panel in which every button 403s --
+            and the refusal rendered below the value list, so it read as
+            "nothing happens". Mirrors the role.edit check every other SPA
+            editor already does (Catalog, AdvancedSearch, BrowseList,
+            BookDetail, Table, BulkBar, Sidebar). */}
+        {editing ? (
+          <button type="button" className={styles.editToggle} onClick={() => setEditing(false)}>
+            {t('Done')}
+          </button>
+        ) : me?.role?.edit ? (
+          <button type="button" className={styles.editToggle}
+            onClick={() => setEditing(true)}
+            title={t('Rename, merge, delete, move or create values')}>
+            <Pencil size={15} aria-hidden="true" focusable={false} /> {t('Edit')}
+          </button>
+        ) : null}
       </div>
-      <p className={styles.hint}>
-        {isHierarchical
-          ? t('Select a category to see the books assigned to it and all of its sub-categories.')
-          : t('Select a value to see the books assigned to it.')}
-      </p>
+      {!editing && (
+        <p className={styles.hint}>
+          {isHierarchical
+            ? t('Select a category to see the books assigned to it and all of its sub-categories.')
+            : t('Select a value to see the books assigned to it.')}
+        </p>
+      )}
       {tree.isLoading ? <SpinnerCentered size={40} /> : tree.isError ? (
         <RequestError title={t('Could not load column')} error={tree.error} retrying={tree.isFetching} retry={() => { void tree.refetch(); }} />
+      ) : editing ? (
+        /* Edit mode: no books, just the values and the actions. */
+        <CcValueEditor colId={id} hierarchical={isHierarchical} onDone={() => setEditing(false)} />
       ) : (
         <>
           <ValuesList colId={id} selected={path} booksSlot={booksSlot} />

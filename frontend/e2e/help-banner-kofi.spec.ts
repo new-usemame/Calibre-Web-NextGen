@@ -295,7 +295,9 @@ test('Help menu renders the Ko-fi label from an authenticated translated catalog
   });
   await page.reload();
 
-  await page.getByRole('button', { name: /^Hilfe/ }).click();
+  // The whole accessible name, as for the English trigger above: the German
+  // banner's dismiss button ("Hilfe-Ankündigung ausblenden") also starts with "Hilfe".
+  await page.getByRole('button', { name: /^Hilfe(?: — neue Aktualisierungen verfügbar)?$/ }).click();
   await expect(page.getByRole('link', { name: 'Auf Ko-fi unterstützen →' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'de');
 });

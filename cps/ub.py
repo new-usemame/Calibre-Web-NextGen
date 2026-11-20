@@ -31,9 +31,9 @@ except ImportError:
     except ImportError:
         OAuthConsumerMixin = BaseException
         oauth_support = False
-from sqlalchemy import create_engine, DDL, exc, exists, event, text
+from sqlalchemy import create_engine, DDL, exc, exists, event, inspect, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
-from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
+from sqlalchemy import String, Integer, SmallInteger, BigInteger, Boolean, DateTime, Float, JSON, Text, BLOB, LargeBinary
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
@@ -810,6 +810,9 @@ class ReadBook(Base):
     # Automatic-created rows have no choice; migration snapshots legacy clocks
     # once as an inferred historical baseline, never as a runtime fallback.
     read_status_choice_at = Column(DateTime, nullable=True)
+    # The last transition into FINISHED, independent of explicit intent and
+    # later device/progress updates. Legacy finishes are snapshotted at upgrade.
+    read_finished_at = Column(DateTime, nullable=True)
 
     # Audit 2026-05-11: enforce per-(user, book) uniqueness so concurrent
     # Kobo PUTs can't produce duplicate rows. The Kobo state handler reads
@@ -1523,6 +1526,10 @@ class Device(Base):
     created_by = Column(String(32), nullable=False, default="auto")
     share_place = Column(Boolean, nullable=False, default=False, server_default='0')
     share_place_enabled_at = Column(DateTime, nullable=True)
+    # Opt-in, Kobo only: share this Kobo's place with the percentage that
+    # CrossPoint computes at its span, not the device's whole number. It
+    # changes the value that KOSync, Hardcover and the book page get.
+    align_percent = Column(Boolean, nullable=False, default=False, server_default='0')
     cwng_header_seen_at = Column(DateTime, nullable=True)
     # NULL is the account setting. JSON retains deleted selection ids for the
     # fallback notice; it holds no foreign keys or reading state.
@@ -1956,6 +1963,10 @@ class Annotation(Base):
         "KoboAnnotationMaterialization", back_populates="annotation",
         cascade="all, delete-orphan", uselist=False, single_parent=True,
     )
+    crosspoint_clipping = relationship(
+        "CrossPointClipping", back_populates="annotation",
+        cascade="all, delete-orphan", uselist=False, single_parent=True,
+    )
 
     __table_args__ = (
         Index('ix_annotation_user_annotation', 'user_id', 'annotation_id'),
@@ -1967,7 +1978,7 @@ class Annotation(Base):
         ),
     )
 
-    _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote"}
+    _VALID_SOURCES = {"kobo", "webreader", "koreader", "textquote", "crosspoint"}
     _VALID_POSITION_TYPES = {
         "cfi", "pdf_quad", "comic_page", "koreader_xpointer", "unanchored",
         "text_quote",
@@ -2041,6 +2052,64 @@ class KoboAnnotationMaterialization(Base):
         ),
         Index('ix_kam_serveable', 'annotation_id', 'serveable'),
     )
+
+
+class CrossPointClipping(Base):
+    """The CrossPoint layout of one ``crosspoint`` annotation row, exactly as
+    the reader sent it.
+
+    The firmware replaces its own record with the server copy on the first
+    pull after an upload, so every field here goes back unchanged, or the
+    highlight moves. ``deleted`` is the tombstone the reader pulls; it is
+    never undone. ``sync_revision`` comes from the owner's
+    ``CrossPointClippingClock``. See notes/CROSSPOINT-CLIPPINGS-DESIGN.md.
+    """
+    __tablename__ = 'crosspoint_clipping'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_id = Column(
+        Integer, ForeignKey('annotation.id', ondelete='CASCADE'),
+        nullable=False, unique=True,
+    )
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    # The document hash of the last upload: for logs only, the book is the key.
+    document = Column(String(255), nullable=False)
+    spine = Column(Integer, nullable=False)
+    start_page = Column(Integer, nullable=False)
+    end_page = Column(Integer, nullable=False)
+    pages = Column(Integer, nullable=False)
+    start_word = Column(Integer, nullable=False)
+    end_word = Column(Integer, nullable=False)
+    words = Column(Integer, nullable=False)
+    para = Column(Integer, nullable=True)
+    chapter = Column(String(64), nullable=False, default='')
+    text = Column(Text, nullable=False)
+    # The reader's own ``created_at``, in Unix seconds.
+    created_epoch = Column(Integer, nullable=False)
+    layout_signature = Column(Integer, nullable=False)
+    start_offset = Column(Integer, nullable=True)
+    end_offset = Column(Integer, nullable=True)
+    deleted = Column(Boolean, nullable=False, default=False)
+    sync_revision = Column(BigInteger, nullable=False)
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    annotation = relationship("Annotation", back_populates="crosspoint_clipping")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'sync_revision', name='uq_crosspoint_clipping_revision'),
+    )
+
+
+class CrossPointClippingClock(Base):
+    """Each account's CrossPoint clipping revision counter.
+
+    The firmware pages one item at a time with ``revision > cursor``, so two
+    items with one revision would make it skip one. A counter row, not
+    ``MAX()+1``, so that a value is never given out again after a hard delete.
+    """
+    __tablename__ = 'crosspoint_clipping_clock'
+
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), primary_key=True)
+    revision = Column(BigInteger, nullable=False, default=0)
 
 
 class KoboAnnotationBookState(Base):
@@ -2539,6 +2608,19 @@ def receive_before_flush(session, flush_context, instances):
                 change.kobo_reading_state.priority_timestamp = ts
             if isinstance(change, KoboBookmark) and not change.created_at and (change.progress_percent or 0) > 0:
                 change.created_at = ts
+            if isinstance(change, ReadBook):
+                attrs = inspect(change).attrs
+                if attrs.read_status.history.has_changes():
+                    if change.read_status != ReadBook.STATUS_FINISHED:
+                        change.read_finished_at = None
+                    elif not attrs.read_finished_at.history.has_changes():
+                        clocks = [getattr(change, field) for field in
+                                  ("last_modified", "read_status_choice_at")
+                                  if getattr(attrs, field).history.has_changes()
+                                  and getattr(change, field) is not None]
+                        change.read_finished_at = max(
+                            clocks, key=lambda stamp: stamp.replace(tzinfo=None),
+                        ) if clocks else datetime.now(timezone.utc)
 
     # Maintain the last_modified_bit for the Shelf table.
     for change in itertools.chain(session.new, session.deleted):
@@ -3703,6 +3785,11 @@ def _dedupe_book_read_link(_session):
         )
         winner, losers = rows[0], rows[1:]
         chosen_clock = winner.last_modified
+        if winner.read_status == ReadBook.STATUS_FINISHED:
+            finishes = [r.read_finished_at for r in rows
+                        if r.read_status == ReadBook.STATUS_FINISHED and r.read_finished_at is not None]
+            if finishes:
+                winner.read_finished_at = max(finishes, key=lambda stamp: stamp.replace(tzinfo=None))
         if not has_paused:
             known_choices = [r.read_status_choice_at for r in rows if r.read_status_choice_at is not None]
             if known_choices:
@@ -4716,6 +4803,7 @@ def migrate_device_share_place(engine, _session):
     for table, name, ddl in (
         ("device", "share_place", "share_place BOOLEAN NOT NULL DEFAULT 0"),
         ("device", "share_place_enabled_at", "share_place_enabled_at DATETIME"),
+        ("device", "align_percent", "align_percent BOOLEAN NOT NULL DEFAULT 0"),
         ("device", "cwng_header_seen_at", "cwng_header_seen_at DATETIME"),
         ("device_reading_position", "reading_status", "reading_status INTEGER"),
         ("device_reading_position", "status_modified_at", "status_modified_at DATETIME"),
@@ -5469,6 +5557,16 @@ def migrate_annotation_text_quote(engine, _session):
                 raise
 
 
+def migrate_crosspoint_clippings(engine, _session):
+    """Create the CrossPoint clipping sidecar and clock tables on upgraded
+    app.db files. Idempotent."""
+    Base.metadata.create_all(
+        engine,
+        tables=[CrossPointClipping.__table__, CrossPointClippingClock.__table__],
+        checkfirst=True,
+    )
+
+
 def migrate_annotation_decouple_source_target(engine, _session):
     """Decouple annotation origin from sync target.
 
@@ -5792,11 +5890,31 @@ def migrate_read_status_choice_at(engine, _session):
     log.info("[read-status-choice] added independent choice clock with historical baseline")
 
 
+def migrate_read_finished_at(engine, _session):
+    """Freeze the best available legacy finish date once, atomically."""
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(
+            text("PRAGMA table_info(book_read_link)"))}
+    if not columns or "read_finished_at" in columns:
+        return
+    try:
+        _run_ddl_with_retry(engine, [
+            "BEGIN IMMEDIATE",
+            "ALTER TABLE book_read_link ADD COLUMN read_finished_at DATETIME",
+            "UPDATE book_read_link SET read_finished_at = last_modified WHERE read_status = 1",
+        ])
+    except exc.OperationalError as error:
+        if "duplicate column" not in str(error).lower():
+            raise
+    log.info("[read-finished-at] preserved historical finish dates")
+
+
 def migrate_Database(_session):
     engine = _session.bind
     migrate_acquisition_schema(engine, Base.metadata)
     add_missing_tables(engine, _session)
     migrate_read_status_choice_at(engine, _session)
+    migrate_read_finished_at(engine, _session)
     migrate_kobo_entitlement_ledger_columns(engine, _session)
     migrate_thumbnail_lookup_index(engine, _session)
     migrate_reading_activity_indexes(engine, _session)
@@ -5842,6 +5960,7 @@ def migrate_Database(_session):
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_annotation_text_quote(engine, _session)
+    migrate_crosspoint_clippings(engine, _session)
     from .services.browser_source import migrate_account_browser_source
     migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)

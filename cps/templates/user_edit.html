@@ -210,6 +210,21 @@
         <div class="form-group">
           <label for="password">{{_('Password')}}</label>
           <input type="password" class="form-control" name="password" id="password" data-lang="{{ current_user.locale }}" data-verify="{{ config.config_password_policy }}" {% if config.config_password_policy %} data-min={{ config.config_password_min_length }} data-word={{ config.config_password_character }} data-special={{ config.config_password_special }} data-upper={{ config.config_password_upper }} data-lower={{ config.config_password_lower }} data-number={{ config.config_password_number }}{% endif %} value="" autocomplete="off">
+          {% if config.config_password_policy %}
+          {% set pw_rules = [] %}
+          {% if config.config_password_number %}{% set _r = pw_rules.append(_('a number')) %}{% endif %}
+          {% if config.config_password_lower %}{% set _r = pw_rules.append(_('a lowercase letter')) %}{% endif %}
+          {% if config.config_password_upper %}{% set _r = pw_rules.append(_('an uppercase letter')) %}{% endif %}
+          {% if config.config_password_character and not (config.config_password_lower or config.config_password_upper) %}{% set _r = pw_rules.append(_('a letter')) %}{% endif %}
+          {% if config.config_password_special %}{% set _r = pw_rules.append(_('a special character')) %}{% endif %}
+          {% set pw_min = config.config_password_min_length or 0 %}
+          {% if pw_min > 0 or pw_rules %}
+          <p class="cwng-pw-hint" id="password-rules-hint">
+            {{ _('Password requirements:') }}
+            {% if pw_min > 0 %}{{ ngettext('at least %(num)d character', 'at least %(num)d characters', pw_min, num=pw_min) }}{% if pw_rules %}, {% endif %}{% endif %}{% if pw_rules %}{{ _('including') }} {{ pw_rules|join(', ') }}{% endif %}.
+          </p>
+          {% endif %}
+          {% endif %}
         </div>
       {% endif %}
     </div>
@@ -374,10 +389,15 @@
         {% endif %}
       </div>
       {% endif %}
+    </div>
+    {% endif %}
 
-      {% if not content.role_anonymous() and not simple %}
-      <div style="margin-top: 25px;">
-        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('Library contents')}}</label>
+    <!-- Library Contents Card: every existing account has these settings, and saving the form
+         writes them, so they must not depend on Kobo, Hardcover or OAuth being enabled. -->
+    {% if not content.role_anonymous() and not simple and not new_user %}
+    <div class="settings-container" style="max-width: none; margin-inline: 0rem;">
+      <h4 class="settings-section-header">{{ _('Library contents')}}</h4>
+      <div>
         <div style="background: #202c34a3; padding: 2rem;">
           <div>
             <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
@@ -413,7 +433,6 @@
           <label for="opds_only_shelves_sync">{{_('Expose only books in selected shelves to OPDS')}}</label>
         </div>
       </div>
-      {% endif %}
     </div>
     {% endif %}
     

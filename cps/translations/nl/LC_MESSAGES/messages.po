@@ -21893,3 +21893,48 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+
+# Book-edit custom-column value picker (#2434).
+
+msgid "Apply selection"
+msgstr "Selectie toepassen"
+
+msgid "Choose from stored values"
+msgstr "Kiezen uit opgeslagen waarden"
+
+msgid "Choose from the existing hierarchy"
+msgstr "Kiezen uit de bestaande hiërarchie"
+
+msgid "Choose from the existing values"
+msgstr "Kiezen uit bestaande waarden"
+
+msgid "Could not load the values for this column."
+msgstr "De waarden voor deze kolom konden niet worden geladen."
+
+msgid "Enter one value without commas."
+msgstr "Voer één waarde zonder komma in."
+
+msgid "Loading values..."
+msgstr "Waarden laden..."
+
+msgid "No values match the filter."
+msgstr "Geen waarden komen overeen met het filter."
+
+msgid "No values stored for this column yet. Add one below."
+msgstr "Deze kolom bevat nog geen waarden. Voeg er hieronder een toe."
+
+msgid "Search or filter values"
+msgstr "Waarden zoeken of filteren"
+
+msgid "Search or filter values..."
+msgstr "Waarden zoeken of filteren..."
+
+msgid "e.g. Category.SubCategory.Item"
+msgstr "bijv. Categorie.Subcategorie.Item"
+
+msgid "Select values"
+msgstr "Waarden selecteren"
+
+msgid "Add a new value"
+msgstr "Een nieuwe waarde toevoegen"

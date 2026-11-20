@@ -22,6 +22,7 @@ import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
+  CcPickerValues,
   Me, Book, BooksPage, BookDetail, ReadingStatus, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
@@ -558,6 +559,14 @@ export function useCcTree(colId: string | number, enabled = true) {
     queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
     enabled,
     staleTime: 60000,
+  });
+}
+
+export function useCcPickerValues(colId: number) {
+  return useQuery<CcPickerValues>({
+    queryKey: ['cc-picker', colId],
+    queryFn: () => apiGet<CcPickerValues>(`/ajax/get_cc_tree/${colId}`),
+    staleTime: 0,
   });
 }
 

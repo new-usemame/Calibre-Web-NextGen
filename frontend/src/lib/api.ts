@@ -402,6 +402,13 @@ export interface CcTree {
   nodes: CcNode[];
 }
 
+/** Editor choices are independent of personal browse visibility. */
+export interface CcPickerValues {
+  hierarchical: boolean;
+  is_multiple: boolean;
+  entries: { value: string; depth: number }[];
+}
+
 /** Books under one node of a custom column (or all books carrying any value
  *  in the column when no path was requested). */
 export interface CcBooksPage extends BooksPage {
@@ -668,6 +675,11 @@ export interface EditableCustomColumn {
   value: string;
   /** Allowed values, enumeration columns only. */
   enum_values?: string[];
+  /** Text columns only: true when the stored values form a dotted hierarchy,
+   *  false when they are flat atomic values. Decided by the server from the
+   *  same detector the browse views use, so the picker cannot disagree with
+   *  CcBrowse about which a column is. */
+  hierarchical?: boolean;
 }
 
 /** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),

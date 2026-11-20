@@ -22100,3 +22100,47 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ msgstr ""
 #~ "Перед безопасным удалением книги необходимо сначала заархивировать её и "
 #~ "синхронизировать устройство."
+
+# Book-edit custom-column value picker (#2434).
+
+msgid "Apply selection"
+msgstr "Применить выбор"
+
+msgid "Choose from stored values"
+msgstr "Выбрать из сохранённых значений"
+
+msgid "Choose from the existing hierarchy"
+msgstr "Выбрать из существующей иерархии"
+
+msgid "Choose from the existing values"
+msgstr "Выбрать из существующих значений"
+
+msgid "Could not load the values for this column."
+msgstr "Не удалось загрузить значения этого столбца."
+
+msgid "Enter one value without commas."
+msgstr "Введите одно значение без запятых."
+
+msgid "Loading values..."
+msgstr "Загрузка значений..."
+
+msgid "No values match the filter."
+msgstr "Нет значений, соответствующих фильтру."
+
+msgid "No values stored for this column yet. Add one below."
+msgstr "В этом столбце пока нет значений. Добавьте значение ниже."
+
+msgid "Search or filter values"
+msgstr "Поиск или фильтрация значений"
+
+msgid "Search or filter values..."
+msgstr "Поиск или фильтрация значений..."
+
+msgid "e.g. Category.SubCategory.Item"
+msgstr "например, Категория.Подкатегория.Элемент"
+
+msgid "Select values"
+msgstr "Выбрать значения"
+
+msgid "Add a new value"
+msgstr "Добавить новое значение"

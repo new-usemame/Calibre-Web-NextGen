@@ -299,6 +299,42 @@ def test_another_users_device_is_not_found_and_stays_unchanged(session, api, rer
     assert stored.share_place_enabled_at is None
 
 
+@pytest.mark.parametrize("bad_value", ["yes", "true", 1, 0, None, [], {}])
+def test_invalid_alignment_in_a_combined_patch_changes_no_device_settings(
+        session, api, reread, bad_value):
+    """Reject malformed alignment before persisting a rename or sharing choice."""
+    device = _device(session, label="Old name")
+    status, body = _patch(api, device.public_id, {
+        "label": "New name", "share_place": True, "align_percent": bad_value,
+    })
+    assert (status, body) == (400, {"error": "invalid_align_percent"})
+    stored = reread(device.public_id)
+    assert (stored.display_name, stored.share_place, stored.align_percent) == (
+        "Old name", False, False)
+
+
+@pytest.mark.parametrize("kind", ["koreader", "webreader"])
+def test_alignment_is_rejected_for_other_reader_kinds(session, api, reread, kind):
+    device = _device(session, kind=kind)
+    assert _patch(api, device.public_id, {"align_percent": True}) == (
+        400, {"error": "invalid_align_percent"})
+    assert reread(device.public_id).align_percent is False
+
+
+def test_only_the_owner_can_persist_and_disable_alignment(session, api, reread):
+    """A committed per-Kobo choice survives a rename; a foreign PATCH cannot set it."""
+    own = _device(session)
+    theirs = _device(session, user_id=STRANGER)
+    assert _patch(api, theirs.public_id, {"align_percent": True})[0] == 404
+    assert reread(theirs.public_id).align_percent is False
+    assert _patch(api, own.public_id, {"align_percent": True})[0] == 200
+    assert reread(own.public_id).align_percent is True
+    assert _patch(api, own.public_id, {"label": "Libra"})[0] == 200
+    assert reread(own.public_id).align_percent is True
+    assert _patch(api, own.public_id, {"align_percent": False})[0] == 200
+    assert reread(own.public_id).align_percent is False
+
+
 # --- Per-device read status storage -----------------------------------------
 
 def test_a_device_reading_position_carries_its_own_read_status(session, engine):

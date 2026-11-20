@@ -153,6 +153,7 @@ jobs:
   # --------------------------------------------------------------------------------
   ensure-mirror:
     runs-on: ubuntu-latest
+    # ci-time-budget: keep the first build after a Python bump is rare and absent from normal samples
     timeout-minutes: 15
     needs: [classify, alias-image-neutral-commit]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
@@ -636,6 +637,7 @@ jobs:
     # The source producer may legitimately consume its full 95-minute
     # classify+mirror+architecture+merge budget. The script stops sooner when
     # that exact run/job fails and never substitutes the floating :dev tag.
+    # ci-time-budget: keep a wait budget for the producer run, not this job's own work
     timeout-minutes: 100
     needs: classify
     outputs:

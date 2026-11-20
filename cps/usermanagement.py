@@ -96,6 +96,45 @@ def _verify_app_password(user, password):
             or _verify_app_password_older(user, password))
 
 
+def _email_taken(email):
+    return ub.session.query(ub.User).filter(func.lower(ub.User.email) == email.lower()).first() is not None
+
+
+def _auto_create_email(username, offered=None):
+    """Pick the email for a user auto-created from proxy headers.
+
+    Uses the username when it is an email address. Header-auth proxies such as
+    Cloudflare Access, Authelia and authentik put the address in the username
+    header. A separate Remote-Email style header is deliberately not used: the proxy
+    does not always set it, so a client can send any value. Profile emails do not
+    prove identity and are never used to select an account for proxy login.
+    The username is skipped if it isn't a single valid address or another account
+    already has it: User.email is unique, so a clash would fail the insert on every
+    login attempt and the person could never get in. Falls back to a placeholder,
+    <username>@localhost, with any @ in the username turned into a dot: a double-@
+    fails valid_email() on the next profile save, and the user could never set a
+    password.
+
+    ``offered`` is an address a trusted caller already knows (an OIDC claim, an
+    admin import). It is tried first, with the same checks; the reverse-proxy
+    login never passes one.
+    """
+    from .helper import valid_email
+    for candidate in ((offered or "").strip(), (username or "").strip()):
+        if "@" not in candidate or "," in candidate:
+            continue
+        try:
+            candidate = valid_email(candidate)
+        except Exception:
+            candidate = None
+        if candidate and _email_taken(candidate):
+            log.warning("Email %s already belongs to another account, not using it for new user '%s'",
+                        candidate, username)
+        elif candidate:
+            return candidate
+    return f"{username.replace('@', '.')}@localhost"
+
+
 def _fresh_user(user):
     """The same User with its columns re-read from app.db, or None if the row is gone.
 
@@ -140,10 +179,8 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
             log.warning("User '%s' already exists, returning existing user", username)
             return existing_user
             
-        # Generate email if not provided
-        if not email:
-            email = f"{username}@localhost"
-        
+        email = _auto_create_email(username, email)
+
         # Create user with same defaults as OAuth users
         user = ub.User()
         user.name = username
@@ -401,15 +438,15 @@ def load_user_from_reverse_proxy_header(req):
         rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
         return user
-    
+
     # If user not found and auto-creation is enabled, create new user
     if getattr(config, 'config_reverse_proxy_auto_create_users', False):
+        # Profile emails are editable without ownership verification, so only a
+        # username match may select an existing account. Separate email headers
+        # may be client-controlled and must not populate the new account either.
         log.info("Reverse proxy authentication: attempting to create user '%s'", rp_header_username)
-        
-        # Get additional headers for user info (common reverse proxy headers)
-        email = req.headers.get('Remote-Email') or req.headers.get('X-Remote-Email')
-        
-        user = create_authenticated_user(rp_header_username, email, "reverse proxy")
+
+        user = create_authenticated_user(rp_header_username, auth_source="reverse proxy")
         if user:
             rate_limits.clear_current_limits(limiter)
             log.info("Reverse proxy authentication: successfully created user '%s'", user.name)

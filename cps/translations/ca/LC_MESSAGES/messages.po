@@ -1575,8 +1575,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "S'ha completat la cerca de duplicats (mètode alternatiu)."
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Estratègia de resolució no vàlida"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -5213,6 +5222,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -6341,6 +6367,10 @@ msgid "Could not open the synced position."
 msgstr "No s'ha pogut obrir la posició sincronitzada."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "No s'ha pogut llegir aquest arxiu de còmics."
 
@@ -6375,6 +6405,10 @@ msgstr "No s'ha pogut sol·licitar la supressió d'aquest dispositiu."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "No s'ha pogut restablir la contrasenya."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6516,6 +6550,10 @@ msgstr "S'està creant…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Retalla per omplir: sense marges, es retallen les vores de la imatge"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Actual"
@@ -6606,6 +6644,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Suprimeix llibres"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -7025,6 +7067,47 @@ msgstr "Servidor de correu electrònic"
 msgid "Email settings saved."
 msgstr "S'ha desat la configuració del correu electrònic."
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "Buit"
@@ -7412,7 +7495,7 @@ msgstr "Amaga la biblioteca del dispositiu"
 msgid "Hide fields"
 msgstr "Amaga camps"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Amaga la contrasenya"
 
@@ -7598,6 +7681,26 @@ msgstr "La sincronització de KOReader no està activada en aquest servidor."
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "Mantén la connexió"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -7927,6 +8030,10 @@ msgstr "Valoració màxima"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Filtre d'usuaris membres"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8342,6 +8449,10 @@ msgid "Nothing requested yet."
 msgstr "Encara no s'ha demanat res."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Encara no hi ha res per previsualitzar."
 
@@ -8692,6 +8803,10 @@ msgstr "Previsualitza aquest punt"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "S'està previsualitzant {source}. La posició desada no canviarà."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Anterior"
@@ -8803,6 +8918,10 @@ msgstr "Recents"
 #: cps/spa_strings.py
 msgid "Recipient(s)"
 msgstr "Destinataris"
+
+#: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
@@ -9026,6 +9145,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Restableix els valors predeterminats"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9563,7 +9691,7 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra'n més"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Mostra la contrasenya"
 
@@ -9770,6 +9898,10 @@ msgstr "URL de sincronització estàndard de Kobo"
 #: cps/spa_strings.py
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller està configurat però no s'ha pogut contactar."
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -10449,6 +10581,12 @@ msgid ""
 msgstr ""
 "Aquesta pàgina ha tingut un error i no s'ha pogut mostrar. La biblioteca no "
 "s'ha vist afectada; normalment n'hi ha prou de tornar-la a carregar."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11169,6 +11307,11 @@ msgstr "{count} resultats per a «{query}»"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} de {total}"
 
@@ -11341,6 +11484,44 @@ msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 "No s'han pogut afegir {failed} dels {total} llibres. Queden seleccionats."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -11460,6 +11641,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11478,6 +11663,12 @@ msgstr "Privat al vostre compte. Això no canvia la descripció compartida."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Conserveu aquí els vostres pensaments sobre aquest llibre."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11502,6 +11693,11 @@ msgstr "Suprimeix la ressenya"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Voleu suprimir la vostra ressenya?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."
@@ -12147,6 +12343,29 @@ msgid "Could not change image fit. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr ""
 
@@ -12179,6 +12398,16 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -19515,6 +19744,17 @@ msgid "Reset user Password"
 msgstr "Restableix la contrasenya d'usuari"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+msgstr[1] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
+
+#: cps/templates/user_edit.html
 msgid "eReader Configuration"
 msgstr "Configuració del lector electrònic"
 
@@ -19675,6 +19915,13 @@ msgstr ""
 "Desactivada per defecte. La fase 0 només registra dades per recuperar "
 "l'estat anterior i no canvia les anotacions que rep el Kobo. L'administrador "
 "també ha d'activar l'opció general de la instància."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

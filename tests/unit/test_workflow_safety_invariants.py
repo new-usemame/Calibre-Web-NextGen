@@ -1435,38 +1435,100 @@ def test_summary_fails_when_path_detection_itself_failed():
     )
 
 
-def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():
-    """Fork frontend PRs must RUN the suite but not block on it yet.
+def _evaluate_e2e_condition(condition: str | bool, context: dict) -> bool:
+    """Evaluate the small Actions expression subset used by the E2E job."""
+    if isinstance(condition, bool):
+        return condition
+    expression = condition.strip().removeprefix("${{").removesuffix("}}")
+    tokens = re.findall(r"'(?:[^']|'')*'|[\w.]+|&&|\|\||==|!=|\S", expression)
+    operators = {"&&": "and", "||": "or", "!": "not", "true": "True", "false": "False"}
+    functions = {
+        "always": lambda: True,
+        "success": lambda: not context["failed"],
+        "failure": lambda: context["failed"],
+        "startsWith": str.startswith,
+    }
+    python_tokens = []
+    for token in tokens:
+        if token.startswith("'"):
+            python_tokens.append(repr(token[1:-1].replace("''", "'")))
+        elif token in operators:
+            python_tokens.append(operators[token])
+        elif token in functions or token in {"(", ")", ",", "==", "!="}:
+            python_tokens.append(token)
+        else:
+            assert token in context, f"Unmodelled E2E condition token {token!r} in {condition!r}"
+            python_tokens.append(repr(context[token]))
+    return bool(eval(" ".join(python_tokens), {"__builtins__": {}, **functions}))
 
-    Same reasoning as the integration-tests tripwire: the job pulls a
-    published image and overlays the PR's own SPA bundle, and no fork PR has
-    exercised that path yet (#1274, the only recent fork PR, touched no
-    frontend files and skipped the job). Hard-gating on an unmeasured
-    infrastructure path would block community contributions for a reason
-    unrelated to their change. Excluding forks from the `if:` instead would
-    restore the original hole for exactly the contributions that need the
-    check most.
 
-    If someone widens the hard gate to forks, they must come here and record
-    why it is now safe.
-    """
+@pytest.mark.parametrize(
+    ("frontend", "concurrency"),
+    [(True, False), (False, True), (True, True)],
+    ids=["frontend-only", "concurrency-only", "frontend-and-concurrency"],
+)
+def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet(frontend: bool, concurrency: bool):
+    """Eligible fork heads get advisory browser coverage with read-only access."""
     wf = _load(WF_DIR / "tests.yml")
-    job = (wf.get("jobs") or {}).get("e2e-tests")
+    triggers = _trigger(wf)
+    assert "pull_request" in triggers and "pull_request_target" not in triggers, (
+        "Fork E2E must run in the pull_request context"
+    )
+    jobs = wf["jobs"]
+    job = jobs["e2e-tests"]
+    permissions = job.get("permissions", wf.get("permissions"))
+    assert permissions == "read-all" or (
+        isinstance(permissions, dict)
+        and permissions.get("contents") == "read"
+        and all(level in {"read", "none"} for level in permissions.values())
+    ), "Fork E2E requires explicit read-only token permissions"
 
-    condition = re.sub(r"\s+", " ", str(job.get("if") or ""))
-    assert "outputs.frontend == 'true' ||" in condition, (
-        "frontend PRs must enter E2E before the concurrency-specific fork carve-out"
-    )
-    assert "outputs.concurrency == 'true'" in condition and "fork != true" in condition, (
-        "only concurrency-triggered image builds exclude forks; frontend fork PRs "
-        "must still run the existing digest-pinned overlay lane"
+    context = {
+        "github.event_name": "pull_request",
+        "github.ref": "refs/pull/123/merge",
+        "github.event.pull_request.head.repo.fork": True,
+        "inputs.run_e2e": False,
+        "needs.changed_paths.outputs.frontend": str(frontend).lower(),
+        "needs.changed_paths.outputs.concurrency": str(concurrency).lower(),
+        "needs.changed_paths.outputs.build": str(concurrency).lower(),
+        # Keep the tag-only notification unreachable even if its secret exists.
+        "env.DISCORD_WEBHOOK": "configured",
+        "failed": False,
+    }
+    assert _evaluate_e2e_condition(job.get("if", True), context), "Fork PR must run E2E"
+    assert _evaluate_e2e_condition(job.get("continue-on-error", False), context), (
+        "Fork E2E must stay advisory"
     )
 
-    coe = str(job.get("continue-on-error", ""))
-    assert "fork" in coe, (
-        "fork PRs must stay advisory until a real fork run shows the "
-        "image-pull + bundle-overlay path works without repo secrets"
+    secret_reference = re.compile(r"\$\{\{[^}]*\bsecrets\b")
+    shared_config = [wf.get("env"), {key: value for key, value in job.items() if key != "steps"}]
+    assert not secret_reference.search(yaml.safe_dump(shared_config)), "Fork E2E has shared secrets"
+    for step in _steps(job):
+        # Check both states so a failure-only step cannot introduce credentials.
+        if not any(
+            _evaluate_e2e_condition(step.get("if", True), {**context, "failed": failed})
+            for failed in (False, True)
+        ):
+            continue
+        name = step.get("name", step.get("uses"))
+        login_action = str(step.get("uses", "")).startswith("docker/login-action@")
+        login_command = re.search(r"\bdocker\s+login\b", str(step.get("run", "")))
+        assert not (login_action or login_command), f"Fork E2E can reach registry login: {name}"
+        assert not secret_reference.search(yaml.safe_dump(step)), (
+            f"Fork E2E can reach a secret reference: {name}"
+        )
+
+    summary = next(job for job in jobs.values() if job.get("name") == "Test Suite Summary")
+    env = next(step["env"] for step in _steps(summary) if "IS_FRONTEND_PR" in step.get("env", {}))
+    rc, output = _run_summary_script(
+        summary,
+        {"e2e-tests": "failure"},
+        {
+            name: str(_evaluate_e2e_condition(env[name], context)).lower()
+            for name in ("IS_BUILD_PR", "IS_FRONTEND_PR", "IS_CONCURRENCY_PR", "IS_MAIN_PUSH")
+        },
     )
+    assert rc == 0, f"Fork E2E failure blocks the Test Suite Summary:\n{output}"
 
 
 # ─── Wall 11: failure evidence actually gets uploaded ──────────────────

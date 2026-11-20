@@ -5713,7 +5713,7 @@ msgstr "O download da lista de livros foi iniciado"
 
 #: cps/spa_strings.py
 msgid "Book order"
-msgstr "Livro"
+msgstr "Ordem de leitura"
 
 #: cps/spa_strings.py
 msgid "Book requested. An administrator has to approve it."
@@ -5770,7 +5770,7 @@ msgstr "Disposição dos livros"
 
 #: cps/spa_strings.py
 msgid "Books seeding"
-msgstr "Livros com importação inicial de anotações"
+msgstr "Livros em fase de importação inicial de anotações"
 
 #: cps/spa_strings.py
 msgid ""
@@ -10219,7 +10219,7 @@ msgstr "Mostrar todas as {count} tags"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Show all {items}"
-msgstr "Mostrar lista completa de {items}"
+msgstr "Mostrar lista completa ({items})"
 
 #: cps/spa_strings.py
 msgid "Show annotations assigned to this device"
@@ -11849,7 +11849,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "an unknown address"
-msgstr ""
+msgstr "um endereço desconhecido"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11894,7 +11894,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "just now"
-msgstr ""
+msgstr "agora mesmo"
 
 #: cps/spa_strings.py
 msgid "qBittorrent download client"

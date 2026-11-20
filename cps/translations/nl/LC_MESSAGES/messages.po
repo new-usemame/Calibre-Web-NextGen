@@ -475,6 +475,35 @@ msgid ""
 "again."
 msgstr ""
 
+#: cps/admin.py cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cover_flag_repair.html
+msgid "Restore missing covers"
+msgstr "Ontbrekende omslagen herstellen"
+
+#: cps/admin.py cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "This is not available for Google Drive libraries."
+msgstr "Dit is niet beschikbaar voor Google Drive-bibliotheken."
+
+#: cps/admin.py cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr "Dit voorbeeld is ongeldig of verlopen. Scan de bibliotheek opnieuw."
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr "Selecteer minstens één boek om te herstellen."
+
+#: cps/admin.py cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr ""
+"De geselecteerde boeken komen niet overeen met dit voorbeeld. Scan de "
+"bibliotheek opnieuw."
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr ""
+"De bibliotheekdatabase kon niet worden bijgewerkt. Er zijn geen omslagen "
+"gewijzigd."
+
 #: cps/admin.py
 msgid "Boolean restrictions must be Yes, No, or Undefined."
 msgstr "Booleaanse beperkingen moeten Ja, Nee of Ongedefinieerd zijn."
@@ -4303,9 +4332,9 @@ msgid "Tags (comma separated)"
 msgstr "Labels (door komma's gescheiden)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
-#: cps/templates/tasks.html
+#: cps/templates/config_view_edit.html cps/templates/cover_flag_repair.html
+#: cps/templates/cwa_settings.html cps/templates/hardcover_missing_ids.html
+#: cps/templates/shelf_edit.html cps/templates/tasks.html
 msgid "Title"
 msgstr "Titel"
 
@@ -8868,8 +8897,8 @@ msgstr "Naam van de voorinstelling"
 msgid "Preset saved."
 msgstr "Voorinstelling opgeslagen."
 
-#: cps/spa_strings.py cps/templates/duplicates.html
-#: cps/templates/kobo_reconcile.html
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Voorbeeld"
 
@@ -9261,7 +9290,7 @@ msgstr "Automatisch oplossen"
 msgid "Resolved {groups} groups and deleted {deleted} books."
 msgstr "{groups} groepen opgelost en {deleted} boeken verwijderd."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid "Restore"
 msgstr "Herstellen"
 
@@ -12505,6 +12534,82 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr "De afbeeldingsweergave kon niet worden gewijzigd. Probeer het opnieuw."
 
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"Find books that have a cover.jpg in their folder but are marked as having no "
+"cover, so the cover is never shown."
+msgstr ""
+"Zoekt boeken met een cover.jpg in hun map die als zonder omslag zijn "
+"gemarkeerd, waardoor het omslag nooit wordt getoond."
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"A cover that was removed on purpose in the book editor also looks like this. "
+"Select only the books whose cover you want back."
+msgstr ""
+"Een omslag die bewust in de boekeditor is verwijderd ziet er ook zo uit. "
+"Selecteer alleen de boeken waarvan het omslag terug moet komen."
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Scan library"
+msgstr "Bibliotheek scannen"
+
+#: cps/spa_strings.py
+msgid "Scanning…"
+msgstr "Scannen…"
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr "De bibliotheek kon niet worden gescand."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr ""
+"{count} boek(en) hebben een omslagbestand maar zijn gemarkeerd als zonder "
+"omslag."
+
+#: cps/spa_strings.py
+msgid "No books need their cover restored."
+msgstr "Geen enkel boek heeft omslagherstel nodig."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} cover(s) restored."
+msgstr "{count} omslag(en) hersteld."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr ""
+"{count} boek(en) zijn overgeslagen omdat ze sinds de scan zijn gewijzigd."
+
+#: cps/spa_strings.py
+msgid "Could not restore covers."
+msgstr "De omslagen konden niet worden hersteld."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{selected} of {count} selected"
+msgstr "{selected} van {count} geselecteerd"
+
+#: cps/spa_strings.py
+msgid "Books with a cover file but no cover"
+msgstr "Boeken met een omslagbestand maar zonder omslag"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore the cover of {title}"
+msgstr "Omslag van {title} herstellen"
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Restore selected covers"
+msgstr "Geselecteerde omslagen herstellen"
+
+#: cps/spa_strings.py
+msgid "Select all books"
+msgstr "Alle boeken selecteren"
+
 #: cps/spa_strings.py
 msgid ""
 "Applies when you choose My Library. The user adds books from the global "
@@ -14087,7 +14192,7 @@ msgstr "Geen resultaten gevonden! Gebruik een ander trefwoord."
 msgid "This Field is Required"
 msgstr "Dit veld is verplicht"
 
-#: cps/templates/book_table.html
+#: cps/templates/book_table.html cps/templates/cover_flag_repair.html
 msgid "Select all"
 msgstr "Alles selecteren"
 
@@ -15694,6 +15799,30 @@ msgstr "Voeg toegestane/geweigerde tags toe"
 #: cps/templates/config_view_edit.html
 msgid "Add Allowed/Denied custom column values"
 msgstr "Voeg toegestane/geweigerde aangepaste kolomwaarden toe"
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d covers were restored."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books were skipped because they changed since the scan."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books have a cover file but are marked as having no cover."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "Restore the cover of %(title)s"
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+msgid "Restore the covers of the selected books?"
+msgstr ""
 
 #: cps/templates/cover_picker.html
 msgid ""
@@ -21528,87 +21657,3 @@ msgstr ""
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
-
-#: cps/spa_strings.py
-msgid "Restore missing covers"
-msgstr "Ontbrekende omslagen herstellen"
-
-#: cps/spa_strings.py
-msgid "Find books that have a cover.jpg in their folder but are marked as having no cover, so the cover is never shown."
-msgstr "Zoekt boeken met een cover.jpg in hun map die als zonder omslag zijn gemarkeerd, waardoor het omslag nooit wordt getoond."
-
-#: cps/spa_strings.py
-msgid "A cover that was removed on purpose in the book editor also looks like this. Select only the books whose cover you want back."
-msgstr "Een omslag die bewust in de boekeditor is verwijderd ziet er ook zo uit. Selecteer alleen de boeken waarvan het omslag terug moet komen."
-
-#: cps/spa_strings.py
-msgid "Scan library"
-msgstr "Bibliotheek scannen"
-
-#: cps/spa_strings.py
-msgid "Scanning…"
-msgstr "Scannen…"
-
-#: cps/spa_strings.py
-msgid "Could not scan the library."
-msgstr "De bibliotheek kon niet worden gescand."
-
-#: cps/spa_strings.py
-msgid "{count} book(s) have a cover file but are marked as having no cover."
-msgstr "{count} boek(en) hebben een omslagbestand maar zijn gemarkeerd als zonder omslag."
-
-#: cps/spa_strings.py
-msgid "No books need their cover restored."
-msgstr "Geen enkel boek heeft omslagherstel nodig."
-
-#: cps/spa_strings.py
-msgid "{count} cover(s) restored."
-msgstr "{count} omslag(en) hersteld."
-
-#: cps/spa_strings.py
-msgid "{count} book(s) were skipped because they changed since the scan."
-msgstr "{count} boek(en) zijn overgeslagen omdat ze sinds de scan zijn gewijzigd."
-
-#: cps/spa_strings.py
-msgid "Could not restore covers."
-msgstr "De omslagen konden niet worden hersteld."
-
-#: cps/spa_strings.py
-msgid "This is not available for Google Drive libraries."
-msgstr "Dit is niet beschikbaar voor Google Drive-bibliotheken."
-
-#: cps/spa_strings.py
-msgid "This preview is invalid or expired. Scan the library again."
-msgstr "Dit voorbeeld is ongeldig of verlopen. Scan de bibliotheek opnieuw."
-
-#: cps/spa_strings.py
-msgid "Select at least one book to restore."
-msgstr "Selecteer minstens één boek om te herstellen."
-
-#: cps/spa_strings.py
-msgid "The selected books do not match this preview. Scan the library again."
-msgstr "De geselecteerde boeken komen niet overeen met dit voorbeeld. Scan de bibliotheek opnieuw."
-
-#: cps/spa_strings.py
-msgid "Could not update the library database. No covers were changed."
-msgstr "De bibliotheekdatabase kon niet worden bijgewerkt. Er zijn geen omslagen gewijzigd."
-
-#: cps/spa_strings.py
-msgid "{selected} of {count} selected"
-msgstr "{selected} van {count} geselecteerd"
-
-#: cps/spa_strings.py
-msgid "Books with a cover file but no cover"
-msgstr "Boeken met een omslagbestand maar zonder omslag"
-
-#: cps/spa_strings.py
-msgid "Restore the cover of {title}"
-msgstr "Omslag van {title} herstellen"
-
-#: cps/spa_strings.py
-msgid "Restore selected covers"
-msgstr "Geselecteerde omslagen herstellen"
-
-#: cps/spa_strings.py
-msgid "Select all books"
-msgstr "Alle boeken selecteren"

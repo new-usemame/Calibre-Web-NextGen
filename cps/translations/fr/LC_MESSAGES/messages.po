@@ -102,6 +102,7 @@ msgstr ""
 "%(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "Vérifier les correspondances Hardcover"
 
@@ -128,6 +129,57 @@ msgstr "Aucune correspondance en attente à rejeter"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "%(count)s correspondance(s) rejetée(s)"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr "En attente de vérification"
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr "Rejeté"
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr "Ignoré"
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr "Pas encore associé"
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr "Livres sans identifiant Hardcover"
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "Tout"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+"Erreur lors de l’affichage des livres sans identifiant Hardcover : %(error)s"
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+"La recherche de correspondances Hardcover a démarré pour tous les livres "
+"sans identifiant Hardcover. Consultez les tâches pour suivre la progression."
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+"La prochaine recherche automatique Hardcover cherchera à nouveau ce livre."
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr "Erreur : %(error)s"
 
 #: cps/admin.py
 #, python-brace-format
@@ -172,11 +224,6 @@ msgstr ""
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "Modifier les utilisateurs"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "Tout"
 
 #: cps/admin.py
 msgid "User not found"
@@ -2451,6 +2498,7 @@ msgstr "Livres non lus"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "Auteurs"
@@ -4100,7 +4148,7 @@ msgstr "La description contient"
 msgid "Deselect {title}"
 msgstr "Désélectionner {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "Modifier les métadonnées"
 
@@ -4438,7 +4486,8 @@ msgstr "Étiquettes (séparées par des virgules)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
+#: cps/templates/tasks.html
 msgid "Title"
 msgstr "Titre"
 
@@ -5859,6 +5908,14 @@ msgid "Basic settings"
 msgstr "Paramètres de base"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr "Devient"
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr "Devient (séparer par des virgules pour scinder)"
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "Bêta"
 
@@ -6014,6 +6071,10 @@ msgid "Bulleted list"
 msgstr "Liste à puces"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr "Par nom"
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "Chemin du certificat d’autorité"
 
@@ -6126,6 +6187,16 @@ msgstr "Chemin du certificat"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "Modifier"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr "Modifier {n} livres maintenant ?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
+msgstr "{n} livres modifiés."
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -6446,6 +6517,10 @@ msgid "Could not load the device board."
 msgstr "Impossible de charger le tableau des appareils."
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr "Impossible de charger les règles."
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr "Impossible de charger la bibliothèque de cet appareil."
 
@@ -6476,6 +6551,11 @@ msgstr "Impossible d’ouvrir ce résultat de recherche."
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
 msgstr "Impossible d’ouvrir la position synchronisée."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr "Impossible de lire ce fichier : {error}"
 
 #: cps/spa_strings.py
 msgid "Could not preview the resolution."
@@ -6623,6 +6703,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "Couverture mise à jour à partir du résultat sélectionné."
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr "Couverte par une règle"
 
 #: cps/spa_strings.py
 msgid "Create account"
@@ -6947,6 +7031,10 @@ msgid "Disabled books"
 msgstr "Livres désactivés"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr "Abandonner"
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Sélection Découvrir mise à jour."
 
@@ -7029,6 +7117,14 @@ msgstr "Création de la couverture…"
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "Déposez les fichiers ici, ou cliquez pour les choisir"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr "Supprimer cette valeur"
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr "Supprimée"
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -7270,6 +7366,14 @@ msgstr ""
 "téléphone."
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr "Saisissez la valeur à reconnaître."
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr "Indiquez ce qu’elle devient, ou choisissez Supprimer."
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
@@ -7280,6 +7384,10 @@ msgstr ""
 msgid "Every filled field will replace each book's existing values."
 msgstr ""
 "Chaque champ renseigné remplacera les valeurs existantes de chaque livre."
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr "Chaque valeur est couverte par une règle."
 
 #: cps/spa_strings.py
 msgid "Exact place"
@@ -7345,6 +7453,10 @@ msgid "Fetch metadata from web"
 msgstr "Récupérer les métadonnées sur le Web"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr "Champ"
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "Fichiers"
 
@@ -7372,6 +7484,10 @@ msgstr "Filtre"
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Filtrer par appareil"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr "Filtrer les valeurs"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7646,6 +7762,10 @@ msgid "Highlights and notes"
 msgstr "Surlignages et notes"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr "Historique"
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "Populaires"
 
@@ -7757,6 +7877,10 @@ msgstr "Inactif"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Inclus"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr "Valeur entrante"
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
@@ -8176,6 +8300,16 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "URL de métadonnées (découverte automatique OIDC)"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr "Nettoyage des métadonnées"
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+"L’application des métadonnées est désactivée : les fichiers des livres "
+"gardent leurs anciennes métadonnées."
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "Min."
 
@@ -8203,6 +8337,10 @@ msgstr "Plus"
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Plus d'actions pour {name}"
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr "Le plus de livres d’abord"
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -8306,6 +8444,22 @@ msgid "New: My Library"
 msgstr "Nouveau : Ma bibliothèque"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr "Ajoutés, du plus récent au plus ancien"
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr "Ajoutés, du plus ancien au plus récent"
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr "Date de lecture, du plus récent au plus ancien"
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr "Date de lecture, du plus ancien au plus récent"
+
+#: cps/spa_strings.py
 msgid "Newest"
 msgstr "Plus récent"
 
@@ -8318,7 +8472,8 @@ msgid "Newznab / Torznab indexer"
 msgstr "Indexeur Newznab / Torznab"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "Suivant"
 
@@ -8337,6 +8492,10 @@ msgstr "Aucun format de téléversement accepté n’autorise l’EPUB ni le PDF
 #: cps/spa_strings.py
 msgid "No approval needed"
 msgstr "Aucune approbation nécessaire"
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr "Aucun livre ne changerait avec les règles enregistrées."
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -8442,6 +8601,12 @@ msgid "No registered devices."
 msgstr "Aucun appareil enregistré."
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+"Aucune règle pour l’instant. Ajoutez-en une ci-dessus, ou importez un "
+"fichier de règles JSON."
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr "Aucune position de lecture enregistrée pour le moment."
 
@@ -8480,6 +8645,10 @@ msgstr "Aucun ISBN valide trouvé dans le texte analysé."
 #: cps/spa_strings.py
 msgid "No values in this column yet"
 msgstr "Cette colonne ne contient pas encore de valeurs"
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr "Aucune valeur ne correspond."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8538,6 +8707,10 @@ msgstr "Note {label}"
 #: cps/spa_strings.py
 msgid "Notes"
 msgstr "Notes"
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr "Rien n’a encore été appliqué."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8653,12 +8826,29 @@ msgstr "Une colonne"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+"Un ensemble de règles par champ. Une règle transforme une valeur en une "
+"autre (renommer), en plusieurs (scinder) ou en aucune (supprimer), sans "
+"tenir compte de la casse ni des accents. Les valeurs qu’aucune règle ne "
+"couvre restent telles quelles. Rien ne change dans la bibliothèque tant que "
+"vous n’appliquez pas l’aperçu."
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
 "Seuls les livres que vous choisissez ci-dessous se synchronisent. En "
 "basculant ici, aucun livre n'est choisi au départ — vous choisissez chaque "
 "livre vous-même."
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr "Seulement les valeurs sans règle"
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8793,7 +8983,7 @@ msgstr "Page {number}"
 msgid "Page {page} of {pages}"
 msgstr "Page {page} sur {pages}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr "Pagination"
 
@@ -8929,7 +9119,8 @@ msgstr "Aperçu de {source}. Sa position enregistrée ne changera pas."
 msgid "Previewing…"
 msgstr "Aperçu en cours…"
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "Précédent"
 
@@ -9139,6 +9330,11 @@ msgid "Remove tag \"{tag}\""
 msgstr "Retirer l’étiquette « {tag} »"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr "Retirer la règle pour {value}"
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr "Retirer ceux-ci"
 
@@ -9154,6 +9350,11 @@ msgstr "Appareils supprimés"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Retiré de « Lecture en cours »."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
+msgstr "{n} valeurs qu’aucun livre n’utilise plus ont été retirées."
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -9294,6 +9495,11 @@ msgstr ""
 "Le mode de bibliothèque précédent a été restauré pour {accounts} comptes."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr "{n} livres restaurés."
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "Restauration…"
 
@@ -9352,6 +9558,14 @@ msgstr "Lignes par chargement"
 #: cps/spa_strings.py
 msgid "Rule group"
 msgstr "Groupe de règles"
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr "Règles"
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr "Règles enregistrées. L’aperçu ci-dessous est à jour."
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -9415,6 +9629,10 @@ msgid "Save preset"
 msgstr "Enregistrer le préréglage"
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr "Enregistrer les règles"
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "Enregistrer les paramètres de sécurité"
 
@@ -9427,6 +9645,10 @@ msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr ""
 "Enregistrez le fichier, éjectez la liseuse Kobo en toute sécurité, puis "
 "redémarrez-la."
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr "Enregistrez les règles pour mettre à jour l’aperçu."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9979,6 +10201,10 @@ msgid "Sort order"
 msgstr "Ordre de tri"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr "Trier les valeurs"
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "Détails de la source"
 
@@ -10008,7 +10234,8 @@ msgstr "Lecture commencée"
 msgid "Starting scan…"
 msgstr "Démarrage de l’analyse…"
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "Statut"
 
@@ -10257,6 +10484,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "The background scheduler is not running."
 msgstr "Le planificateur en arrière-plan n'est pas en cours d'exécution."
+
+#: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr "Les fichiers des livres sont aussi en cours de mise à jour."
 
 #: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
@@ -10517,6 +10748,10 @@ msgstr "Le transfert ne s'est pas terminé."
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
 msgstr "Il n'y a pas encore d'autres comptes sur ce serveur."
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr "Il existe déjà une règle pour cette valeur."
 
 #: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
@@ -10903,6 +11138,10 @@ msgid "Undoing…"
 msgstr "Annulation…"
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr "Annulé"
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Afficher"
 
@@ -10933,6 +11172,10 @@ msgstr "Déverrouillez la couverture pour la changer"
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
 msgstr "Détacher la barre latérale"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr "Modifications des règles non enregistrées."
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -11062,6 +11305,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
 msgstr "Utilisation de l’image derrière ce lien Google"
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr "Valeurs de votre bibliothèque"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -11515,6 +11762,16 @@ msgstr "{n} attribués à {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr "{n} livres"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr "{n} livres n’ont pas pu être modifiés : {list}"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "{n} livres dans le dernier inventaire"
 
@@ -11537,6 +11794,11 @@ msgstr "{n} trouvé(s)"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} surlignages et notes"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr "{n} ignorés, car modifiés depuis l’aperçu ou laissés de côté."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -18585,6 +18847,72 @@ msgstr "Jeton Kobo :"
 msgid "List"
 msgstr "Liste"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+"La progression de lecture, le statut de lecture et les annotations ne sont "
+"envoyés à Hardcover que pour les livres possédant un identifiant Hardcover. "
+"Ces %(total)s livre(s) n’en ont pas."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+"Relance la recherche Hardcover pour tous les livres répertoriés ici, y "
+"compris ceux en attente de vérification. Les livres rejetés sont ignorés."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr "Relancer la recherche"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+"La synchronisation Hardcover est désactivée. Activez-la dans la "
+"configuration de base ou avec HARDCOVER_SYNC_ENABLED."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+"Aucun jeton Hardcover disponible. Définissez la variable d’environnement "
+"HARDCOVER_TOKEN ou configurez-le dans la configuration de base."
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr "Page %(page)s sur %(pages)s"
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "Actions"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+"Récupérez les métadonnées depuis Hardcover sur la page de modification pour "
+"ajouter l’identifiant manuellement."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr "Autoriser une nouvelle tentative"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr "Rien à afficher"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr "Aucun livre sans identifiant Hardcover ne correspond à ce filtre."
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Vérification des correspondances Hardcover 🔖"
@@ -19818,10 +20146,6 @@ msgstr "Présentation des tâches en arrière-plan"
 #: cps/templates/tasks.html
 msgid "Run Time"
 msgstr "Durée"
-
-#: cps/templates/tasks.html
-msgid "Actions"
-msgstr "Actions"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"
@@ -21852,6 +22176,90 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
+#: cps/spa_strings.py
+msgid "Restore missing covers"
+msgstr "Restaurer les couvertures manquantes"
+
+#: cps/spa_strings.py
+msgid "Find books that have a cover.jpg in their folder but are marked as having no cover, so the cover is never shown."
+msgstr "Trouve les livres dont le dossier contient un fichier cover.jpg mais qui sont marqués comme n’ayant pas de couverture, de sorte que la couverture n’est jamais affichée."
+
+#: cps/spa_strings.py
+msgid "A cover that was removed on purpose in the book editor also looks like this. Select only the books whose cover you want back."
+msgstr "Une couverture supprimée volontairement dans l’éditeur de livre apparaît aussi de cette façon. Sélectionnez uniquement les livres dont vous voulez retrouver la couverture."
+
+#: cps/spa_strings.py
+msgid "Scan library"
+msgstr "Analyser la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Scanning…"
+msgstr "Analyse en cours…"
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr "Impossible d’analyser la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr "{count} livre(s) ont un fichier de couverture mais sont marqués comme n’ayant pas de couverture."
+
+#: cps/spa_strings.py
+msgid "No books need their cover restored."
+msgstr "Aucun livre n’a besoin que sa couverture soit restaurée."
+
+#: cps/spa_strings.py
+msgid "{count} cover(s) restored."
+msgstr "{count} couverture(s) restaurée(s)."
+
+#: cps/spa_strings.py
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr "{count} livre(s) ont été ignorés car ils ont changé depuis l’analyse."
+
+#: cps/spa_strings.py
+msgid "Could not restore covers."
+msgstr "Impossible de restaurer les couvertures."
+
+#: cps/spa_strings.py
+msgid "This is not available for Google Drive libraries."
+msgstr "Cette fonction n’est pas disponible pour les bibliothèques Google Drive."
+
+#: cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr "Cet aperçu est invalide ou a expiré. Analysez de nouveau la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr "Sélectionnez au moins un livre à restaurer."
+
+#: cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr "Les livres sélectionnés ne correspondent pas à cet aperçu. Analysez de nouveau la bibliothèque."
+
+#: cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr "Impossible de mettre à jour la base de données de la bibliothèque. Aucune couverture n’a été modifiée."
+
+#: cps/spa_strings.py
+msgid "{selected} of {count} selected"
+msgstr "{selected} sur {count} sélectionné(s)"
+
+#: cps/spa_strings.py
+msgid "Books with a cover file but no cover"
+msgstr "Livres avec un fichier de couverture mais sans couverture"
+
+#: cps/spa_strings.py
+msgid "Restore the cover of {title}"
+msgstr "Restaurer la couverture de {title}"
+
+#: cps/spa_strings.py
+msgid "Restore selected covers"
+msgstr "Restaurer les couvertures sélectionnées"
+
+#: cps/spa_strings.py
+msgid "Select all books"
+msgstr "Sélectionner tous les livres"
 
 # Book-edit custom-column value picker (#2434).
 

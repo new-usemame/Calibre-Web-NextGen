@@ -81,6 +81,7 @@ msgid "Error starting Hardcover auto-fetch task: %(error)s"
 msgstr "Fel när automatisk hämtning från Hardcover skulle startas: %(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "Granska träffar från Hardcover"
 
@@ -106,6 +107,53 @@ msgstr "Det finns inga väntande träffar att avvisa"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "Avvisade %(count)s träff(ar)"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr ""
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr ""
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr ""
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr ""
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr ""
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "Alla"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr ""
 
 #: cps/admin.py
 #, python-brace-format
@@ -148,11 +196,6 @@ msgstr "Anpassad kolumn nr %(column)d finns inte i calibre-databasen"
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "Redigera användare"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "Alla"
 
 #: cps/admin.py
 msgid "User not found"
@@ -2303,6 +2346,7 @@ msgstr "Olästa böcker"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "Författare"
@@ -3921,7 +3965,7 @@ msgstr "Beskrivningen innehåller"
 msgid "Deselect {title}"
 msgstr "Avmarkera {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "Redigera metadata"
 
@@ -4257,7 +4301,8 @@ msgstr "Taggar (kommaseparerade)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
+#: cps/templates/tasks.html
 msgid "Title"
 msgstr "Titel"
 
@@ -5622,6 +5667,14 @@ msgid "Basic settings"
 msgstr "Grundläggande inställningar"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "Beta"
 
@@ -5768,6 +5821,10 @@ msgid "Bulleted list"
 msgstr "Punktlista"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "Sökväg till CA-certifikat"
 
@@ -5871,6 +5928,16 @@ msgstr "Certifikatsökväg"
 
 #: cps/spa_strings.py
 msgid "Change"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6186,6 +6253,10 @@ msgid "Could not load the device board."
 msgstr "Kunde inte läsa in enhetsöversikten."
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr "Kunde inte läsa in det här enhetsbiblioteket."
 
@@ -6216,6 +6287,11 @@ msgstr "Kunde inte öppna det sökresultatet."
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
 msgstr "Kunde inte öppna den synkroniserade positionen."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not preview the resolution."
@@ -6362,6 +6438,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "Omslaget har uppdaterats från det valda resultatet."
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create account"
@@ -6674,6 +6754,10 @@ msgid "Disabled books"
 msgstr "Inaktiverade böcker"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Valen i Upptäck har uppdaterats."
 
@@ -6754,6 +6838,14 @@ msgstr "Skapar omslaget …"
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "Släpp filer här eller klicka för att välja"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6979,6 +7071,14 @@ msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
@@ -6988,6 +7088,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Every filled field will replace each book's existing values."
 msgstr "Varje ifyllt fält ersätter varje boks befintliga värden."
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exact place"
@@ -7052,6 +7156,10 @@ msgid "Fetch metadata from web"
 msgstr "Hämta metadata från webben"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "Filer"
 
@@ -7078,6 +7186,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Filtrera efter enhet"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7346,6 +7458,10 @@ msgid "Highlights and notes"
 msgstr "Markeringar och anteckningar"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "Populärt"
 
@@ -7450,6 +7566,10 @@ msgstr "Inaktiv"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Inkluderad"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
@@ -7853,6 +7973,14 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "Metadatawebbadress (automatisk OIDC-upptäckt)"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "Min"
 
@@ -7880,6 +8008,10 @@ msgstr ""
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Fler åtgärder för {name}"
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -7980,6 +8112,22 @@ msgid "New: My Library"
 msgstr "Nytt: Mitt bibliotek"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Newest"
 msgstr "Nyast"
 
@@ -7992,7 +8140,8 @@ msgid "Newznab / Torznab indexer"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "Nästa"
 
@@ -8010,6 +8159,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No approval needed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8108,6 +8261,10 @@ msgid "No registered devices."
 msgstr "Inga registrerade enheter."
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr "Det finns inga sparade läsplatser ännu."
 
@@ -8141,6 +8298,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No values match."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8200,6 +8361,10 @@ msgstr "Anteckning {label}"
 #: cps/spa_strings.py
 msgid "Notes"
 msgstr "Anteckningar"
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8308,11 +8473,23 @@ msgstr "En kolumn"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
 "Endast böckerna du väljer nedan synkroniseras. När du byter hit är inga "
 "böcker valda från början — du väljer varje bok själv."
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8448,7 +8625,7 @@ msgstr "Sida {number}"
 msgid "Page {page} of {pages}"
 msgstr "Sida {page} av {pages}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr ""
 
@@ -8584,7 +8761,8 @@ msgstr "Förhandsvisar {source}. Den sparade positionen ändras inte."
 msgid "Previewing…"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "Föregående"
 
@@ -8789,6 +8967,11 @@ msgid "Remove tag \"{tag}\""
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr ""
 
@@ -8803,6 +8986,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8943,6 +9131,11 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "Återställde föregående biblioteksläge för {accounts} konton."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "Återställer…"
 
@@ -8994,6 +9187,14 @@ msgstr "Rader per inläsning"
 
 #: cps/spa_strings.py
 msgid "Rule group"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9058,6 +9259,10 @@ msgid "Save preset"
 msgstr "Spara förinställning"
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "Spara säkerhetsinställningar"
 
@@ -9068,6 +9273,10 @@ msgstr "Spara inställningar"
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "Spara filen, mata ut Kobon säkert och starta sedan om den."
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9604,6 +9813,10 @@ msgid "Sort order"
 msgstr "Sorteringsordning"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "Källdetaljer"
 
@@ -9633,7 +9846,8 @@ msgstr "Började läsa"
 msgid "Starting scan…"
 msgstr "Startar genomsökning…"
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "Status"
 
@@ -9865,6 +10079,10 @@ msgid "The background scheduler is not running."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr "Boken håller fortfarande på att öppnas. Försök igen om en stund."
 
@@ -10093,6 +10311,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10435,6 +10657,10 @@ msgid "Undoing…"
 msgstr "Ångrar…"
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Visa igen"
 
@@ -10465,6 +10691,10 @@ msgstr "Lås upp omslaget för att ändra det"
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
 msgstr "Lossa sidopanel"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -10589,6 +10819,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
 msgstr "Använder bilden bakom Google-länken"
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -11017,6 +11251,16 @@ msgstr "{n} har tilldelats {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "{n} böcker i den senaste inventeringen"
 
@@ -11039,6 +11283,11 @@ msgstr "{n} hittades"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} markeringar och anteckningar"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -17737,6 +17986,61 @@ msgstr "Kobo-token:"
 msgid "List"
 msgstr "Lista"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "Åtgärder"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr ""
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Granskning av Hardcover-matchningar 🔖"
@@ -18944,10 +19248,6 @@ msgstr "Översikt över bakgrundsuppgifter"
 #: cps/templates/tasks.html
 msgid "Run Time"
 msgstr "Drifttid"
-
-#: cps/templates/tasks.html
-msgid "Actions"
-msgstr "Åtgärder"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"

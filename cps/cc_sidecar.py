@@ -173,6 +173,9 @@ def ensure_tables() -> bool:
     swallowed: without the sidecar the app still works, it just cannot hold a
     curated order.
     """
+    if not sidecar_ready():
+        return False
+
     statements = (        # is_hierarchy is a tri-state: NULL means "still derived from the data",
         # which is what every existing install keeps. No DEFAULT on purpose --
         # DEFAULT 0 would silently declare every column flat on creation.

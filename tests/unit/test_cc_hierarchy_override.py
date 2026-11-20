@@ -25,7 +25,7 @@ rather than a boolean.
 import sqlite3
 
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
 
 from cps import cc_sidecar, db, hierarchy
@@ -310,28 +310,13 @@ def test_reconcile_never_overwrites_a_declared_verdict(sidecar, tmp_path):
     conn.commit()
     conn.close()
 
-    engine = create_engine("sqlite://", poolclass=StaticPool)
-    ev = event
+    sidecar.session.execute(text("ATTACH DATABASE :path AS calibre"), {"path": meta})
+    assert cc_sidecar.set_hierarchy_verdict(3, True)
 
-    def _attach(dbapi_connection, _record):
-        cur = dbapi_connection.cursor()
-        try:
-            cur.execute("ATTACH DATABASE ? AS calibre", (meta,))
-        finally:
-            cur.close()
+    result = cc_sidecar.reconcile()
 
-    ev.listen(engine, "connect", _attach)
-    calibre = object.__new__(db.CalibreDB)
-    calibre.session = db.sessionmaker(bind=engine)()
-    calibre.ensure_session = lambda *a, **k: None
-
-    cc_sidecar.set_hierarchy_verdict(3, True)
-    saved, cc_sidecar.calibre_db = cc_sidecar.calibre_db, calibre
-    try:
-        assert cc_sidecar.reconcile()["available"] is True
-    finally:
-        cc_sidecar.calibre_db = saved
-
+    assert result["available"] is True
+    assert result["columns_added"] == 1
     assert _verdict(sidecar, 3) == cc_sidecar.HierarchyVerdict(True, "override")
 
 

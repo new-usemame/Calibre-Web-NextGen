@@ -17,7 +17,7 @@ import os
 import sqlite3
 
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.pool import StaticPool
 
 from cps import cc_sidecar, db, hierarchy
@@ -99,13 +99,23 @@ def sidecar_library(tmp_path, monkeypatch):
 
 @pytest.fixture
 def detached(monkeypatch):
-    """A session with no app_settings attachment, as many unit tests have."""
+    """An initialized app database that the Calibre connection cannot see."""
+    calibre_engine = create_engine("sqlite://", poolclass=StaticPool)
+    app_engine = create_engine("sqlite://", poolclass=StaticPool)
     calibre = object.__new__(db.CalibreDB)
-    calibre.session = db.sessionmaker(bind=create_engine("sqlite://",
-                                                        poolclass=StaticPool))()
     calibre.ensure_session = lambda *a, **k: None
-    monkeypatch.setattr(cc_sidecar, "calibre_db", calibre)
-    return calibre
+    try:
+        with (
+            db.sessionmaker(bind=calibre_engine)() as calibre_session,
+            db.sessionmaker(bind=app_engine)() as app_session,
+        ):
+            calibre.session = calibre_session
+            monkeypatch.setattr(cc_sidecar, "calibre_db", calibre)
+            monkeypatch.setattr(cc_sidecar.ub, "session", app_session)
+            yield calibre
+    finally:
+        calibre_engine.dispose()
+        app_engine.dispose()
 
 
 def _cc_index_query(session, column_id=3):
@@ -204,6 +214,9 @@ def test_everything_is_a_no_op_without_the_attachment(detached):
     assert cc_sidecar.hierarchy_verdict(3).source == "unavailable"
     assert cc_sidecar.reconcile() == {"columns_added": 0, "columns_removed": 0,
                                       "orders_pruned": 0, "available": False}
+    app_db = inspect(cc_sidecar.ub.session.get_bind())
+    assert not app_db.has_table("cc_column")
+    assert not app_db.has_table("cc_value_order")
 
 
 def test_no_sidecar_leaves_the_stored_order_empty_so_sorting_stays_alphabetical(detached):

@@ -18,10 +18,10 @@ from sqlalchemy import exc as sa_exc
 from sqlalchemy.orm import selectinload
 
 # Import the Hardcover provider
-from cps.utils.text_similarity import main_title, normalize_isbn
+from cps.utils.text_similarity import main_title
 
 try:
-    from cps.metadata_provider.hardcover import Hardcover
+    from cps.metadata_provider.hardcover import Hardcover, normalize_isbn
 except ImportError:
     Hardcover = None
 

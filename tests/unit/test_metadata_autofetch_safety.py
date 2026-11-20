@@ -150,8 +150,8 @@ class TestISBNPrioritySelection:
         assert m._select_metadata_result([first, NS(identifiers={"isbn": "222"})], "999") is first
 
     def test_book_isbn_prefers_isbn13(self):
-        b = _Book(identifiers=[_Ident("isbn", "1111111111"), _Ident("isbn13", "9782222222222")])
-        assert m._book_isbn(b) == "9782222222222"
+        b = _Book(identifiers=[_Ident("isbn", "0441013597"), _Ident("isbn13", "9780593099322")])
+        assert m._book_isbn(b) == "9780593099322"
 
 
 # --- #403: smart mode guards every canonical field ---------------------------

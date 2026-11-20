@@ -23,7 +23,6 @@ try:
         author_list_similarity,
         normalize_string,
         calculate_year_similarity,
-        normalize_isbn,
         main_title,
     )
 except ImportError:
@@ -41,7 +40,6 @@ except ImportError:
     author_list_similarity = _similarity.author_list_similarity
     normalize_string = _similarity.normalize_string
     calculate_year_similarity = _similarity.calculate_year_similarity
-    normalize_isbn = _similarity.normalize_isbn
     main_title = _similarity.main_title
 
 # Try importing from full app; if unavailable (CLI), use light fallbacks
@@ -50,6 +48,7 @@ try:  # pragma: no cover - normal app path
     from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata  # type: ignore
     from cps.services.Metadata import ProviderRefused  # type: ignore
     from cps.isoLanguages import get_language_name  # type: ignore
+    from cps.services.isbn import isbn13  # type: ignore
     from ..cw_login import current_user  # type: ignore
 except Exception:  # pragma: no cover - CLI/testing path
     import logging as _logging
@@ -119,12 +118,27 @@ except Exception:  # pragma: no cover - CLI/testing path
     def get_language_name(locale: str, code3: str) -> str:  # type: ignore
         return code3 or ""
 
+    # Load the same pure helper without starting the application in CLI mode.
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    _isbn_spec = spec_from_file_location("cwng_isbn", Path(__file__).resolve().parents[1] / "services" / "isbn.py")
+    _isbn_module = module_from_spec(_isbn_spec)
+    _isbn_spec.loader.exec_module(_isbn_module)
+    isbn13 = _isbn_module.isbn13
+
     class _DummyUser:
         hardcover_token: Optional[str] = None
 
     current_user = _DummyUser()  # type: ignore
 
 log = logger.create()
+
+
+def normalize_isbn(value) -> str:
+    """Return a comparable ISBN-13, also accepting explicit ISBN-10/13 labels."""
+    unlabelled = re.sub(r"^isbn-1[03]:?\s*", "", str(value or "").strip(), flags=re.I)
+    return isbn13(unlabelled) or ""
 
 
 class Hardcover(Metadata):
@@ -551,12 +565,10 @@ class Hardcover(Metadata):
         score = 0.0
         reasons = []
         
-        # ISBN match (if available) - highest confidence. Search hits carry
-        # every ISBN of every edition, so a translation's ISBN finds the
-        # original book.
+        # Compare valid ISBNs as ISBN-13s across every edition in a search hit.
         query_isbn_norm = normalize_isbn(query_isbn)
         if query_isbn_norm:
-            result_isbns = {normalize_isbn(i) for i in Hardcover._result_isbns(result)}
+            result_isbns = {normalize_isbn(value) for value in Hardcover._result_isbns(result)}
             if query_isbn_norm in result_isbns:
                 return (1.0, "ISBN exact match")
         

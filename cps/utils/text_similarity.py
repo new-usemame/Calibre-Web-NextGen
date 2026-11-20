@@ -183,31 +183,6 @@ def calculate_year_similarity(year1: str, year2: str) -> float:
     except (ValueError, AttributeError):
         return 0.0
 
-
-def normalize_isbn(value) -> str:
-    """Return an ISBN as 13 digits (an ISBN-10 is converted), else "".
-
-    Calibre stores whatever the source gave it: hyphens, spaces, ISBN-10.
-    Hardcover lists both forms per edition. Comparing the ISBN-13 form
-    makes "2-07-036822-X" and "9782070368228" the same book.
-    """
-    raw = re.sub(r"^isbn(?:-1[03])?:?\s*", "", str(value or "").strip(), flags=re.I)
-    digits = re.sub(r"[\s-]", "", raw).upper()
-    if re.fullmatch(r"[0-9]{9}[0-9X]", digits):
-        checksum = sum((10 - i) * (10 if d == 'X' else int(d))
-                       for i, d in enumerate(digits))
-        if checksum % 11:
-            return ""
-        core = "978" + digits[:9]
-        total = sum((1 if i % 2 == 0 else 3) * int(d) for i, d in enumerate(core))
-        return core + str((10 - total % 10) % 10)
-    if re.fullmatch(r"97[89][0-9]{10}", digits):
-        checksum = sum((1 if i % 2 == 0 else 3) * int(d) for i, d in enumerate(digits))
-        if checksum % 10 == 0:
-            return digits
-    return ""
-
-
 def main_title(title: str) -> str:
     """The title without its subtitle ("Play Nice: The Rise..." -> "Play Nice").
 

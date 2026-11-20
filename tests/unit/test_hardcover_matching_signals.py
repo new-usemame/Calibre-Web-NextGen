@@ -23,13 +23,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from cps.metadata_provider.hardcover import Hardcover
+from cps.metadata_provider.hardcover import Hardcover, normalize_isbn
 from cps.services.Metadata import MetaRecord, MetaSourceInfo
 from cps.tasks import auto_hardcover_id as mod
 from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
 from cps.utils.text_similarity import (
     main_title,
-    normalize_isbn,
     normalized_levenshtein_similarity,
 )
 
@@ -60,6 +59,7 @@ def _hit(title, authors, *, id_="1", subtitle="", alternative_titles=(), isbns=(
     ("2-07-036822-X", "9782070368228"),
     ("207036822X", "9782070368228"),
     ("isbn 0441172717", "9780441172719"),
+    ("ISBN-10: 2‑07‑036822‑X", "9782070368228"),
     ("", ""),
     ("not an isbn", ""),
     ("12345", ""),

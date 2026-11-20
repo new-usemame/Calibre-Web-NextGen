@@ -1575,8 +1575,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "S'ha completat la cerca de duplicats (mètode alternatiu)."
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "Estratègia de resolució no vàlida"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -2468,7 +2477,9 @@ msgstr "Llibres de %(name)s, incloses totes les subcategories"
 
 #: cps/api/browse.py cps/opds.py cps/web.py
 msgid "Tag hierarchy temporarily unavailable. Please try again."
-msgstr "La jerarquia d'etiquetes no està disponible temporalment. Torneu-ho a provar més tard."
+msgstr ""
+"La jerarquia d'etiquetes no està disponible temporalment. Torneu-ho a provar "
+"més tard."
 
 #: cps/opds.py
 msgid "All books in this tag group"
@@ -5211,6 +5222,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -5224,6 +5252,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Only these shelves"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Smart shelves are not synced to e-readers on this server, so a smart shelf "
+"ticked here adds no books. An administrator can turn on Sync smart shelves "
+"in the settings."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5251,6 +5286,26 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save the book choice. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Clear reading position"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Clear your saved reading position for \"{title}\" in the web reader, on your "
+"Kobo and in KOReader? Your read status is not changed. A device that still "
+"holds its own position can send it back the next time it syncs."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading position cleared."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not clear the reading position."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6312,6 +6367,10 @@ msgid "Could not open the synced position."
 msgstr "No s'ha pogut obrir la posició sincronitzada."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "No s'ha pogut llegir aquest arxiu de còmics."
 
@@ -6348,6 +6407,10 @@ msgid "Could not reset password."
 msgstr "No s'ha pogut restablir la contrasenya."
 
 #: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
 msgstr "No s'ha pogut restaurar aquesta font. Torneu-ho a provar."
 
@@ -6358,6 +6421,10 @@ msgstr "No s'ha pogut desar l'ordre."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "No s'ha pogut desar la configuració del lector."
+
+#: cps/spa_strings.py
+msgid "Could not save that highlight."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
@@ -6483,6 +6550,10 @@ msgstr "S'està creant…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Retalla per omplir: sense marges, es retallen les vores de la imatge"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Actual"
@@ -6573,6 +6644,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Suprimeix llibres"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -6992,6 +7067,47 @@ msgstr "Servidor de correu electrònic"
 msgid "Email settings saved."
 msgstr "S'ha desat la configuració del correu electrònic."
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "Buit"
@@ -7379,7 +7495,7 @@ msgstr "Amaga la biblioteca del dispositiu"
 msgid "Hide fields"
 msgstr "Amaga camps"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Amaga la contrasenya"
 
@@ -7565,6 +7681,26 @@ msgstr "La sincronització de KOReader no està activada en aquest servidor."
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "Mantén la connexió"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -7896,6 +8032,10 @@ msgid "Member user filter"
 msgstr "Filtre d'usuaris membres"
 
 #: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Merge into {name}"
 msgstr "Fusiona amb {name}"
@@ -8038,6 +8178,22 @@ msgstr "Usuari nou"
 #: cps/spa_strings.py cps/templates/index.html
 msgid "New: My Library"
 msgstr "Nou: La meva biblioteca"
+
+#: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Newest"
@@ -8307,6 +8463,10 @@ msgstr "Res en aquesta pàgina"
 #: cps/spa_strings.py
 msgid "Nothing requested yet."
 msgstr "Encara no s'ha demanat res."
+
+#: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
@@ -8659,6 +8819,10 @@ msgstr "Previsualitza aquest punt"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "S'està previsualitzant {source}. La posició desada no canviarà."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Anterior"
@@ -8772,6 +8936,10 @@ msgid "Recipient(s)"
 msgstr "Destinataris"
 
 #: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Redirect host (full URL)"
 msgstr "Amfitrió de redirecció (URL completa)"
 
@@ -8871,6 +9039,10 @@ msgstr "Elimina aquests"
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "Voleu treure {name}?"
+
+#: cps/spa_strings.py
+msgid "Removed devices"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
@@ -8991,8 +9163,22 @@ msgid "Reset to defaults"
 msgstr "Restableix els valors predeterminats"
 
 #: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Restore"
 msgstr "Restaura"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9521,7 +9707,7 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra'n més"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Mostra la contrasenya"
 
@@ -9728,6 +9914,10 @@ msgstr "URL de sincronització estàndard de Kobo"
 #: cps/spa_strings.py
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller està configurat però no s'ha pogut contactar."
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -10239,6 +10429,13 @@ msgstr ""
 "Aquesta configuració no s'ha pogut actualitzar, de manera que el que es "
 "mostra pot estar obsolet."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"This account can't download books, so its Kobo will be refused when it "
+"syncs. An administrator can fix this by turning on Allow Downloads for the "
+"account."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "This account cannot use book sources, or the feature is switched off."
 msgstr ""
@@ -10349,8 +10546,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Aquesta és l'adreça de l'ordinador mateix, a la qual el lector electrònic no "
 "pot accedir. Trieu «Canvia» i introduïu una adreça accessible des del "
@@ -10400,6 +10597,12 @@ msgid ""
 msgstr ""
 "Aquesta pàgina ha tingut un error i no s'ha pogut mostrar. La biblioteca no "
 "s'ha vist afectada; normalment n'hi ha prou de tornar-la a carregar."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -10538,9 +10741,9 @@ msgid ""
 "are never allowed."
 msgstr ""
 "Activeu aquesta opció si la connexió funciona a la vostra xarxa, com ara un "
-"catàleg, un indexador o un client de descàrrega amb una adreça 192.168 o 10."
-"x. Només s'aplica a aquesta connexió. Les adreces de bucle local, d'enllaç "
-"local i de metadades dels serveis al núvol no es permeten mai."
+"catàleg, un indexador o un client de descàrrega amb una adreça 192.168 o "
+"10.x. Només s'aplica a aquesta connexió. Les adreces de bucle local, "
+"d'enllaç local i de metadades dels serveis al núvol no es permeten mai."
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -11120,6 +11323,11 @@ msgstr "{count} resultats per a «{query}»"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} de {total}"
 
@@ -11292,6 +11500,44 @@ msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 "No s'han pogut afegir {failed} dels {total} llibres. Queden seleccionats."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -11411,6 +11657,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11429,6 +11679,12 @@ msgstr "Privat al vostre compte. Això no canvia la descripció compartida."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Conserveu aquí els vostres pensaments sobre aquest llibre."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11453,6 +11709,11 @@ msgstr "Suprimeix la ressenya"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Voleu suprimir la vostra ressenya?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."
@@ -11963,17 +12224,23 @@ msgid ""
 "Leave blank to keep the existing filename. Example: {series} #{series_index} "
 "- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
 "the file extension is added automatically."
-msgstr "Deixeu en blanc el camp per mantenir el nom de fitxer actual. Exemple: {series} #{series_index} - {title}. Els camps inclouen {title}, {authors}, {series} i {series_index}; l'extensió del fitxer s'afegeix automàticament."
+msgstr ""
+"Deixeu en blanc el camp per mantenir el nom de fitxer actual. Exemple: "
+"{series} #{series_index} - {title}. Els camps inclouen {title}, {authors}, "
+"{series} i {series_index}; l'extensió del fitxer s'afegeix automàticament."
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 #, python-brace-format
 msgid ""
 "Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr "Utilitzeu {series:|(|) }{title} per ometre el prefix de la sèrie quan no n'hi hagi cap."
+msgstr ""
+"Utilitzeu {series:|(|) }{title} per ometre el prefix de la sèrie quan no "
+"n'hi hagi cap."
 
 #: cps/spa_strings.py cps/templates/tag_tree.html
 msgid "Choose a tag group to browse books from it and its subtags."
-msgstr "Trieu un grup d'etiquetes per consultar-ne els llibres i les subetiquetes."
+msgstr ""
+"Trieu un grup d'etiquetes per consultar-ne els llibres i les subetiquetes."
 
 #: cps/spa_strings.py
 msgid "Sleep screen"
@@ -12065,6 +12332,98 @@ msgstr ""
 msgid ""
 "Remove this image? Your previous KOReader sleep-screen settings will return "
 "after the next sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -12577,7 +12936,9 @@ msgstr "No s'ha trobat cap fitxer gmail.json vàlid amb informació d'OAuth"
 #: cps/services/mail_filename.py
 msgid ""
 "Use a valid attachment filename template with supported metadata fields."
-msgstr "Utilitzeu una plantilla de nom de fitxer adjunt vàlida amb camps de metadades compatibles."
+msgstr ""
+"Utilitzeu una plantilla de nom de fitxer adjunt vàlida amb camps de "
+"metadades compatibles."
 
 #: cps/services/opds_filename.py
 msgid "Conditional text needs both prefix and suffix separators."
@@ -13958,8 +14319,8 @@ msgid ""
 msgstr ""
 "Aquestes rutes només són internes a NextGen. Podeu canviar lliurement les "
 "vinculacions de l’esquerra, però no cal\n"
-"        canviar les rutes de la dreta.<br><br>Si voleu desar <code>metadata."
-"db</code> en una ubicació diferent de la resta de la\n"
+"        canviar les rutes de la dreta.<br><br>Si voleu desar "
+"<code>metadata.db</code> en una ubicació diferent de la resta de la\n"
 "        biblioteca, activeu l’opció <b>Separa els fitxers dels llibres de la "
 "biblioteca i introduïu-hi la ruta de la resta de la biblioteca</b>."
 
@@ -15887,6 +16248,18 @@ msgstr ""
 "        i AZW3."
 
 #: cps/templates/cwa_settings.html
+msgid "Preserve cover aspect ratio in EPUBs"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"When the enforcement service writes a new cover into an EPUB, its cover page "
+"keeps the image's proportions instead of stretching it to fill the screen. "
+"This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
+"covers written from now on; KEPUB files are not changed."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
 msgstr "Activa el corrector d'EPUB per a Kindle de NextGen"
 
@@ -15978,8 +16351,8 @@ msgstr ""
 "detecten el títol, la sèrie, l'autor ni l'editorial. Si activeu aquesta "
 "opció, abans d'importar un arxiu amb ComicInfo.xml fora de lloc se'n crearà "
 "una còpia amb el fitxer traslladat a l'arrel. No es modificaran els arxius "
-"que ja siguin correctes. Només s'admeten els arxius ZIP (.cbz); els formats ."
-"cbr, .cb7 i .cbt no es modifiquen. La baixada original tampoc no es "
+"que ja siguin correctes. Només s'admeten els arxius ZIP (.cbz); els "
+"formats .cbr, .cb7 i .cbt no es modifiquen. La baixada original tampoc no es "
 "modifica, només la còpia importada."
 
 #: cps/templates/cwa_settings.html
@@ -16122,15 +16495,11 @@ msgstr "Activa l'aplicació de metadades intel·ligents"
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"When enabled, fetched metadata will only replace existing data if it appears "
-"to be better quality (e.g., longer descriptions, higher resolution covers). "
-"When disabled, fetched metadata will replace existing data as-is from the "
-"preferred provider."
+"When enabled, fetched metadata only fills in what a book is missing (for "
+"example an empty description, a missing series or cover) and adds new tags, "
+"but never replaces data the book already has. When disabled, fetched "
+"metadata will replace existing data as-is from the preferred provider."
 msgstr ""
-"Si s'activa, les metadades obtingudes només substituiran les actuals quan "
-"semblin de més qualitat (p. ex., descripcions més llargues o cobertes de més "
-"resolució). Si es desactiva, les metadades del proveïdor preferit "
-"substituiran directament les actuals."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -19391,6 +19760,17 @@ msgid "Reset user Password"
 msgstr "Restableix la contrasenya d'usuari"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+msgstr[1] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
+
+#: cps/templates/user_edit.html
 msgid "eReader Configuration"
 msgstr "Configuració del lector electrònic"
 
@@ -19551,6 +19931,13 @@ msgstr ""
 "Desactivada per defecte. La fase 0 només registra dades per recuperar "
 "l'estat anterior i no canvia les anotacions que rep el Kobo. L'administrador "
 "també ha d'activar l'opció general de la instància."
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -19855,3 +20242,14 @@ msgstr "Mostra els prestatges seleccionats a OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra la secció de llibres llegits i no llegits"
+
+#~ msgid ""
+#~ "When enabled, fetched metadata will only replace existing data if it "
+#~ "appears to be better quality (e.g., longer descriptions, higher "
+#~ "resolution covers). When disabled, fetched metadata will replace existing "
+#~ "data as-is from the preferred provider."
+#~ msgstr ""
+#~ "Si s'activa, les metadades obtingudes només substituiran les actuals quan "
+#~ "semblin de més qualitat (p. ex., descripcions més llargues o cobertes de "
+#~ "més resolució). Si es desactiva, les metadades del proveïdor preferit "
+#~ "substituiran directament les actuals."

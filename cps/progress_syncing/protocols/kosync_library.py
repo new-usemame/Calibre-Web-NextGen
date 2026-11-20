@@ -273,6 +273,7 @@ def get_library_placeholder(book_id):
         authors=entry["authors"],
         series=entry["series"],
         series_index=entry["series_index"],
+        tags=koreader_library.tag_order(tag.name for tag in book.tags),
         cover_path=_cover_path(book),
         language=language,
         modified=koreader_library.iso_z(book.last_modified) or "2000-01-01T00:00:00Z",

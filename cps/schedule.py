@@ -6,7 +6,9 @@
 # See CONTRIBUTORS for full list of authors.
 
 import datetime
+import os
 import threading
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from markupsafe import escape
 
@@ -282,11 +284,48 @@ def register_startup_tasks():
             scheduler.schedule_tasks_immediately(tasks=[[lambda: TaskClean(), 'delete temp', True]])
 
 
+def _local_zone():
+    """The zone, DST rules included, whose wall clock the scheduled hours follow."""
+    name = os.environ.get("TZ", "").lstrip(":")
+    if not name:
+        try:
+            with open("/etc/localtime", "rb") as zone_file:
+                return ZoneInfo.from_file(zone_file)
+        except (OSError, ValueError):
+            pass
+    else:
+        try:
+            return ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    # A TZ the zone database doesn't name (a POSIX rule string): today's offset.
+    return datetime.datetime.now().astimezone().tzinfo
+
+
+def schedule_window_active(now, start, duration):
+    """Whether the daily task window contains ``now``.
+
+    The window opens every day at ``start`` o'clock in the zone ``now`` carries
+    and stays open for ``duration`` minutes of real time, so one that opened
+    yesterday evening is still open after midnight, and one that spans a DST
+    change is no shorter or longer than on other days. An opening hour the
+    clocks skip opens when they resume; one they repeat opens the first time.
+    """
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("now must carry its time zone")
+    instant = now.astimezone(datetime.timezone.utc)
+    length = datetime.timedelta(minutes=duration)
+    for days_back in range(duration // (24 * 60) + 2):
+        day = now.date() - datetime.timedelta(days=days_back)
+        opened = datetime.datetime.combine(day, datetime.time(start), tzinfo=now.tzinfo)
+        opened = opened.astimezone(datetime.timezone.utc)
+        if opened <= instant < opened + length:
+            return True
+    return False
+
+
 def should_task_be_running(start, duration):
-    now = datetime.datetime.now()
-    start_time = datetime.datetime.now().replace(hour=start, minute=0, second=0, microsecond=0)
-    end_time = start_time + datetime.timedelta(hours=duration // 60, minutes=duration % 60)
-    return start_time < now < end_time
+    return schedule_window_active(datetime.datetime.now(_local_zone()), start, duration)
 
 
 def calclulate_end_time(start, duration):
@@ -499,3 +538,4 @@ def _schedule_archived_book_cleanup(scheduler, timezone_info):
     except Exception:
         # Scheduling is best-effort; never block startup
         pass
+

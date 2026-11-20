@@ -14,9 +14,11 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
+import { beginImportWatch, getImportWatch } from './uploadImportStore';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
-import { createEntityListQueryOptions } from './entityListQueryOptions';
+import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
+import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
@@ -587,6 +589,17 @@ export function useEntityList(plural: string) {
   return useQuery<EntityList>({ ...options, queryKey: [...options.queryKey, me?.id] });
 }
 
+/** Authors, series and publishers browse in pages; other useEntityList callers stay full-list. */
+export function usePagedEntityList(plural: string, q: string, minimum: number | null, enabled: boolean) {
+  const me = useMe().data;
+  return useInfiniteQuery({
+    ...createPagedEntityListQueryOptions(plural, q, minimum, me?.id,
+      (url, signal) => apiGet<EntityListPage>(url, { signal }), enabled),
+    // Keep the filter controls mounted while a new filter's first page loads.
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** The tag a rename collided with, carried on the 409 so the caller can offer
  *  to merge into it rather than showing a dead end (#973). */
 export interface TagConflict { id: number; name: string; count: number }
@@ -686,7 +699,36 @@ export function useStopReading(id: string | number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
     onSuccess: () => {
-      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Clear this user's saved reading position for a book on the web reader, Kobo
+ *  and KOReader together (#2831). The read status is left as it is. */
+export function useClearReadingPosition(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; cleared: number }>(`/api/v1/books/${id}/clear-position`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
+
+/** Record a new-UI reader open, as the classic /read route does (#2750): the
+ *  server moves the book onto Currently Reading (a finished book stays
+ *  finished) and counts a session only on that transition. */
+export function useRecordReaderOpen(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean }>(`/api/v1/books/${id}/reader-open`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['reading-sources', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
         void qc.invalidateQueries({ queryKey });
       }
     },
@@ -787,18 +829,28 @@ export function useShelves(options?: { enabled?: boolean }) {
 
 // A new revision starts a fresh result set after bulk changes. Do not reuse
 // pre-mutation pages in the local accumulator; pages already skip placeholders.
-export function useShelf(id: string | number | undefined, page = 1, sort = 'stored', revision = 0) {
+export function useShelf(
+  id: string | number | undefined,
+  page = 1,
+  sort = 'stored',
+  revision = 0,
+  perPage = 24,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), sort, page, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 2, and the
+    // invalidations elsewhere match on the ['shelf', id] prefix.
+    queryKey: ['shelf', String(id), sort, page, revision, perPage],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: '24',
+        per_page: String(perPage),
         sort,
       });
       return apiGet<ShelfDetail>(`/api/v1/shelves/${id}?${params.toString()}`);
     },
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== '' && ready,
     // Keep the previous page's rows only while paging within the SAME shelf and
     // sort. Never carry rows across either identity change (#612/#2059).
     placeholderData: (prev, prevQuery) =>
@@ -975,6 +1027,19 @@ export interface MailConfig {
   mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
+  /** Whether the saved settings are enough for the app to send mail (#2771). */
+  mail_configured: boolean;
+  /** Whether Gmail OAuth (classic page only) has been authorised. */
+  gmail_authorised: boolean;
+}
+
+export interface MailTestResult { ok: boolean; email: string; message: string }
+
+/** Queue a test email to the signed-in admin's own address (#2771). */
+export function useSendTestMail() {
+  return useMutation({
+    mutationFn: () => apiPost<MailTestResult>('/api/v1/admin/mailsettings/test', {}),
+  });
 }
 
 export function useMailConfig() {
@@ -1066,7 +1131,7 @@ export function useUpdateSecurityConfig() {
 export function useUpdateAdminUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode'] }) => {
+    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode']; start_empty?: boolean }) => {
       const { id, ...body } = v;
       return apiPost<AdminUser>(`/api/v1/admin/users/${id}`, body);
     },
@@ -1262,23 +1327,43 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => invalidateBookVisibilityViews(qc),
+    onSuccess: () => {
+      invalidateBookVisibilityViews(qc);
+      // The merged-away copies are deleted, so their duplicate group shrinks or
+      // goes; the list reads live book rows and is right on the next fetch.
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+    },
   });
 }
 
 // ── Upload ───────────────────────────────────────────────────────────────────
 
+/** The library's current book total, or null if it cannot be read. One row is
+ *  requested; only the total is wanted. */
+async function readLibraryTotal(): Promise<number | null> {
+  try {
+    const page = await apiGet<BooksPage>('/api/v1/books?page=1&per_page=1&sort=new');
+    return typeof page.total === 'number' ? page.total : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useUploadBooks() {
-  const qc = useQueryClient();
   return useMutation({
+    // The total before the files are queued is what later arrivals are counted
+    // against (#1044).
+    onMutate: async () => ({ watch: getImportWatch(), baseline: await readLibraryTotal() }),
     mutationFn: (files: File[]) => {
       const fd = new FormData();
       for (const f of files) fd.append('file', f);
       return apiUpload<UploadResult>('/api/v1/upload', fd);
     },
-    onSuccess: () => {
-      // The library will populate as ingest processes; nudge the catalog.
-      void qc.invalidateQueries({ queryKey: ['books'] });
+    onSuccess: (result, _files, context) => {
+      // Ingest runs after this request returns, so refetching the catalog now
+      // would still show the old list. Follow the books in instead; the
+      // library views refresh as they arrive (UploadImportWatcher).
+      beginImportWatch(result.queued.length, context?.baseline ?? null, context?.watch);
     },
   });
 }
@@ -1976,17 +2061,29 @@ export interface MagicShelfSortOption {
   label: string;
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
+export function useMagicShelfBooks(
+  id: string | number,
+  page = 1,
+  sort = 'new',
+  revision = 0,
+  /** Books per request; leave out to use the server's configured page size. */
+  perPage?: number,
+  /** Lets a caller hold the first request until it knows its page size (#980). */
+  ready = true,
+) {
   return useQuery<MagicShelfItem & BooksPage & {
     sort: string;
     sort_persistable?: boolean;
     custom_sort_options?: MagicShelfSortOption[];
   }>({
-    queryKey: ['magicshelf', String(id), page, sort, revision],
+    // perPage stays LAST: placeholderData reads positions 1 and 3, and the
+    // invalidations elsewhere match on the ['magicshelf', id] prefix.
+    queryKey: ['magicshelf', String(id), page, sort, revision, perPage],
     queryFn: () => apiGet(
-      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
+      `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`
+        + (perPage ? `&per_page=${perPage}` : ''),
     ),
-    enabled: String(id).length > 0,
+    enabled: String(id).length > 0 && ready,
     // Same-shelf, same-order paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>
       prevQuery
@@ -2043,6 +2140,67 @@ export function useDismissDuplicate() {
     mutationFn: (groupHash: string) =>
       apiPost(`/duplicates/dismiss/${encodeURIComponent(groupHash)}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+export type DuplicateStrategy =
+  | 'newest' | 'oldest' | 'merge'
+  | 'highest_quality_format' | 'most_metadata' | 'largest_file_size';
+
+export interface DuplicateResolutionPreviewGroup {
+  group_hash: string;
+  title: string;
+  author: string;
+  kept_book_id: number;
+  kept_book_formats: string[];
+  /** Publisher and year, so different editions in one group stand out (#1902). */
+  kept_book_edition?: { publisher: string | null; year: number | null };
+  deleted_book_ids: number[];
+  deleted_books_info: {
+    id: number; formats: string[]; publisher?: string | null; year?: number | null;
+  }[];
+}
+
+/** Shared by the dry run and the real run: the backend answers both with the
+ *  same counters and only adds `preview` for the dry run. */
+export interface DuplicateResolutionResult {
+  success: boolean;
+  resolved_count?: number;
+  kept_count?: number;
+  deleted_count?: number;
+  errors?: string[];
+  message?: string;
+  error?: string;
+  preview?: DuplicateResolutionPreviewGroup[] | null;
+}
+
+/** Dry run of the classic "Auto-Resolve Duplicates" panel (#1902). Admin only
+ *  on the server; nothing is deleted. */
+export function usePreviewDuplicateResolution() {
+  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
+    mutationFn: (strategy) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/preview-resolution', { strategy }),
+  });
+}
+
+/** Real run: keeps one book per group and deletes the rest. */
+export function useExecuteDuplicateResolution() {
+  const qc = useQueryClient();
+  return useMutation<DuplicateResolutionResult, Error, {
+    strategy: DuplicateStrategy; expected_preview: DuplicateResolutionPreviewGroup[];
+  }>({
+    mutationFn: (plan) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', plan),
+    // Books were deleted, so every list that can show them is stale -- not just
+    // the duplicates view. Refresh on either outcome: a partial failure still
+    // deletes some groups before it reports its errors.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+      invalidateBookVisibilityViews(qc);
+      void qc.invalidateQueries({ queryKey: ['book'] });
+      void qc.invalidateQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['discover-strip'] });
+    },
   });
 }
 

@@ -302,3 +302,155 @@ def test_member_integrity_is_checked_after_bounded_inflation(epub, field):
     snapshot = kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
     print(f'false {field}, snapshot={snapshot}')
     assert snapshot is None, f'valid XML must not bypass the final {field} check'
+
+
+@pytest.mark.parametrize('raw, expected_mib', [
+    (None, 16), ('', 16), ('  ', 16), ('32', 32), ('1', 1), ('256', 256),
+    ('0', 16), ('-4', 16), ('257', 16), ('1.5', 16), ('invalid', 16),
+])
+def test_resume_archive_limit_configuration(monkeypatch, raw, expected_mib):
+    if raw is None:
+        monkeypatch.delenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', raising=False)
+    else:
+        monkeypatch.setenv('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', raw)
+    assert kobo_position._resume_archive_limit() == expected_mib * 1024 * 1024
+
+
+def test_archive_over_cap_is_explained_once_and_never_resolves(epub, monkeypatch, caplog):
+    """The cap stays a hard bound, but the operator can see why exact resume was skipped."""
+    import logging
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size - 1)
+    kobo_position._note_archive_over_cap.cache_clear()
+    with caplog.at_level(logging.INFO, logger=kobo_position.log.name):
+        for _ in range(3):
+            assert kobo_position._resume_snapshot(
+                epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None
+    messages = [r.getMessage() for r in caplog.records if 'Exact Kobo resume skipped' in r.getMessage()]
+    assert len(messages) == 1
+    assert 'CWA_KOBO_RESUME_MAX_ARCHIVE_MIB' in messages[0]
+    assert str(epub) in messages[0]
+
+
+def test_archive_at_cap_still_resolves(epub, monkeypatch):
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size)
+    point, digest = kobo_position._resume_snapshot(
+        epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    assert point == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+    assert len(digest) == 64
+
+
+def test_chapter_snapshot_over_cap_is_explained(epub, monkeypatch, caplog):
+    import logging
+    from cps.services import kobo_resume
+    monkeypatch.setattr(kobo_resume, 'MAX_RESUME_ARCHIVE_BYTES', epub.stat().st_size - 1)
+    kobo_position._note_archive_over_cap.cache_clear()
+    with caplog.at_level(logging.INFO, logger=kobo_position.log.name):
+        assert kobo_resume._chapter_snapshot(epub, 'OEBPS/chapter.xhtml', 50) is None
+    assert any('Exact Kobo resume skipped' in r.getMessage() for r in caplog.records)
+
+
+def test_large_illustrated_archive_resolves_once_the_cap_allows_it(epub, monkeypatch):
+    """A >16 MiB archive (stored images) is refused by default and exact when admitted."""
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', 16 * 1024 * 1024)
+    with zipfile.ZipFile(epub, 'a', zipfile.ZIP_STORED) as archive:
+        archive.writestr('OEBPS/images/plate.jpg', b'\0' * (17 * 1024 * 1024))
+    assert epub.stat().st_size > kobo_position.MAX_RESUME_ARCHIVE_BYTES
+    args = (epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    assert kobo_position._resume_snapshot(*args) is None
+    monkeypatch.setattr(kobo_position, 'MAX_RESUME_ARCHIVE_BYTES', 32 * 1024 * 1024)
+    point, digest = kobo_position._resume_snapshot(*args)
+    assert point == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+    assert len(digest) == 64
+
+
+@pytest.mark.parametrize('configured, admitted', [(None, False), ('32', True), ('257', False)])
+def test_startup_archive_limit_reaches_both_snapshot_readers(epub, tmp_path, configured, admitted):
+    """A real startup setting must admit the same large EPUB for exact and chapter resume.
+
+    A child process imports both readers afresh, so patching the parser without
+    wiring its result into either reader cannot pass this check.
+    """
+    import hashlib
+    import json
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    with zipfile.ZipFile(epub, 'a', zipfile.ZIP_STORED) as archive:
+        archive.writestr('OEBPS/images/plate.jpg', b'\0' * (17 * 1024 * 1024))
+    config_dir = tmp_path / 'config'
+    config_dir.mkdir()
+    env = {**os.environ, 'CALIBRE_DBPATH': str(config_dir)}
+    env.pop('CWA_KOBO_RESUME_MAX_ARCHIVE_MIB', None)
+    if configured is not None:
+        env['CWA_KOBO_RESUME_MAX_ARCHIVE_MIB'] = configured
+    script = '''
+import json
+import sys
+from cps.services import kobo_position, kobo_resume
+exact = kobo_position._resume_snapshot(sys.argv[1], 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+chapter = kobo_resume._chapter_snapshot(sys.argv[1], 'OEBPS/chapter.xhtml', 50)
+print(json.dumps({'exact': exact, 'chapter': chapter}))
+'''
+    child = subprocess.run(
+        [sys.executable, '-c', script, str(epub)], env=env,
+        cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, timeout=30,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+    result = json.loads(child.stdout.splitlines()[-1])
+    if admitted:
+        fingerprint = hashlib.sha256(epub.read_bytes()).hexdigest()
+        assert result == {
+            'exact': ['epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)', fingerprint],
+            'chapter': {'chapter_href': 'OEBPS/chapter.xhtml',
+                        'chapter_progression': 0.5, 'epub_sha256': fingerprint},
+        }
+    else:
+        assert result == {'exact': None, 'chapter': None}
+
+
+def _set_flag_on_every_member(path, flag):
+    """OR a general-purpose flag into every local AND central header."""
+    import struct
+    raw = bytearray(path.read_bytes())
+    with zipfile.ZipFile(path) as archive:
+        offsets = [info.header_offset for info in archive.infolist()]
+        cursor = archive.start_dir
+    for offset in offsets:
+        struct.pack_into('<H', raw, offset + 6, struct.unpack_from('<H', raw, offset + 6)[0] | flag)
+    while raw[cursor:cursor + 4] == b'PK\x01\x02':
+        struct.pack_into('<H', raw, cursor + 8, struct.unpack_from('<H', raw, cursor + 8)[0] | flag)
+        name, extra, comment = struct.unpack_from('<3H', raw, cursor + 28)
+        cursor += 46 + name + extra + comment
+    path.write_bytes(raw)
+
+
+def test_enhanced_deflate_flag_does_not_block_exact_resume(epub):
+    """Some EPUB writers set bit 0x10 on every deflated member; zlib and JSZip ignore it."""
+    _set_flag_on_every_member(epub, 0x10)
+    assert kobo_position.compute_cfi_point(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') == (
+        'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)')
+
+
+@pytest.mark.parametrize('flag', [0x1, 0x20, 0x40, 0x1000])
+def test_encrypted_or_patched_members_still_fall_back(epub, flag):
+    """Encryption, patch data and strong encryption stay outside the supported subset."""
+    _set_flag_on_every_member(epub, flag)
+    assert kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None
+
+
+def test_enhanced_deflate_flag_leaves_member_names_and_bytes_unchanged(epub):
+    """Bit 0x10 must not change which member or which bytes the resume check reads."""
+    with zipfile.ZipFile(epub) as plain:
+        expected = {i.filename: plain.read(i) for i in plain.infolist() if not i.is_dir()}
+    _set_flag_on_every_member(epub, 0x10)
+    raw = epub.read_bytes()
+    with zipfile.ZipFile(epub) as flagged:
+        infos = sorted(flagged.infolist(), key=lambda i: i.header_offset)
+        for n, info in enumerate(infos):
+            if info.is_dir():
+                continue
+            end = infos[n + 1].header_offset if n + 1 < len(infos) else flagged.start_dir
+            bounds = kobo_position._resume_member_bounds(raw, end, info)
+            assert kobo_position._resume_member_bytes(raw, bounds, info) == expected[info.filename]

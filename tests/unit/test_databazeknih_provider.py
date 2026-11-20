@@ -15,12 +15,13 @@ test touches the network.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-import types
+import inspect
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from cps.metadata_provider import databazeknih
 
 pytestmark = pytest.mark.unit
 
@@ -32,65 +33,9 @@ def _fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
-def _load_module():
-    """Load cps/metadata_provider/databazeknih.py without the full `cps`
-    package init (which boots login/database side effects)."""
-    name = "cps.metadata_provider.databazeknih"
-    if name in sys.modules:
-        return sys.modules[name]
-
-    cps_dir = REPO_ROOT / "cps"
-    if "cps" not in sys.modules:
-        cps_pkg = types.ModuleType("cps")
-        cps_pkg.__path__ = [str(cps_dir)]
-        sys.modules["cps"] = cps_pkg
-
-        constants = types.ModuleType("cps.constants")
-        constants.STATIC_DIR = str(cps_dir / "static")
-        constants.USER_AGENT = "Calibre-Web-NextGen-tests"
-        sys.modules["cps.constants"] = constants
-
-        logger_mod = types.ModuleType("cps.logger")
-        logger_mod.create = lambda *_a, **_k: types.SimpleNamespace(
-            debug=lambda *_args, **_kwargs: None,
-            warning=lambda *_args, **_kwargs: None,
-            info=lambda *_args, **_kwargs: None,
-            error=lambda *_args, **_kwargs: None,
-        )
-        sys.modules["cps.logger"] = logger_mod
-
-    if "cps.isoLanguages" not in sys.modules:
-        iso_mod = types.ModuleType("cps.isoLanguages")
-        iso_mod.get_language_name = lambda _locale, code: code
-        sys.modules["cps.isoLanguages"] = iso_mod
-
-    if "cps.services.Metadata" not in sys.modules:
-        services_pkg = types.ModuleType("cps.services")
-        services_pkg.__path__ = [str(cps_dir / "services")]
-        sys.modules["cps.services"] = services_pkg
-        meta_spec = importlib.util.spec_from_file_location(
-            "cps.services.Metadata", cps_dir / "services" / "Metadata.py"
-        )
-        meta_mod = importlib.util.module_from_spec(meta_spec)
-        sys.modules["cps.services.Metadata"] = meta_mod
-        meta_spec.loader.exec_module(meta_mod)
-
-    if "cps.metadata_provider" not in sys.modules:
-        provider_pkg = types.ModuleType("cps.metadata_provider")
-        provider_pkg.__path__ = [str(cps_dir / "metadata_provider")]
-        sys.modules["cps.metadata_provider"] = provider_pkg
-    spec = importlib.util.spec_from_file_location(
-        name, cps_dir / "metadata_provider" / "databazeknih.py"
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def dk():
-    return _load_module()
+    return databazeknih
 
 
 @pytest.fixture(autouse=True)
@@ -219,12 +164,12 @@ def test_slovak_edition_page(dk):
 # -- search() end to end with a fake session ------------------------------------------
 
 class _FakeResponse:
-    def __init__(self, url, text="", status=200, content_type="text/html"):
+    def __init__(self, url, text="", status=200, content_type="text/html", location=None):
         self.url = url
         self.text = text
         self.status_code = status
         self.ok = status < 400
-        self.headers = {"content-type": content_type}
+        self.headers = {"content-type": content_type, "Location": location}
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -251,6 +196,7 @@ class _FakeSession:
         return _FakeResponse(url, status=404)
 
     def head(self, url, timeout=None, **_kw):
+        self.calls.append(url)
         return _FakeResponse(url, status=200 if self.head_ok else 404, content_type="image/png")
 
 
@@ -264,7 +210,10 @@ def test_isbn_query_follows_redirect_to_edition(dk):
     base = _FakeSession.BASE
     book_url = f"{base}/prehled-knihy/henry-chinaski-postovy-urad-499580"
     provider = _provider(dk, {
-        f"{base}/search?q=9788081820960": _FakeResponse(book_url, _fixture("book_499580.html")),
+        f"{base}/search?q=9788081820960": _FakeResponse(
+            f"{base}/search?q=9788081820960", status=302, location=book_url.removeprefix(base)
+        ),
+        book_url: _FakeResponse(book_url, _fixture("book_499580.html")),
         f"{base}/book-detail-more-info/499580": _FakeResponse("", _fixture("more_info_499580.html")),
     })
     records = provider.search("978-80-8182-096-0")
@@ -386,3 +335,93 @@ def test_slovak_title_found_through_czech_edition(dk):
     assert [r.title for r in records] == ["Poštový úrad", "Poštovní úřad"]
     assert records[0].languages == ["slk"]
     assert records[0].publisher == "Citadella (SK)"
+
+
+@pytest.fixture
+def catalog(dk):
+    base = dk.BASE_URL
+    book_url = f"{base}/prehled-knihy/postovni-urad-1781"
+    return _provider(dk, {
+        f"{base}/search?q=": _FakeResponse(book_url, _fixture("book_1781.html")),
+        f"{base}/book-detail-more-info/1781": _FakeResponse(
+            f"{base}/book-detail-more-info/1781", _fixture("more_info_1781.html")
+        ),
+    })
+
+
+def test_manual_search_contacts_catalog_only_after_user_picks_it(monkeypatch, catalog):
+    """A fresh manual search sends zero catalog requests until the user turns it on."""
+    from cps import app, cover_picker, search_metadata as search
+
+    user = SimpleNamespace(view_settings={})
+    monkeypatch.setattr(search, "current_user", user)
+    monkeypatch.setattr(cover_picker, "current_user", user)
+    monkeypatch.setattr(search, "cl", [catalog])
+    monkeypatch.setattr(search, "_get_global_provider_enabled_map", lambda: {})
+    monkeypatch.setattr(search, "_get_provider_hierarchy", lambda: [])
+    monkeypatch.setattr(search, "boost_covers", lambda _: None)
+    monkeypatch.setattr(search, "get_locale", lambda: "en")
+    monkeypatch.setattr(search.ub, "session", SimpleNamespace(commit=lambda: None))
+
+    def search_for_book():
+        with app.test_request_context("/metadata/search", method="POST", data={"query": "Poštovní úřad"}):
+            return inspect.unwrap(search.metadata_search)().get_json()
+
+    assert search_for_book()["results"] == []
+    assert not cover_picker._is_provider_enabled_for_user(catalog)
+
+    provider_path = "/metadata/provider/databazeknih"
+    with app.test_request_context(provider_path, method="POST", json={
+        "id": "databazeknih", "value": False, "initial": False, "query": "Poštovní úřad",
+    }):
+        inspect.unwrap(search.metadata_change_active_provider)("databazeknih")
+    assert catalog.session.calls == []
+
+    with app.test_request_context(provider_path, method="POST", json={"id": "databazeknih", "value": True}):
+        inspect.unwrap(search.metadata_change_active_provider)("databazeknih")
+
+    payload = search_for_book()
+    assert cover_picker._is_provider_enabled_for_user(catalog)
+    assert catalog.session.calls
+    assert [record["title"] for record in payload["results"]] == ["Poštovní úřad"]
+
+
+@pytest.mark.parametrize(("settings", "expected"), [
+    ({}, False),
+    ({"metadata_providers_enabled": '{"databazeknih": true}'}, False),
+    ({"metadata_provider_hierarchy": '["databazeknih"]'}, True),
+    ({"metadata_provider_hierarchy": '["databazeknih"]',
+      "metadata_providers_enabled": '{"databazeknih": false}'}, False),
+])
+def test_auto_fetch_contacts_catalog_only_in_enabled_order(monkeypatch, catalog, settings, expected):
+    """Ingest only sends catalog requests when the saved order includes it and it is available."""
+    from cps import metadata_helper as metadata
+
+    book = SimpleNamespace(title="Poštovní úřad", authors=[SimpleNamespace(name="Charles Bukowski")], identifiers=[])
+    session = SimpleNamespace(close=lambda: None, rollback=lambda: None)
+    library = SimpleNamespace(session=session, get_book=lambda _book_id: book)
+    monkeypatch.setattr(metadata.db, "CalibreDB", type("Library", (), {
+        "session_factory": True,
+        "__new__": lambda cls, **kwargs: library,
+    }))
+    monkeypatch.setattr(metadata, "CWA_DB", lambda: SimpleNamespace(
+        get_cwa_settings=lambda: {"auto_metadata_fetch_enabled": True, **settings}
+    ))
+    monkeypatch.setattr(metadata, "metadata_providers", [catalog])
+    applied = []
+    monkeypatch.setattr(metadata, "_apply_metadata_to_book",
+                        lambda _book, record, _library: applied.append(record.title) or True)
+
+    assert metadata.fetch_and_apply_metadata(1) is expected
+    assert bool(catalog.session.calls) is expected
+    assert applied == (["Poštovní úřad"] if expected else [])
+
+
+def test_catalog_search_does_not_follow_off_site_redirect(dk):
+    url = f"{dk.BASE_URL}/search?q=9788081820960"
+    provider = _provider(dk, {
+        url: _FakeResponse(url, status=302, location="https://example.invalid/book"),
+    })
+
+    assert provider.search("9788081820960") == []
+    assert provider.session.calls == [url]

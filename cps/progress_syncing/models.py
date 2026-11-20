@@ -52,9 +52,32 @@ def _execute_sql_with_retry(conn, sql, is_sqlalchemy, retries=5, base_delay=0.25
     return None
 
 
+class ForeignKeyHealth:
+    """Result of a CASCADE check: falsy when unhealthy, with the reason.
+
+    ``inspected`` is False when the schema could not be read at all. That is
+    unhealthy too, but it is not evidence that the table needs rebuilding, so
+    callers must not run the drop-and-copy migration on it (#2548).
+    """
+
+    __slots__ = ("healthy", "reason", "inspected")
+
+    def __init__(self, healthy, reason=None, inspected=True):
+        self.healthy = healthy
+        self.reason = reason
+        self.inspected = inspected
+
+    def __bool__(self):
+        return self.healthy
+
+    def __repr__(self):
+        return (f"ForeignKeyHealth(healthy={self.healthy!r}, reason={self.reason!r}, "
+                f"inspected={self.inspected!r})")
+
+
 def check_cascade_delete_on_fk(conn, table_name, expected_cascades, db_name=None):
     """
-    Check if foreign keys on a table have ON DELETE CASCADE.
+    Check that each expected foreign key on a table exists with ON DELETE CASCADE.
 
     Args:
         conn: SQLAlchemy connection object or sqlite3 connection
@@ -63,7 +86,9 @@ def check_cascade_delete_on_fk(conn, table_name, expected_cascades, db_name=None
                           e.g., {'book': 'books', 'user_id': 'user'}
 
     Returns:
-        bool: True if all foreign keys have CASCADE, False otherwise
+        ForeignKeyHealth: truthy only when every expected foreign key is present
+        with CASCADE (or the table does not exist yet). A missing foreign key and
+        a failed inspection are both unhealthy; the latter has inspected=False.
     """
     try:
         # Detect connection type
@@ -82,34 +107,30 @@ def check_cascade_delete_on_fk(conn, table_name, expected_cascades, db_name=None
             f"SELECT name FROM {db_prefix}sqlite_master WHERE type='table' AND name='{table_name}'"
         )
         if not result.fetchone():
-            return True  # Table doesn't exist, no migration needed
+            return ForeignKeyHealth(True)  # Table doesn't exist, no migration needed
 
-        # Get foreign key info
-        pragma_prefix = f"{db_name}." if db_name else ""
-        fk_info = execute_sql(f"PRAGMA {pragma_prefix}foreign_key_list({table_name})").fetchall()
+        # PRAGMA foreign_key_list returns: (id, seq, table, from, to, on_update, on_delete, match)
+        fk_info = execute_sql(f"PRAGMA {db_prefix}foreign_key_list({table_name})").fetchall()
+        actual = {fk[3]: (fk[2], fk[6]) for fk in fk_info}
 
-        if not fk_info:
-            return True  # No foreign keys defined
-
-        # Check each foreign key for CASCADE
-        for fk in fk_info:
-            # PRAGMA foreign_key_list returns: (id, seq, table, from, to, on_update, on_delete, match)
-            from_column = fk[3]  # Column in this table
-            to_table = fk[2]     # Referenced table
-            on_delete = fk[6]    # ON DELETE action
-
-            # Check if this is an expected foreign key
-            if from_column in expected_cascades:
-                expected_table = expected_cascades[from_column]
-                if to_table == expected_table and on_delete != 'CASCADE':
-                    log.debug(f"Table {table_name}.{from_column} FK to {to_table} missing CASCADE (has: {on_delete})")
-                    return False
-
-        return True
+        problems = []
+        for from_column, expected_table in expected_cascades.items():
+            to_table, on_delete = actual.get(from_column, (None, None))
+            if to_table is None:
+                problems.append(f"{table_name}.{from_column} has no foreign key to {expected_table}")
+            elif to_table == expected_table and on_delete != 'CASCADE':
+                problems.append(f"{table_name}.{from_column} FK to {to_table} missing CASCADE "
+                                f"(has: {on_delete})")
+        if problems:
+            reason = "; ".join(problems)
+            log.debug(reason)
+            return ForeignKeyHealth(False, reason)
+        return ForeignKeyHealth(True)
 
     except Exception as e:
-        log.error(f"Error checking CASCADE on {table_name}: {e}")
-        return True  # Assume OK to avoid breaking startup
+        reason = f"could not inspect foreign keys on {table_name}: {e}"
+        log.error(reason)
+        return ForeignKeyHealth(False, reason, inspected=False)
 
 
 def ensure_calibre_db_tables(conn):
@@ -214,10 +235,13 @@ def ensure_checksum_table(conn):
                 {'book': 'books'},
                 db_name=cascade_db_name,
             )
-            if not has_cascade:
+            if not has_cascade.inspected:
+                log.error("book_format_checksums schema unhealthy, migration skipped: %s",
+                          has_cascade.reason)
+            elif not has_cascade:
                 log.warning(
-                    "book_format_checksums table missing ON DELETE CASCADE. "
-                    "Attempting in-place migration to add CASCADE..."
+                    "book_format_checksums table missing ON DELETE CASCADE (%s). "
+                    "Attempting in-place migration to add CASCADE...", has_cascade.reason
                 )
                 try:
                     temp_table = f"{table_prefix}book_format_checksums_new"
@@ -252,6 +276,12 @@ def ensure_checksum_table(conn):
                     conn.commit()
                     log.info("Migrated book_format_checksums to add ON DELETE CASCADE")
                 except Exception as migration_error:
+                    # Undo the copy and the DROP so a later commit cannot
+                    # persist a half-rebuilt table.
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        log.exception("Rollback after a failed book_format_checksums migration failed")
                     log.error(f"Failed to migrate book_format_checksums for CASCADE: {migration_error}")
                     table_exists = True
 
@@ -423,10 +453,13 @@ def ensure_kosync_progress_table(conn):
 
             # Check if foreign keys have CASCADE DELETE
             has_cascade = check_cascade_delete_on_fk(conn, "kosync_progress", {'user_id': 'user'})
-            if not has_cascade:
+            if not has_cascade.inspected:
+                log.error("kosync_progress schema unhealthy, migration skipped: %s",
+                          has_cascade.reason)
+            elif not has_cascade:
                 log.warning(
-                    "kosync_progress table missing ON DELETE CASCADE. "
-                    "Attempting in-place migration to add CASCADE..."
+                    "kosync_progress table missing ON DELETE CASCADE (%s). "
+                    "Attempting in-place migration to add CASCADE...", has_cascade.reason
                 )
                 try:
                     execute_sql("DROP TABLE IF EXISTS kosync_progress_new")
@@ -460,6 +493,12 @@ def ensure_kosync_progress_table(conn):
                     conn.commit()
                     log.info("Migrated kosync_progress to add ON DELETE CASCADE")
                 except Exception as migration_error:
+                    # Undo the copy and the DROP so a later commit cannot
+                    # persist a half-rebuilt table.
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        log.exception("Rollback after a failed kosync_progress migration failed")
                     log.error(f"Failed to migrate kosync_progress for CASCADE: {migration_error}")
                     table_exists = True
 

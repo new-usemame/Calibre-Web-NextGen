@@ -138,6 +138,7 @@ function SetupFlow:connectWith(config, how, on_done)
     logger.info("CWNGSync: connected via", how, "to", hostOf(config.server))
     self:syncLibrary({
         force = true,
+        after_setup = true,
         on_done = function()
             self:syncDeviceCapabilities(false, false)
             self:collectDeliveries(false, false)

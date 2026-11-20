@@ -20,6 +20,10 @@ from .. import ub
 UPLOAD_LIMIT = 10 * 1024 * 1024
 PNG_LIMIT = 8 * 1024 * 1024
 ACCOUNT_LIMIT = 64 * 1024 * 1024
+# Most of the art a zoom may crop away; past this the art is shown whole on white.
+ZOOM_CROP_LIMIT = 0.10
+# Bump when prepare() renders differently, so stored renditions are redone.
+PREPARE_VERSION = 2
 PLATFORMS = frozenset({'kindle', 'kobo', 'pocketbook', 'android', 'remarkable', 'emulator', 'other'})
 SUPPORTED_PLATFORMS = frozenset({'kindle', 'kobo', 'emulator'})
 ERROR_CODES = frozenset({'download_failed', 'invalid_image', 'checksum_mismatch',
@@ -98,12 +102,19 @@ def encode(image):
     return data
 
 
-def prepare(source_png, width, height):
+def prepare(source_png, width, height, fit=None):
     with Image.open(io.BytesIO(source_png)) as source:
         source.load()
-        fit = ImageOps.contain(source, (width, height), method=Image.Resampling.LANCZOS)
+        # Art close to the screen's shape is zoomed to fill it (an even crop,
+        # never a stretch): a thin band reads as a defect on e-ink. Art far
+        # off the screen's shape is shown whole on white.
+        fit_scale = min(width / source.width, height / source.height)
+        fill_scale = max(width / source.width, height / source.height)
+        if fit == 'fill' or (fit in (None, 'auto') and 1 - fit_scale / fill_scale <= ZOOM_CROP_LIMIT):
+            return encode(ImageOps.fit(source, (width, height), method=Image.Resampling.LANCZOS))
+        contained = ImageOps.contain(source, (width, height), method=Image.Resampling.LANCZOS)
         canvas = Image.new('L', (width, height), 255)
-        canvas.paste(fit, ((width-fit.width)//2, (height-fit.height)//2))
+        canvas.paste(contained, ((width-contained.width)//2, (height-contained.height)//2))
         return encode(canvas)
 
 
@@ -123,6 +134,7 @@ def metadata(device, row=None):
     revision = row.desired_revision if row else '0'
     has_image = row is not None and row.source_png is not None and device.active
     return {
+        'fit': (row.fit or 'auto') if row else 'auto',
         'desired_revision': revision,
         'state': row.state if row else 'none',
         'support': support(device), 'platform': cap.get('platform'),
@@ -161,14 +173,32 @@ def save(device, source, session=None):
     if support(device) == 'unsupported':
         raise SleepScreenError('sleep_screen_unsupported', 'This device cannot show a custom KOReader sleep screen', 409)
     cap = capability(device)
-    prepared = prepare(source, cap['screen_width'], cap['screen_height']) if support(device) == 'supported' else None
-    check_quota(device, source, prepared, session)
     row = row_for(device, session)
+    prepared = prepare(source, cap['screen_width'], cap['screen_height'], row.fit if row else None) if support(device) == 'supported' else None
+    check_quota(device, source, prepared, session)
     if row is None:
         row = ub.DeviceSleepScreen(device_id=device.id)
         session.add(row)
     row.source_png, row.prepared_png = source, prepared
     advance(row, 'image' if prepared else 'waiting_for_device')
+    return row
+
+
+def set_fit(device, fit, session=None):
+    """Store a device's choice and publish only a changed rendition."""
+    session = session if session is not None else ub.session
+    row = row_for(device, session)
+    if row is None:
+        row = ub.DeviceSleepScreen(device_id=device.id, desired_revision='0', state='none')
+        session.add(row)
+    if row.source_png is not None and support(device) == 'supported':
+        cap = capability(device)
+        prepared = prepare(row.source_png, cap['screen_width'], cap['screen_height'], fit)
+        check_quota(device, row.source_png, prepared, session)
+        if prepared != row.prepared_png:
+            row.prepared_png = prepared
+            advance(row, 'image')
+    row.fit = None if fit == 'auto' else fit
     return row
 
 
@@ -210,12 +240,15 @@ def observe(device, report, session=None):
     previous = capability(device)
     row = row_for(device, session)
     prepared = None
-    changed = any(previous.get(key) != report.get(key) for key in ('supported', 'platform', 'screen_width', 'screen_height'))
+    changed = (previous.get('prepare_version') != PREPARE_VERSION
+               or any(previous.get(key) != report.get(key)
+                      for key in ('supported', 'platform', 'screen_width', 'screen_height')))
     if row and row.source_png and changed and report['supported']:
-        prepared = prepare(row.source_png, report['screen_width'], report['screen_height'])
+        prepared = prepare(row.source_png, report['screen_width'], report['screen_height'], row.fit)
         check_quota(device, row.source_png, prepared, session)
-    device.sleep_screen_capability = report
-    if row and row.source_png and changed:
+    device.sleep_screen_capability = dict(report, prepare_version=PREPARE_VERSION)
+    # Identical bytes keep their revision, so the device downloads nothing new.
+    if row and row.source_png and changed and not (prepared and prepared == row.prepared_png):
         row.prepared_png = prepared
         advance(row, 'image' if prepared else 'waiting_for_device')
     return row

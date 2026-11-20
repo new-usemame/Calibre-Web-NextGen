@@ -123,6 +123,7 @@ def memory_db_session_no_unique_indexes(memory_db_session):
                 read_status INTEGER NOT NULL DEFAULT 0,
                 last_modified DATETIME,
                 read_status_choice_at DATETIME,
+                read_finished_at DATETIME,
                 last_time_started_reading DATETIME,
                 times_started_reading INTEGER NOT NULL DEFAULT 0
             )

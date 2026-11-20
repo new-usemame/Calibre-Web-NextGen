@@ -24,7 +24,7 @@ from cps.services.cover_picker import format_provider_summary
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
 from .usermanagement import user_login_required
-from .metadata_constants import metadata_provider_enabled
+from .metadata_constants import ORDER_OPT_IN_METADATA_PROVIDERS, metadata_provider_enabled
 
 
 meta = Blueprint("metadata", __name__)
@@ -277,6 +277,7 @@ def metadata_provider():
                 # Global omission means available; best-effort defaults are a
                 # per-user/ingest opt-in, not hidden from the SPA toggle list.
                 "globally_enabled": bool(global_enabled.get(c.__id__, True)),
+                "requires_ingest_opt_in": c.__id__ in ORDER_OPT_IN_METADATA_PROVIDERS,
             }
         )
     return make_response(jsonify(provider))
@@ -305,7 +306,9 @@ def metadata_change_active_provider(prov_name):
         # Respect global disablement for preview search as well
         global_enabled = _get_global_provider_enabled_map()
         if provider is not None:
-            if bool(global_enabled.get(provider.__id__, True)):
+            selected = (provider.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS
+                        or metadata_provider_enabled(provider.__id__, active))
+            if selected and bool(global_enabled.get(provider.__id__, True)):
                 try:
                     # parallel.run_blocking, not a bare call: this runs on the
                     # request greenlet and the provider blocks on its own

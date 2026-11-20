@@ -862,6 +862,91 @@ select.cwa-settings-select {
   display: inline-block;
 }
 
+/* ---- Custom-column value editor (classic) ------------------------------- */
+/* Mirrors the SPA's CcValueEditor.module.css (.row / .rowActions): a row once
+ * had no rules here at all, so the inline label, badge, tag and the buttons
+ * the script injects into .cc-values-actions simply flowed in line -- as soon
+ * as the hierarchy indent (40px/level padding) plus the name overflowed the
+ * width, the button cluster wrapped onto the next line, left-aligned, instead
+ * of sitting on the same line as the value. A flex row with margin-left:auto
+ * on the actions pushes the whole cluster to the right edge, as the SPA does.
+ */
+.cc-values-list {
+  margin: .3em 0;
+}
+
+.cc-values-row {
+  display: flex;
+  align-items: center;
+  column-gap: .4em;
+  padding: .15em 0;
+}
+
+/* Label keeps the per-depth inline padding; it owns the checkbox and name and
+ * is the one flex item allowed to shrink, so a long value name wraps within
+ * the label instead of shoving the buttons off the row. */
+.cc-values-check {
+  display: flex;
+  align-items: center;
+  column-gap: .4em;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.cc-values-name {
+  overflow-wrap: anywhere;
+}
+
+.cc-values-row .badge,
+.cc-values-row .label,
+.cc-values-create-under,
+.cc-values-focus-here {
+  flex-shrink: 0;
+}
+
+/* Right-hand button cluster. The JS fills this span in edit mode (rename,
+ * cut, move up/down, paste, merge, delete); margin-left:auto anchors it to
+ * the row's right edge, level with the value name. The gap keeps adjacent
+ * icon buttons from reading as one control. */
+.cc-values-actions {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Count chip. Sized and shaped like the row's .btn-xs controls (12px text,
+ * 1px/5px padding, 3px radius) so it reads as part of the same control family,
+ * but it is an indicator, not a control: warning orange, default cursor, and
+ * no hover/active states to invite a press. The number means "books under
+ * this value", spelled out in the badge's title tooltip. */
+.cc-values-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 3px;
+  background-color: #f0ad4e;
+  border: 1px solid #eea236;
+  color: #fff;
+  cursor: default;
+}
+
+.cc-values-count .glyphicon {
+  margin-right: 4px;
+}
+
+.cc-values-count .glyphicon,
+.cc-values-tag .glyphicon {
+  top: 1px;
+  line-height: 1;
+}
+
 /* Keep OPDS field errors readable on both Classic theme backgrounds. */
 .settings-container .opds-filename-error {
   color: #8c2020;

@@ -75,7 +75,7 @@
 
       <div class="form-group">
         <label>{{_('Custom columns')}}</label>
-        <p class="settings-explanation">{{_('Sort by')}}</p>
+        <p class="settings-explanation">{{_('Magic Shelves')}} — {{_('Sort by')}}</p>
         {% set selected_sort_columns = (conf.config_sortable_custom_columns or '').split(',') %}
         {% for sortColumn in sortableColumns %}
         <div class="checkbox">
@@ -87,7 +87,24 @@
         </div>
         {% endfor %}
       </div>
-      
+
+      {% if ccModes %}
+      <div class="form-group">
+        <label>{{_('Custom column hierarchy')}}</label>
+        <p class="settings-explanation">{{_('Automatic follows the hierarchy preference in Calibre. Older libraries without that preference infer the hierarchy from their values. Choose an explicit mode to override it for this website.')}}</p>
+        {% for mode in ccModes %}
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label for="cc_hierarchy_mode_{{ mode.id }}" style="margin-bottom: 2px;">{{ mode.name }}</label>
+          <select name="cc_hierarchy_mode_{{ mode.id }}" id="cc_hierarchy_mode_{{ mode.id }}" class="form-control">
+            <option value="auto" {% if mode.mode == 'auto' %}selected{% endif %}>{{ _('Automatic') }}</option>
+            <option value="hierarchical" {% if mode.mode == 'hierarchical' %}selected{% endif %}>{{ _('Always a hierarchy') }}</option>
+            <option value="flat" {% if mode.mode == 'flat' %}selected{% endif %}>{{ _('Never a hierarchy') }}</option>
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       <div class="form-group">
         <label for="config_read_column">{{_('Link Read/Unread Status to Calibre Column')}}</label>
         <select name="config_read_column" id="config_read_column" class="form-control">

@@ -73,6 +73,7 @@ msgid "Error starting Hardcover auto-fetch task: %(error)s"
 msgstr "啟用 Hardcover 自動獲取任務出錯：%(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "審核 Hardcover 匹配"
 
@@ -98,6 +99,53 @@ msgstr "沒有待拒絕的匹配"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "已拒絕 %(count)s 個匹配"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr ""
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr ""
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr ""
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr ""
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr ""
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "全部"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr ""
 
 #: cps/admin.py
 #, python-brace-format
@@ -138,11 +186,6 @@ msgstr "自訂列號：%(column)d 在Calibre資料庫中不存在"
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "管理用戶"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "全部"
 
 #: cps/admin.py
 msgid "User not found"
@@ -2177,6 +2220,7 @@ msgstr "未讀書籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "作者"
@@ -3704,7 +3748,7 @@ msgstr "包含描述"
 msgid "Deselect {title}"
 msgstr "取消選擇 {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "編輯元數據"
 
@@ -4040,7 +4084,8 @@ msgstr "標籤 (使用,分隔)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
+#: cps/templates/tasks.html
 msgid "Title"
 msgstr "標題"
 
@@ -5381,6 +5426,14 @@ msgid "Basic settings"
 msgstr "基本設定"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "測試版"
 
@@ -5523,6 +5576,10 @@ msgid "Bulleted list"
 msgstr "項目符號清單"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "CA 憑證路徑"
 
@@ -5626,6 +5683,16 @@ msgstr "憑證路徑"
 
 #: cps/spa_strings.py
 msgid "Change"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5937,6 +6004,10 @@ msgid "Could not load the device board."
 msgstr "無法載入裝置面板。"
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr "無法載入此裝置書庫。"
 
@@ -5967,6 +6038,11 @@ msgstr "無法開啟該搜尋結果。"
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
 msgstr "無法開啟同步的進度。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not preview the resolution."
@@ -6110,6 +6186,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "封面已從選取的結果更新。"
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Create account"
@@ -6414,6 +6494,10 @@ msgid "Disabled books"
 msgstr "已停用的書籍"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "探索精選已更新。"
 
@@ -6494,6 +6578,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "將檔案拖放至此處，或點擊選擇"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6715,6 +6807,14 @@ msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
@@ -6722,6 +6822,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Every filled field will replace each book's existing values."
 msgstr "每個填入的欄位都會替換每本書的現有值。"
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exact place"
@@ -6786,6 +6890,10 @@ msgid "Fetch metadata from web"
 msgstr "從網路擷取中繼資料"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "檔案"
 
@@ -6811,6 +6919,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "依裝置篩選"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7075,6 +7187,10 @@ msgid "Highlights and notes"
 msgstr "標記和筆記"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "熱門"
 
@@ -7176,6 +7292,10 @@ msgstr "停用"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "已包含"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
@@ -7576,6 +7696,14 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "中繼資料 URL（OIDC 自動探索）"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "最小"
 
@@ -7603,6 +7731,10 @@ msgstr ""
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "{name} 更多操作"
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -7729,7 +7861,8 @@ msgid "Newznab / Torznab indexer"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "下一個"
 
@@ -7747,6 +7880,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No approval needed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7845,6 +7982,10 @@ msgid "No registered devices."
 msgstr "無已註冊裝置。"
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr ""
 
@@ -7878,6 +8019,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No values in this column yet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No values match."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7937,6 +8082,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Notes"
 msgstr "筆記"
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8036,8 +8185,20 @@ msgstr "單欄"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8165,7 +8326,7 @@ msgstr "第 {number} 頁"
 msgid "Page {page} of {pages}"
 msgstr "第 {page} 頁，共 {pages} 頁"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr ""
 
@@ -8299,7 +8460,8 @@ msgstr ""
 msgid "Previewing…"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "上一個"
 
@@ -8501,6 +8663,11 @@ msgid "Remove tag \"{tag}\""
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr ""
 
@@ -8515,6 +8682,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8651,6 +8823,11 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "已為 {accounts} 個帳戶還原之前的書庫模式。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "正在還原…"
 
@@ -8700,6 +8877,14 @@ msgstr "每次載入列數"
 
 #: cps/spa_strings.py
 msgid "Rule group"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8764,6 +8949,10 @@ msgid "Save preset"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "儲存安全設定"
 
@@ -8774,6 +8963,10 @@ msgstr "儲存設定"
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "儲存檔案，安全退出 Kobo，然後重新啟動它。"
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9299,6 +9492,10 @@ msgid "Sort order"
 msgstr "排序方式"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "來源詳情"
 
@@ -9325,7 +9522,8 @@ msgstr "開始閱讀"
 msgid "Starting scan…"
 msgstr "開始掃描..."
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "任務狀態"
 
@@ -9551,6 +9749,10 @@ msgid "The background scheduler is not running."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr ""
 
@@ -9773,6 +9975,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10104,6 +10310,10 @@ msgid "Undoing…"
 msgstr "正在復原…"
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "取消隱藏"
 
@@ -10134,6 +10344,10 @@ msgstr "解鎖封面以變更"
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
 msgstr "取消釘選側邊欄"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -10255,6 +10469,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Values in your library"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10661,6 +10879,16 @@ msgstr "{n} 個已指派到 {name}。"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "最新清單中有 {n} 本書"
 
@@ -10683,6 +10911,11 @@ msgstr "找到 {n} 個"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} 個標記和筆記"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -17042,6 +17275,61 @@ msgstr "Kobo Token"
 msgid "List"
 msgstr "列表"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "操作"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr ""
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Hardcover 匹配審核 🔖"
@@ -18216,10 +18504,6 @@ msgstr "背景任務總覽"
 #: cps/templates/tasks.html
 msgid "Run Time"
 msgstr "運行時間"
-
-#: cps/templates/tasks.html
-msgid "Actions"
-msgstr "操作"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"

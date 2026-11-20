@@ -199,3 +199,100 @@ test('mounted send draft and pending response stay with their original book', as
   expect(rig.writes).toEqual([{format:rig.format,convert:false,emails:'draft-for-first-book@example.invalid'}]);
   expect(rig.targets).toEqual([`/api/v1/books/${rig.id}/send`]);
 });
+
+test('several saved e-reader addresses get a tickbox each, all ticked, beside the free-text field (#1763)', async ({page}) => {
+  const rig = await install(page);
+  rig.state.email = 'first@example.invalid, second@example.invalid';
+  await page.goto(`/app/book/${rig.id}`);
+  await page.getByTestId('book-actions-menu').click();
+  await page.getByRole('menuitem', {name:'Send to e-reader', exact:true}).click();
+  const saved = page.getByTestId('send-saved-ereaders');
+  const first = saved.getByRole('checkbox', {name: 'first@example.invalid'});
+  const second = saved.getByRole('checkbox', {name: 'second@example.invalid'});
+  await expect(first).toBeChecked();
+  await expect(second).toBeChecked();
+  const field = page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ });
+  await expect(field).toHaveValue('first@example.invalid, second@example.invalid');
+  // One device only: untick the other, then add an address that isn't saved.
+  await second.uncheck();
+  await expect(field).toHaveValue('first@example.invalid');
+  await field.fill('first@example.invalid, friend@example.invalid');
+  await expect(first).toBeChecked();
+  await page.getByRole('button', {name:'Send', exact:true}).click();
+  await expect.poll(() => rig.writes).toEqual([
+    {format: rig.format, convert: false, emails: 'first@example.invalid, friend@example.invalid'},
+  ]);
+});
+
+test('with every saved address unticked nothing can be sent, instead of falling back to all of them (#1763)', async ({page}) => {
+  const rig = await install(page);
+  rig.state.email = 'first@example.invalid, second@example.invalid';
+  await page.goto(`/app/book/${rig.id}`);
+  await page.getByTestId('book-actions-menu').click();
+  await page.getByRole('menuitem', {name:'Send to e-reader', exact:true}).click();
+  const saved = page.getByTestId('send-saved-ereaders');
+  await saved.getByRole('checkbox', {name: 'first@example.invalid'}).uncheck();
+  await saved.getByRole('checkbox', {name: 'second@example.invalid'}).uncheck();
+  await expect(page.getByRole('button', {name:'Send', exact:true})).toBeDisabled();
+  await saved.getByRole('checkbox', {name: 'second@example.invalid'}).check();
+  await expect(page.getByRole('button', {name:'Send', exact:true})).toBeEnabled();
+  expect(rig.writes).toEqual([]);
+});
+
+test('a single saved e-reader address shows no tickbox list (#1763)', async ({page}) => {
+  const rig = await install(page);
+  await page.goto(`/app/book/${rig.id}`);
+  await page.getByTestId('book-actions-menu').click();
+  await page.getByRole('menuitem', {name:'Send to e-reader', exact:true}).click();
+  await expect(page.getByRole('textbox', { name: /^Recipient\(s\)(?:\s|$)/ })).toHaveValue(rig.state.email);
+  await expect(page.getByTestId('send-saved-ereaders')).toHaveCount(0);
+});
+
+test('saved-address choices reset on reopening and stay independent of admin recipients', async ({page}) => {
+  const rig = await install(page);
+  rig.state.email = 'first@example.invalid, second@example.invalid';
+  await page.goto(`/app/book/${rig.id}`);
+  const action = page.getByTestId('book-actions').getByRole('button', {name: 'Send to e-reader', exact: true});
+  await action.click();
+  const saved = page.getByTestId('send-saved-ereaders');
+  const field = page.getByRole('textbox', {name: /^Recipient\(s\)(?:\s|$)/});
+  await saved.getByRole('checkbox', {name: 'second@example.invalid', exact: true}).uncheck();
+  await page.getByTestId('send-other-ereaders').getByRole('checkbox').check();
+  await field.fill('SECOND@example.invalid, another-reader@example.invalid, friend@example.invalid');
+  await expect(saved.getByRole('checkbox', {name: 'first@example.invalid', exact: true})).not.toBeChecked();
+  await expect(saved.getByRole('checkbox', {name: 'second@example.invalid', exact: true})).toBeChecked();
+  await saved.getByRole('checkbox', {name: 'second@example.invalid', exact: true}).uncheck();
+  await expect(field).toHaveValue('another-reader@example.invalid, friend@example.invalid');
+  await page.getByRole('button', {name: 'Send', exact: true}).click();
+  await expect.poll(() => rig.writes).toEqual([
+    {format: rig.format, convert: false, emails: 'another-reader@example.invalid, friend@example.invalid'},
+  ]);
+  await action.click();
+  await expect(saved).toHaveCount(0);
+  await action.click();
+  await expect(field).toHaveValue(rig.state.email);
+  await expect(saved.getByRole('checkbox', {name: 'first@example.invalid', exact: true})).toBeChecked();
+  await expect(saved.getByRole('checkbox', {name: 'second@example.invalid', exact: true})).toBeChecked();
+  await expect(page.getByTestId('send-other-ereaders').getByRole('checkbox')).not.toBeChecked();
+});
+
+test('a non-admin gets one checkbox per distinct saved address with no layout or accessibility regression', async ({page}, testInfo) => {
+  const rig = await install(page);
+  rig.state.admin = false;
+  const longAddress = `${'long'.repeat(15)}@example.invalid`;
+  rig.state.email = `first@example.invalid, FIRST@example.invalid, , ${longAddress}`;
+  await page.goto(`/app/book/${rig.id}`);
+  await page.getByTestId('book-actions').getByRole('button', {name: 'Send to e-reader', exact: true}).click();
+  const saved = page.getByTestId('send-saved-ereaders');
+  await expect(saved.getByRole('checkbox')).toHaveCount(2);
+  await expect(page.getByTestId('send-other-ereaders')).toHaveCount(0);
+  const first = saved.getByRole('checkbox', {name: 'first@example.invalid', exact: true});
+  await first.focus();
+  await page.keyboard.press('Space');
+  await expect(first).not.toBeChecked();
+  await expect(page.getByRole('textbox', {name: /^Recipient\(s\)(?:\s|$)/})).toHaveValue(longAddress);
+  await assertNoHorizontalOverflow(page);
+  const axe = await new AxeBuilder({page}).include('#book-send-ereader').analyze();
+  expect(axe.violations.filter(item => ['serious', 'critical'].includes(item.impact ?? ''))).toEqual([]);
+  await page.screenshot({path: testInfo.outputPath('saved-ereader-addresses.jpg'), type: 'jpeg', quality: 75});
+});

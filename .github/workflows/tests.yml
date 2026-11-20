@@ -86,7 +86,7 @@ jobs:
     # timeout-minutes cannot reach. This job runs two networked installs (apt
     # and npm) before pytest starts; without a job-level cap a stall in either
     # runs to GitHub's 6-hour default. Twice observed stalling in the apt step.
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     
@@ -156,7 +156,10 @@ jobs:
         # coverage made the same tests ~2.4x slower (18s vs 43s on 188
         # share-place tests). Its only consumer, the Codecov upload, failed
         # every run ("Token required - not valid tokenless upload").
-        timeout-minutes: 15
+        # 25, not 15: by 2026-11-19 a healthy run of this step took 12-15 min on
+        # main and killed two PRs whose tests were still passing (90% done). The
+        # job cap moves from 25 to 35 to keep room for the installs before it.
+        timeout-minutes: 25
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
         run: |
@@ -495,7 +498,11 @@ jobs:
   # ============================================================================
   e2e-tests:
     name: E2E Tests (SPA)
-    runs-on: ubuntu-latest
+    # Pinned: on the ubuntu-26.04 image (ubuntu-latest from 2026-11) the
+    # Playwright WebKit build cannot launch (it links libicu*.so.74; 26.04
+    # ships libicu78), which failed every WebKit project. Move this pin only
+    # together with a Playwright release that supports the newer image.
+    runs-on: ubuntu-24.04
     # `always()` matters: changed_paths only runs on PRs, and without it a
     # skipped dependency would drag the tag and dispatch runs down with it —
     # silently turning the release gate off, which is the exact class of
@@ -990,7 +997,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
       # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
@@ -1002,8 +1009,14 @@ jobs:
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
+      # The browser step is bimodal: about 30-60s when the apt mirror is quick,
+      # 200-600s when it is slow. On 2026-11-19, 7 of 25 runs hit the old 10m
+      # limit while packages were still arriving (run 44582337839 fetched its
+      # 121st package at 9m15s), so a slow mirror failed the gate rather than
+      # a hang. 20m covers the slow mode and still stops a real hang long
+      # before the job's 180m guard.
       - name: Install Playwright browsers
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: frontend
         run: npx playwright install --with-deps chromium webkit
 

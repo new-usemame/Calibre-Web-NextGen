@@ -19,7 +19,8 @@ backward, with no prompt).
   cover and PUTs 0% back (section 14, Clara probe 2).
 * Unchanged: an unchecked Kobo never receives it; a Kobo's own span report
   works as today; with the rollout switch off nothing changes (the merge
-  bar); an unidentified KOReader keeps today's percentage-only bridge.
+  bar). An unidentified KOSync app's accepted place also arrives as the
+  span since #2783 (``test_2783_headerless_kosync_exact_place.py``).
 
 Real book (``alice-pg11`` and its served KEPUB, the ``kepub_alignment``
 fixtures), real kosync HTTP, real Kobo handlers (``share_place_span_world``).
@@ -32,7 +33,9 @@ from datetime import timedelta
 
 import pytest
 
+from cps import kobo, ub
 from cps.services import kepub_alignment
+from tests.unit.kobo_state_world import _states
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
     BOOK, OTHER_DIGEST, _now, after_now, location_of, span_location, span_rows, sw,
 )
@@ -74,6 +77,11 @@ def _expected(sw, row):
     return span_location(*found)
 
 
+def _kobo_percent(sw, row):
+    """The percentage a Kobo reports at the row's span in these very files (#2821)."""
+    return kepub_alignment.kobo_progress_percent(sw.kepub, row["source"], row["span"])
+
+
 def _bookmark(sw, device):
     return sw.get(device).get("CurrentBookmark") or {}
 
@@ -85,7 +93,10 @@ def test_a_checked_koreader_place_reaches_a_checked_kobo_as_the_exact_span(accou
     sw.push(rows["late"]["xpointer"], 40)
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(40)
+    # Not the 40 KOReader sent, which counts the book another way: the exact
+    # span arrives with the percentage the Kobo itself works out for it.
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
+    assert bookmark.get("ProgressPercent") != pytest.approx(40, abs=1)
     assert location_of(bookmark) == _expected(sw, rows["late"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["late"])
 
@@ -98,9 +109,61 @@ def test_a_backward_move_from_koreader_reaches_the_kobo_as_the_earlier_span(acco
     sw.push(rows["early"]["xpointer"], 20, client_at=after_now(4))
 
     bookmark = _bookmark(sw, sw.checked)
-    assert bookmark.get("ProgressPercent") == pytest.approx(20)
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["early"]), abs=0.01)
     assert location_of(bookmark) == _expected(sw, rows["early"])
     assert sw.synced_location(sw.checked) == _expected(sw, rows["early"])
+
+
+@pytest.mark.parametrize("download_still_proven", [True, False])
+def test_retrying_an_exact_place_keeps_the_kobo_percentage_and_rechecks_download(
+        account, rows, download_still_proven):
+    """A lost sync reply is retried with its incoming token. Converting the
+    percentage must not make that page look superseded; losing download proof
+    must still turn its exact place into the Kobo's held place on replay."""
+    sw = account
+    header = kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+    incoming = sw.sync(sw.checked).headers[header]
+    sw.push(rows["late"]["xpointer"], 40)
+    first = sw.sync(sw.checked)
+    assert _states(first).get(sw.book.uuid)
+    if not download_still_proven:
+        sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+            device_id=sw.checked.id, book_id=sw.book.id).delete()
+        sw.session.commit()
+
+    retry = sw.sync(sw.checked, token=incoming)
+
+    assert retry.headers[header] == first.headers[header]
+    replayed = _states(retry).get(sw.book.uuid)
+    assert replayed, retry.get_json()
+    bookmark = replayed[-1]["CurrentBookmark"]
+    if download_still_proven:
+        assert retry.get_json() == first.get_json()
+        assert bookmark["ProgressPercent"] == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
+        assert location_of(bookmark) == _expected(sw, rows["late"])
+    else:
+        assert bookmark["ProgressPercent"] == pytest.approx(40)
+        own = rows["kobo-own"]
+        assert location_of(bookmark) == span_location(own["source"], own["span"])
+    assert sw.pull()[0] == pytest.approx(40)  # delivery never rewrites the shared row
+
+
+def test_retrying_a_page_with_a_converted_percentage_withholds_a_superseded_place(account, rows):
+    """Accepting Kobo percentage units must not replay a place the reader
+    has since replaced, including a backward move."""
+    sw = account
+    header = kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+    incoming = sw.sync(sw.checked).headers[header]
+    sw.push(rows["late"]["xpointer"], 40, client_at=after_now(2))
+    first = sw.sync(sw.checked)
+    assert _states(first).get(sw.book.uuid)
+    sw.push(rows["early"]["xpointer"], 20, client_at=after_now(4))
+
+    retry = sw.sync(sw.checked, token=incoming)
+
+    assert retry.headers[header] == first.headers[header]
+    assert sw.book.uuid not in _states(retry)
+    assert sw.pull()[0] == pytest.approx(20)
 
 
 # == Today's fallback for a Kobo that does not hold the current KEPUB ========
@@ -158,6 +221,23 @@ def _kepub_of_another_edition(sw):
     shutil.move(edited, sw.kepub)
 
 
+def test_a_kepub_with_kepubifys_blank_title_page_gets_the_exact_span(account, rows, tmp_path):
+    # #2804: kepubify adds a blank page to many KEPUBs, which made no place in
+    # those books exact; the Kobo opened at its own old page however far the
+    # shared place had moved.
+    from tests.unit.test_kepub_alignment import _with_kepubify_dummy
+    sw = account
+    shutil.move(_with_kepubify_dummy(tmp_path, sw.kepub, "dummy.kepub.epub"), sw.kepub)
+    sw.download(sw.checked)  # holds the library KEPUB as it now is
+
+    sw.push(rows["late"]["xpointer"], 40)
+
+    bookmark = _bookmark(sw, sw.checked)
+    assert bookmark.get("ProgressPercent") == pytest.approx(_kobo_percent(sw, rows["late"]), abs=0.01)
+    assert location_of(bookmark) == span_location(rows["late"]["source"], rows["late"]["span"])
+
+
+
 @pytest.mark.parametrize("failure", ["xpointer-outside-the-book", "kepub-not-this-epub",
                                      "koreader-holds-another-file"])
 def test_when_alignment_fails_every_kobo_keeps_its_location_with_the_new_percentage(
@@ -211,18 +291,15 @@ def test_a_kobos_own_later_span_report_wins_as_today(account, rows):
     assert location_of(bookmark) == span_location(later["source"], later["span"])
 
 
-@pytest.mark.parametrize("path", ["switch-off", "unidentified-koreader"])
-def test_unchanged_paths_keep_the_kobos_own_span_with_the_new_percentage(
-        account, rows, monkeypatch, path):
-    """Today the KOReader bridge moves only the percentage, forward only."""
+def test_with_the_switch_off_the_kobo_keeps_its_own_span_with_the_new_percentage(
+        account, rows, monkeypatch):
+    """With the rollout switch off the KOReader bridge moves only the
+    percentage, forward only."""
     sw = account
-    if path == "switch-off":
-        monkeypatch.setenv(SWITCH, "0")
+    monkeypatch.setenv(SWITCH, "0")
     own = rows["kobo-own"]
 
-    sw.push(rows["late"]["xpointer"], 40, identified=path != "unidentified-koreader",
-            raw_id="koreader-1" if path == "switch-off" else "stock-koreader",
-            name="KOReader" if path == "switch-off" else "Stock KOReader")
+    sw.push(rows["late"]["xpointer"], 40, raw_id="koreader-1", name="KOReader")
 
     bookmark = _bookmark(sw, sw.checked)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)

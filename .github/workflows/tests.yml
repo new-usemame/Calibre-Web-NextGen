@@ -1005,10 +1005,9 @@ jobs:
           key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       # Run 33848680049 twice saw npm ci stall for 193s with warm caches.
-      # The five-minute limit covers that case and bounds a longer stall.
       - name: Install frontend dependencies (npm ci)
-        # ci-time-budget 2026-11-20: shorten 10 -> 5 min; p50 0.1, p95 0.1, max 0.1 min over 24 main runs; p95 0.1 min is 1% of the 10-min limit.
-        timeout-minutes: 5
+        # ci-time-budget: keep a margin of at least 3x the observed warm-cache stall.
+        timeout-minutes: 10
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 

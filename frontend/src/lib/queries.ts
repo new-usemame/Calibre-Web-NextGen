@@ -14,6 +14,7 @@ import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
 import { captureNamedPreferencesOwner, namedPreferencesMutationOptions } from './namedPreferencesMutation';
 import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
+import { beginImportWatch, getImportWatch } from './uploadImportStore';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { addShelfBooks } from './shelfAdd';
 import { createEntityListQueryOptions, createPagedEntityListQueryOptions } from './entityListQueryOptions';
@@ -1026,6 +1027,19 @@ export interface MailConfig {
   mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
+  /** Whether the saved settings are enough for the app to send mail (#2771). */
+  mail_configured: boolean;
+  /** Whether Gmail OAuth (classic page only) has been authorised. */
+  gmail_authorised: boolean;
+}
+
+export interface MailTestResult { ok: boolean; email: string; message: string }
+
+/** Queue a test email to the signed-in admin's own address (#2771). */
+export function useSendTestMail() {
+  return useMutation({
+    mutationFn: () => apiPost<MailTestResult>('/api/v1/admin/mailsettings/test', {}),
+  });
 }
 
 export function useMailConfig() {
@@ -1117,7 +1131,7 @@ export function useUpdateSecurityConfig() {
 export function useUpdateAdminUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode'] }) => {
+    mutationFn: (v: { id: number; roles?: Record<string, boolean>; email?: string; library_mode?: LibraryModePayload['library_mode']; start_empty?: boolean }) => {
       const { id, ...body } = v;
       return apiPost<AdminUser>(`/api/v1/admin/users/${id}`, body);
     },
@@ -1324,17 +1338,32 @@ export function useMergeBooks() {
 
 // ── Upload ───────────────────────────────────────────────────────────────────
 
+/** The library's current book total, or null if it cannot be read. One row is
+ *  requested; only the total is wanted. */
+async function readLibraryTotal(): Promise<number | null> {
+  try {
+    const page = await apiGet<BooksPage>('/api/v1/books?page=1&per_page=1&sort=new');
+    return typeof page.total === 'number' ? page.total : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useUploadBooks() {
-  const qc = useQueryClient();
   return useMutation({
+    // The total before the files are queued is what later arrivals are counted
+    // against (#1044).
+    onMutate: async () => ({ watch: getImportWatch(), baseline: await readLibraryTotal() }),
     mutationFn: (files: File[]) => {
       const fd = new FormData();
       for (const f of files) fd.append('file', f);
       return apiUpload<UploadResult>('/api/v1/upload', fd);
     },
-    onSuccess: () => {
-      // The library will populate as ingest processes; nudge the catalog.
-      void qc.invalidateQueries({ queryKey: ['books'] });
+    onSuccess: (result, _files, context) => {
+      // Ingest runs after this request returns, so refetching the catalog now
+      // would still show the old list. Follow the books in instead; the
+      // library views refresh as they arrive (UploadImportWatcher).
+      beginImportWatch(result.queued.length, context?.baseline ?? null, context?.watch);
     },
   });
 }
@@ -2111,6 +2140,67 @@ export function useDismissDuplicate() {
     mutationFn: (groupHash: string) =>
       apiPost(`/duplicates/dismiss/${encodeURIComponent(groupHash)}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+export type DuplicateStrategy =
+  | 'newest' | 'oldest' | 'merge'
+  | 'highest_quality_format' | 'most_metadata' | 'largest_file_size';
+
+export interface DuplicateResolutionPreviewGroup {
+  group_hash: string;
+  title: string;
+  author: string;
+  kept_book_id: number;
+  kept_book_formats: string[];
+  /** Publisher and year, so different editions in one group stand out (#1902). */
+  kept_book_edition?: { publisher: string | null; year: number | null };
+  deleted_book_ids: number[];
+  deleted_books_info: {
+    id: number; formats: string[]; publisher?: string | null; year?: number | null;
+  }[];
+}
+
+/** Shared by the dry run and the real run: the backend answers both with the
+ *  same counters and only adds `preview` for the dry run. */
+export interface DuplicateResolutionResult {
+  success: boolean;
+  resolved_count?: number;
+  kept_count?: number;
+  deleted_count?: number;
+  errors?: string[];
+  message?: string;
+  error?: string;
+  preview?: DuplicateResolutionPreviewGroup[] | null;
+}
+
+/** Dry run of the classic "Auto-Resolve Duplicates" panel (#1902). Admin only
+ *  on the server; nothing is deleted. */
+export function usePreviewDuplicateResolution() {
+  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
+    mutationFn: (strategy) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/preview-resolution', { strategy }),
+  });
+}
+
+/** Real run: keeps one book per group and deletes the rest. */
+export function useExecuteDuplicateResolution() {
+  const qc = useQueryClient();
+  return useMutation<DuplicateResolutionResult, Error, {
+    strategy: DuplicateStrategy; expected_preview: DuplicateResolutionPreviewGroup[];
+  }>({
+    mutationFn: (plan) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', plan),
+    // Books were deleted, so every list that can show them is stale -- not just
+    // the duplicates view. Refresh on either outcome: a partial failure still
+    // deletes some groups before it reports its errors.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+      invalidateBookVisibilityViews(qc);
+      void qc.invalidateQueries({ queryKey: ['book'] });
+      void qc.invalidateQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['discover-strip'] });
+    },
   });
 }
 

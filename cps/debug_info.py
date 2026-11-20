@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 
 from flask import send_file
@@ -571,29 +572,32 @@ _SANITIZED_NOTE = (
 )
 
 
-def send_debug():
-    """Unsanitized debug pack — admin/internal use only."""
-    memory_zip = _build_debug_zip(sanitize=False)
+def _pack_filename(stem: str, now=None) -> str:
+    """``<stem>-YYYYMMDD-HHMMSSZ.zip``, stamped in UTC.
+
+    Several packs from the same instance land in one Downloads folder (and in
+    one issue), so the name says when each was made. UTC, because the pack is
+    read by people in other timezones and ``manifest.json`` records
+    ``generated_at_utc``; the trailing ``Z`` says so.
+    """
+    moment = now if now is not None else datetime.now(timezone.utc)
+    return f"{stem}-{moment:%Y%m%d-%H%M%S}Z.zip"
+
+
+def _send_zip(memory_zip, filename: str):
     version = importlib.metadata.version("flask")
     if int(version.split('.')[0]) < 2:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         attachment_filename="Calibre-Web-NextGen-debug-pack.zip")
-    else:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         download_name="Calibre-Web-NextGen-debug-pack.zip")
+        return send_file(memory_zip, as_attachment=True, attachment_filename=filename)
+    return send_file(memory_zip, as_attachment=True, download_name=filename)
+
+
+def send_debug():
+    """Unsanitized debug pack — admin/internal use only."""
+    return _send_zip(_build_debug_zip(sanitize=False),
+                     _pack_filename("Calibre-Web-NextGen-debug-pack"))
 
 
 def send_debug_sanitized():
     """Sanitized debug pack — safe to share in public issues."""
-    memory_zip = _build_debug_zip(sanitize=True)
-    version = importlib.metadata.version("flask")
-    if int(version.split('.')[0]) < 2:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         attachment_filename="Calibre-Web-NextGen-support-pack.zip")
-    else:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         download_name="Calibre-Web-NextGen-support-pack.zip")
+    return _send_zip(_build_debug_zip(sanitize=True),
+                     _pack_filename("Calibre-Web-NextGen-support-pack"))

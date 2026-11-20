@@ -315,3 +315,51 @@ class TestInPack:
         from cps import debug_info
         inputs = debug_info._resolve_integration_inputs()
         assert set(inputs) <= {"mail_settings", "worker_tasks", "koreader_enabled"}
+
+
+@pytest.mark.unit
+class TestDownloadFilename:
+    """The pack's download name carries a UTC timestamp (fork issue #2728)."""
+
+    def test_format_is_sortable_utc_with_z(self):
+        from datetime import datetime, timezone
+        from cps.debug_info import _pack_filename
+
+        moment = datetime(2026, 11, 20, 2, 16, 37, tzinfo=timezone.utc)
+        assert _pack_filename("Calibre-Web-NextGen-support-pack", moment) == \
+            "Calibre-Web-NextGen-support-pack-20261120-021637Z.zip"
+
+    def test_default_is_now_and_well_formed(self):
+        from cps.debug_info import _pack_filename
+
+        assert re.fullmatch(r"Calibre-Web-NextGen-support-pack-\d{8}-\d{6}Z\.zip",
+                            _pack_filename("Calibre-Web-NextGen-support-pack"))
+
+    @pytest.mark.parametrize("endpoint, sanitize, stem", [
+        ("send_debug_sanitized", True, "Calibre-Web-NextGen-support-pack"),
+        ("send_debug", False, "Calibre-Web-NextGen-debug-pack"),
+    ])
+    def test_both_endpoints_send_a_stamped_name(self, monkeypatch, endpoint, sanitize, stem):
+        import io
+        from cps import debug_info
+
+        built, sent = [], {}
+        monkeypatch.setattr(debug_info, "_build_debug_zip",
+                            lambda sanitize: built.append(sanitize) or io.BytesIO(b"zip"))
+        monkeypatch.setattr(debug_info, "send_file", lambda *a, **kw: sent.update(kw) or "sent")
+        assert getattr(debug_info, endpoint)() == "sent"
+        assert built == [sanitize]
+        name = sent.get("download_name") or sent.get("attachment_filename")
+        assert re.fullmatch(stem + r"-\d{8}-\d{6}Z\.zip", name)
+        assert sent["as_attachment"] is True
+
+    def test_old_flask_uses_attachment_filename(self, monkeypatch):
+        import io
+        from cps import debug_info
+
+        sent = {}
+        monkeypatch.setattr(debug_info.importlib.metadata, "version", lambda _name: "1.1.4")
+        monkeypatch.setattr(debug_info, "_build_debug_zip", lambda sanitize: io.BytesIO(b"zip"))
+        monkeypatch.setattr(debug_info, "send_file", lambda *a, **kw: sent.update(kw) or "sent")
+        debug_info.send_debug_sanitized()
+        assert "attachment_filename" in sent and "download_name" not in sent

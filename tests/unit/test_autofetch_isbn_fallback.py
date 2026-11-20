@@ -40,7 +40,7 @@ def _provider(answers, supports_isbn=True):
 def run(monkeypatch):
     applied = []
 
-    def _run(provider, isbn="978-80-7227-282-5"):
+    def _run(provider, isbn="978-80-8182-096-0"):
         identifiers = [SimpleNamespace(type="isbn", val=isbn)] if isbn else []
         book = SimpleNamespace(id=1, title="Babicka",
                                authors=[SimpleNamespace(name="Bozena Nemcova")],
@@ -62,19 +62,23 @@ def run(monkeypatch):
     return _run
 
 
-def test_empty_title_search_falls_back_to_isbn(run):
-    hit = _record("Babička", "9788072272825")
+@pytest.mark.parametrize(("isbn", "expected"), [
+    ("978-80-8182-096-0", "9788081820960"),
+    ("80-7205-048-6", "8072050486"),
+])
+def test_empty_title_search_falls_back_to_isbn(run, isbn, expected):
+    hit = _record("Babička", expected)
     provider, calls = _provider({"isbn": [hit]})
-    assert run(provider) is True
-    assert calls == ["Babicka Bozena Nemcova", "isbn:9788072272825"]
+    assert run(provider, isbn=isbn) is True
+    assert calls == ["Babicka Bozena Nemcova", f"isbn:{expected}"]
     assert run.applied == [hit]
 
 
 def test_unconfident_title_result_falls_back_to_isbn(run):
-    hit = _record("Babička", "9788072272825")
+    hit = _record("Babička", "9788081820960")
     provider, calls = _provider({"title": [_record("Úplně jiná kniha")], "isbn": [hit]})
     assert run(provider) is True
-    assert calls[-1] == "isbn:9788072272825"
+    assert calls[-1] == "isbn:9788081820960"
     assert run.applied == [hit]
 
 
@@ -86,8 +90,9 @@ def test_confident_title_result_does_not_trigger_isbn_search(run):
 
 
 def test_isbn_result_still_has_to_pass_the_confidence_gate(run):
-    provider, _ = _provider({"isbn": [_record("Úplně jiná kniha")]})
+    provider, calls = _provider({"isbn": [_record("Úplně jiná kniha")]})
     assert run(provider) is False
+    assert calls == ["Babicka Bozena Nemcova", "isbn:9788081820960"]
     assert run.applied == []
 
 
@@ -100,4 +105,10 @@ def test_provider_without_isbn_support_is_not_retried(run):
 def test_book_without_isbn_is_not_retried(run):
     provider, calls = _provider({})
     assert run(provider, isbn=None) is False
+    assert calls == ["Babicka Bozena Nemcova"]
+
+
+def test_invalid_book_isbn_is_not_sent(run):
+    provider, calls = _provider({})
+    assert run(provider, isbn="978-80-8182-096-1") is False
     assert calls == ["Babicka Bozena Nemcova"]

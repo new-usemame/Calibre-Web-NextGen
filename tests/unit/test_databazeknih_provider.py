@@ -231,7 +231,10 @@ def test_auto_fetch_isbn_query_form_follows_redirect(dk):
     base = _FakeSession.BASE
     book_url = f"{base}/prehled-knihy/henry-chinaski-postovy-urad-499580"
     provider = _provider(dk, {
-        f"{base}/search?q=9788081820960": _FakeResponse(book_url, _fixture("book_499580.html")),
+        f"{base}/search?q=9788081820960": _FakeResponse(
+            f"{base}/search?q=9788081820960", status=302, location=book_url.removeprefix(base)
+        ),
+        book_url: _FakeResponse(book_url, _fixture("book_499580.html")),
         f"{base}/book-detail-more-info/499580": _FakeResponse("", _fixture("more_info_499580.html")),
     })
     records = provider.search("isbn:9788081820960")

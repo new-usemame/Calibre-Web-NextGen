@@ -18,7 +18,7 @@ from cps.metadata_constants import (
 )
 from cps.search_metadata import cl as metadata_providers
 from cps.cwa_db_loader import load_cwa_db
-from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid
+from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid, normalize as normalize_isbn
 CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
@@ -117,9 +117,10 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 # differently from the catalog (e.g. without diacritics). A
                 # provider that understands "isbn:<isbn>" gets a second try by
                 # the book's own ISBN, under the same confidence gate.
-                if metadata is None and book_isbn and getattr(provider, "SUPPORTS_ISBN_QUERY", False) is True:
-                    log.debug(f"Retrying {provider.__name__} by ISBN {book_isbn}")
-                    isbn_results = provider.search(f"isbn:{_normalize_isbn(book_isbn)}", "", "en")
+                if (metadata is None and getattr(provider, "SUPPORTS_ISBN_QUERY", False) is True
+                        and (isbn_query := normalize_isbn(book_isbn))):
+                    log.debug(f"Retrying {provider.__name__} by ISBN {isbn_query}")
+                    isbn_results = provider.search(f"isbn:{isbn_query}", "", "en")
                     if isbn_results:
                         results = isbn_results
                         metadata = _select_metadata_result(

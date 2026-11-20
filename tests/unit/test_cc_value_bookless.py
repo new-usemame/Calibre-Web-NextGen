@@ -556,4 +556,3 @@ def test_pasting_onto_the_same_parent_is_refused_as_a_no_op(cut_tree):
     assert mapping == {}
     assert new_path == "TestNode.TestSubNode"
     assert errors, "the endpoint must report this rather than answer 200 doing nothing"
-

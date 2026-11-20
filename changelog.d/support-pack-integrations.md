@@ -1,0 +1,3 @@
+### Added
+
+- **The support pack now shows the reading devices and send-to-eReader path.** `state/devices.json` lists each device by kind, model, platform, firmware, last seen, Share my place and pending-sync counts (devices are short hashes such as `dev_1a2b3c4d`, accounts are `u1`, `u2`), `state/koreader.json` reports KOReader sync counts and the last sync per device, and `state/email.json` reports the SMTP shape (port, encryption, size limit, never the host), how many accounts have an eReader email, and send outcomes since start. No names, addresses, tokens, serials, document hashes or reading positions (#2728).

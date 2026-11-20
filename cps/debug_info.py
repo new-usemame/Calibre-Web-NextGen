@@ -400,6 +400,39 @@ def assemble_logfiles(file_name):
                          download_name=os.path.basename(file_name))
 
 
+def _resolve_integration_inputs() -> dict:
+    """Live inputs for the per-integration sections (``support_pack_integrations``).
+
+    Each lookup is independent and best-effort: an input that cannot be read
+    is omitted, and its section reports it as unavailable.
+    """
+    inputs = {}
+    try:
+        inputs["mail_settings"] = {
+            "configured": config.get_mail_server_configured(),
+            "server_type": config.mail_server_type,
+            "port": config.mail_port,
+            "encryption": config.mail_use_ssl,
+            "max_attachment_bytes": config.mail_size,
+        }
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        from .services.worker import WorkerThread
+        inputs["worker_tasks"] = [
+            (type(queued.task).__name__, queued.task.stat)
+            for queued in WorkerThread.get_instance().tasks
+        ]
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        from .progress_syncing.settings import is_koreader_sync_enabled
+        inputs["koreader_enabled"] = bool(is_koreader_sync_enabled())
+    except Exception:  # pylint: disable=broad-except
+        pass
+    return inputs
+
+
 def _resolve_state_paths() -> dict:
     """Real paths for the state collectors (see ``support_pack_state``).
 
@@ -472,7 +505,9 @@ def _build_debug_zip(sanitize: bool):
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
-    state_files = support_pack_state.collect_all(_resolve_state_paths(), sanitized=sanitize)
+    state_files = support_pack_state.collect_all(
+        _resolve_state_paths(), sanitized=sanitize, integrations=_resolve_integration_inputs()
+    )
     scrubber = None
     note = _SANITIZED_NOTE
     if sanitize:

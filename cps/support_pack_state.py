@@ -469,13 +469,21 @@ def _section_ok(value) -> bool:
     return True
 
 
-def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None) -> dict:
+def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None,
+                integrations=None) -> dict:
     """Return ``{archive filename: bytes}`` for the manifest and every section.
 
     ``paths`` keys: ``config``, ``library``, ``ingest`` (directories),
     ``library_books`` (directory, split libraries only) and ``app_db``,
     ``cwa_db``, ``metadata_db`` (files). Any may be ``None``.
+
+    ``integrations`` carries the live inputs for the per-integration sections
+    (see ``support_pack_integrations``): ``mail_settings``, ``worker_tasks``
+    and ``koreader_enabled``. Missing keys report that input as unavailable.
     """
+    from . import support_pack_integrations as integ
+
+    inputs = integrations or {}
     collectors = {
         "state/runtime.json": lambda: collect_runtime(environ),
         "state/storage.json": lambda: collect_storage(
@@ -492,6 +500,13 @@ def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, envir
         ),
         "state/background.json": lambda: collect_background(
             paths.get("cwa_db"), paths.get("ingest"), scheduler
+        ),
+        "state/devices.json": lambda: integ.collect_devices(paths.get("app_db")),
+        "state/koreader.json": lambda: integ.collect_koreader(
+            paths.get("app_db"), inputs.get("koreader_enabled")
+        ),
+        "state/email.json": lambda: integ.collect_email(
+            inputs.get("mail_settings"), inputs.get("worker_tasks"), paths.get("app_db")
         ),
     }
     files: dict = {}

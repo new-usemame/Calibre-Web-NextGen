@@ -22927,9 +22927,6 @@ msgstr "Saisissez une seule valeur sans virgule."
 msgid "Loading values..."
 msgstr "Chargement des valeurs..."
 
-msgid "New value"
-msgstr "Nouvelle valeur"
-
 msgid "No values match the filter."
 msgstr "Aucune valeur ne correspond au filtre."
 

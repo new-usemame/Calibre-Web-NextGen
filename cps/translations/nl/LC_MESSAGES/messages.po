@@ -21918,9 +21918,6 @@ msgstr "Voer één waarde zonder komma in."
 msgid "Loading values..."
 msgstr "Waarden laden..."
 
-msgid "New value"
-msgstr "Nieuwe waarde"
-
 msgid "No values match the filter."
 msgstr "Geen waarden komen overeen met het filter."
 

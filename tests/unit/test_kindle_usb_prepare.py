@@ -30,12 +30,13 @@ def _book(formats, title="Dune", authors=("Frank Herbert",)):
                            authors=[SimpleNamespace(name=a) for a in authors])
 
 
-def _call(book, *, converter="/usr/bin/ebook-convert", convert_result=None, user=None):
+def _call(book, *, converter="/usr/bin/ebook-convert", convert_result=None, user=None, enabled=True):
     from cps.api import actions as mod
     db = MagicMock()
     db.get_filtered_book.return_value = book
     db.get_book_format.side_effect = lambda _id, fmt: SimpleNamespace(name="Dune - Frank Herbert", format=fmt)
-    cfg = SimpleNamespace(config_converterpath=converter, get_book_path=lambda: "/books")
+    cfg = SimpleNamespace(config_kindle_usb_enabled=enabled, config_converterpath=converter,
+                          get_book_path=lambda: "/books")
     with _ctx():
         with patch.object(mod, "current_user", user or _user()), \
              patch.object(mod, "calibre_db", db), \
@@ -120,3 +121,11 @@ def test_filename_is_filesystem_safe():
     resp, _ = _call(_book(["AZW3"], title='A/B: "C"?', authors=("X|Y",)))
     name = _body(resp)["filename"]
     assert name.endswith(".azw3") and not any(c in name for c in '/:"?|')
+
+
+@pytest.mark.unit
+def test_prepare_is_unavailable_when_admin_disables_kindle_usb():
+    resp, convert = _call(_book(["EPUB"]), enabled=False)
+    assert (resp[1] if isinstance(resp, tuple) else resp.status_code) == 404
+    assert _body(resp)["error"]["code"] == "kindle_usb_disabled"
+    convert.assert_not_called()

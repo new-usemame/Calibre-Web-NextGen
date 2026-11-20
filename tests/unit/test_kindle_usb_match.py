@@ -70,7 +70,7 @@ def test_pipe_escaped_commas_in_author_names():
     assert ku.name_key("William H. Keith, Jr.") in ku.book_author_keys(["William H. Keith| Jr."])
 
 
-def _call(body, *, download=True, rows=(), books=(), cover="/cover/1"):
+def _call(body, *, download=True, rows=(), books=(), cover="/cover/1", enabled=True):
     from cps.api import actions as mod
     db = MagicMock()
     query = db.session.query.return_value
@@ -79,6 +79,7 @@ def _call(body, *, download=True, rows=(), books=(), cover="/cover/1"):
             "/api/v1/kindle-usb/resolve", method="POST", json=body, content_type="application/json"):
         user = SimpleNamespace(is_authenticated=True, is_anonymous=False, id=1, role_download=lambda: download)
         with patch.object(mod, "current_user", user), patch.object(mod, "calibre_db", db), \
+             patch.object(mod, "config", SimpleNamespace(config_kindle_usb_enabled=enabled)), \
              patch("cps.api.serializers.cover_url_for", return_value=cover):
             resp = inspect.unwrap(mod.resolve_kindle_usb_files)()
     return resp
@@ -112,3 +113,10 @@ def test_resolve_reports_a_null_cover_for_a_book_without_one():
     book = SimpleNamespace(id=7, title="Shatter Me", authors=[SimpleNamespace(name="Tahereh Mafi")])
     resp = _call({"files": ["Shatter Me - Tahereh Mafi.azw3"]}, rows=[(7, "Shatter Me")], books=[book], cover=None)
     assert json.loads(resp.get_data())["items"][0]["book"]["cover_url"] is None
+
+
+@pytest.mark.unit
+def test_resolve_is_unavailable_when_admin_disables_kindle_usb():
+    resp = _call({"files": ["Dune.azw3"]}, enabled=False)
+    assert (resp[1] if isinstance(resp, tuple) else resp.status_code) == 404
+    assert resp[0].get_json()["error"]["code"] == "kindle_usb_disabled"

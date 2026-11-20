@@ -298,6 +298,7 @@ def _ui_config_payload():
         "config_default_ui_font_body": getattr(config, "config_default_ui_font_body", ""),
         "config_default_ui_font_display": getattr(config, "config_default_ui_font_display", ""),
         "config_server_announcement": config.config_server_announcement or "",
+        "config_kindle_usb_enabled": bool(getattr(config, "config_kindle_usb_enabled", False)),
         "config_opds_filename_template": getattr(config, "config_opds_filename_template", "") or "",
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
@@ -458,6 +459,11 @@ def admin_update_config():
         if data["config_theme"] not in ALLOWED_THEME_SLUGS:
             return _err("invalid_request", "Invalid theme option", 400)
         integer_updates['config_theme'] = theme_code(data["config_theme"])
+    if "config_kindle_usb_enabled" in data:
+        enabled = data["config_kindle_usb_enabled"]
+        if not isinstance(enabled, bool):
+            return _err("invalid_request", "Kindle USB setting must be a boolean", 400)
+        config.config_kindle_usb_enabled = enabled
     for key, value in integer_updates.items():
         setattr(config, key, value)
     for key in _UI_CONFIG_STR:

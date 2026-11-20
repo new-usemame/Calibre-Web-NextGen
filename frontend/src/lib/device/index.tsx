@@ -5,6 +5,7 @@
  * Add a kind by writing a driver (see ./kindle.tsx) and listing it in DRIVERS.
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import type { Me } from '../api';
 import { useKindleDevices } from './kindle';
 import type { ConnectedDevice, DeviceSource } from './types';
 
@@ -21,6 +22,10 @@ interface DevicesValue {
 }
 const NONE: DevicesValue = { devices: [], sources: [] };
 const DevicesContext = createContext<DevicesValue>(NONE);
+
+export function canUseKindleUsb(me: Me | null | undefined): boolean {
+  return !!me?.id && !me.role?.anonymous && !!me.role?.download && me.features?.kindle_usb === true;
+}
 
 export function DevicesProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
   // DRIVERS is a module constant, so these hook calls happen in the same order on every render.

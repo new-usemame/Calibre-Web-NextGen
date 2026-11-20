@@ -615,6 +615,17 @@ KINDLE_USB_FORMATS = ("AZW3", "MOBI", "AZW", "PDF", "TXT")
 KINDLE_USB_CONVERT_FROM = ("EPUB", "FB2", "DOCX", "HTMLZ", "ODT", "RTF")
 
 
+def _require_kindle_usb_access():
+    guard = _require_real_user()
+    if guard:
+        return guard
+    if not current_user.role_download():
+        return _err("forbidden", "You don't have download permission", 403)
+    if not getattr(config, "config_kindle_usb_enabled", False):
+        return _err("kindle_usb_disabled", "Kindle USB is disabled", 404)
+    return None
+
+
 def kindle_usb_plan(available, converter_configured):
     """Decide what to put on the Kindle: (format, convert_from).
 
@@ -641,11 +652,9 @@ def prepare_kindle_usb(book_id):
     Conversion runs inline: the SPA has to wait for it before it can start the transfer. Returns
     {format, converted, filename, download_url}.
     """
-    guard = _require_real_user()
+    guard = _require_kindle_usb_access()
     if guard:
         return guard
-    if not current_user.role_download():
-        return _err("forbidden", "You don't have download permission", 403)
 
     book = calibre_db.get_filtered_book(book_id, allow_show_archived=True)
     if book is None:
@@ -692,11 +701,9 @@ def resolve_kindle_usb_files():
     Body: {files: [filename, ...]}. Returns {items: [{file, book}]} in the same order, `book` being
     null for a file this library does not know. Only books the user may see are matched.
     """
-    guard = _require_real_user()
+    guard = _require_kindle_usb_access()
     if guard:
         return guard
-    if not current_user.role_download():
-        return _err("forbidden", "You don't have download permission", 403)
 
     data = request.get_json(silent=True)
     files = data.get("files") if isinstance(data, dict) else None

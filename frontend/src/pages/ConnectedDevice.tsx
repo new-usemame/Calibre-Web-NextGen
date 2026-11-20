@@ -67,6 +67,7 @@ export function ConnectedDevice({ id }: { id: string }) {
   };
   const canImport = canUploadBooks(me);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [ejectError, setEjectError] = useState(false);
 
   const removeEntry = (entry: DeviceEntry) => {
     if (!device) return;
@@ -182,13 +183,18 @@ export function ConnectedDevice({ id }: { id: string }) {
           <button type="button" className={styles.primary} data-testid="device-eject"
             disabled={device.busy !== null}
             onClick={() => {
-              void device.eject().then(() => announce(t('{name} ejected. It is safe to unplug.', { name: device.name })));
+              setEjectError(false);
+              void device.eject().then(
+                () => announce(t('{name} ejected. It is safe to unplug.', { name: device.name })),
+                () => setEjectError(true),
+              );
             }}>
             <Unplug size={15} aria-hidden="true" focusable={false} />
             {t('Eject')}
           </button>
         </div>
       </header>
+      {ejectError && <p role="alert">{t('Could not eject the Kindle. Keep it connected and try again.')}</p>}
 
       {(removeError ?? connectError ?? device.error) && (
         <p className={styles.error} role="alert">{removeError ?? connectError ?? device.error}</p>

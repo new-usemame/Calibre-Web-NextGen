@@ -413,7 +413,7 @@ function AdminConfigForm() {
   const t = useT();
   const { data: cfg } = useAdminConfig();
   const update = useUpdateAdminConfig();
-  const [form, setForm] = useState<Record<string, string | number>>({});
+  const [form, setForm] = useState<Record<string, string | number | boolean>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [filenameError, setFilenameError] = useState<string | null>(null);
   const filenameInput = useRef<HTMLInputElement>(null);
@@ -432,11 +432,12 @@ function AdminConfigForm() {
       config_default_ui_font_display: cfg.config_default_ui_font_display,
       config_server_announcement: cfg.config_server_announcement,
       config_opds_filename_template: cfg.config_opds_filename_template,
+      config_kindle_usb_enabled: cfg.config_kindle_usb_enabled === true,
     });
   }, [cfg]);
 
   if (!cfg) return null;
-  const set = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: string, v: string | number | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -557,6 +558,17 @@ function AdminConfigForm() {
         <input value={String(form.config_server_announcement ?? '')}
           onChange={(e) => set('config_server_announcement', e.target.value)} />
       </label>
+      <div>
+        <label className={styles.checkField}>
+          <input type="checkbox" checked={form.config_kindle_usb_enabled === true}
+            aria-describedby="kindle-usb-help"
+            onChange={(e) => set('config_kindle_usb_enabled', e.target.checked)} />
+          <span>{t('Enable Kindle USB (experimental)')}</span>
+        </label>
+        <p id="kindle-usb-help" className={styles.fieldHint}>
+          {t('Use Chrome or Edge over HTTPS or on localhost. This lets signed-in readers with download permission manage files on a connected Kindle.')}
+        </p>
+      </div>
       <div className={styles.newActions}>
         <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
           {update.isPending ? t('Saving…') : t('Save settings')}

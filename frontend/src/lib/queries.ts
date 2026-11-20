@@ -1102,6 +1102,7 @@ export interface AdminConfig {
   config_default_ui_font_display: string;
   config_server_announcement: string;
   config_opds_filename_template: string;
+  config_kindle_usb_enabled: boolean;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }

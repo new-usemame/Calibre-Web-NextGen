@@ -343,6 +343,7 @@ export class KindleConnection {
   private docs: number;
   private chain: Promise<unknown> = Promise.resolve();
   private closed = false;
+  private closing: Promise<void> | null = null;
 
   private constructor(device: UsbDeviceLike, session: MtpSession, claimed: number, storage: number, docs: number) {
     this.device = device;
@@ -384,10 +385,10 @@ export class KindleConnection {
   }
 
   private run<T>(task: () => Promise<T>): Promise<T> {
-    const next = this.chain.then(() => {
-      if (this.closed) throw new MtpError('The Kindle is no longer connected.', 0);
-      return task();
-    });
+    if (this.closed || this.closing) {
+      return Promise.reject(new MtpError('The Kindle is no longer connected.', 0));
+    }
+    const next = this.chain.then(task);
     this.chain = next.catch(() => undefined);
     return next;
   }
@@ -439,13 +440,22 @@ export class KindleConnection {
 
   /** End the session and hand the interface back, so Calibre and similar tools can use the Kindle again. */
   async close(): Promise<void> {
-    if (this.closed) return;
-    // Let an in-flight transfer finish rather than cutting it off mid-file.
-    await this.chain;
-    this.closed = true;
-    try { await this.session.close(); } catch { /* ignore */ }
-    try { await this.device.releaseInterface(this.claimed); } catch { /* ignore */ }
-    try { await this.device.close(); } catch { /* ignore */ }
+    if (this.closing) return this.closing;
+    if (this.closed && !this.device.opened) return;
+    this.closing = (async () => {
+      // Finish transfers already in the queue before closing the device.
+      await this.chain;
+      this.closed = true;
+      await this.session.close();
+      // An interface may already be released when a previous close failed.
+      try { await this.device.releaseInterface(this.claimed); } catch { /* close still runs */ }
+      await this.device.close();
+    })();
+    try {
+      await this.closing;
+    } finally {
+      this.closing = null;
+    }
   }
 }
 

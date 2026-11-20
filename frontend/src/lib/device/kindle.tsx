@@ -143,10 +143,20 @@ export function useKindleDevices(enabled: boolean): { devices: ConnectedDevice[]
   const connectedUsb = useCallback((d: UsbDeviceLike) => connections.current.has(deviceId(d)), []);
 
   const eject = useCallback(async (id: string) => {
-    setEjected(id, true);
-    await drop(id);
-    patch(id, { status: 'ejected', error: null });
-  }, [drop, patch, setEjected]);
+    const connection = connections.current.get(id);
+    if (!connection) throw new Error('The Kindle is not connected.');
+    patch(id, { busy: 'Ejecting…' });
+    try {
+      await connection.close();
+      if (connections.current.get(id) !== connection) return;
+      connections.current.delete(id);
+      setEjected(id, true);
+      patch(id, { status: 'ejected', error: null, entries: [], space: null, busy: null });
+    } catch (error) {
+      if (connections.current.get(id) === connection) patch(id, { busy: null });
+      throw error;
+    }
+  }, [patch, setEjected]);
 
   const refresh = useCallback(async (id: string) => {
     const conn = connections.current.get(id);

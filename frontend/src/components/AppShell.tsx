@@ -11,7 +11,7 @@ import { UploadImportWatcher } from './UploadImportWatcher';
 import { contextSidebarForLocation } from '../lib/contextSidebars';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useMe } from '../lib/queries';
-import { DevicesProvider } from '../lib/device';
+import { canUseKindleUsb, DevicesProvider } from '../lib/device';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -23,8 +23,7 @@ interface AppShellProps {
 
 export function AppShell(props: AppShellProps) {
   const me = useMe().data;
-  // A device plugged in over USB is only offered to a signed-in account allowed to download books.
-  const devicesEnabled = !!me?.id && !me.role?.anonymous && !!me.role?.download;
+  const devicesEnabled = canUseKindleUsb(me);
   return (
     <DevicesProvider enabled={devicesEnabled}>
       <ShelfDragProvider><ShellContents {...props} /></ShelfDragProvider>

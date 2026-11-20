@@ -238,3 +238,19 @@ test('read returns the content of a file on the Kindle, larger than one USB pack
   assert.deepEqual(await conn.read(20), bytes);
   await conn.close();
 });
+
+test('closing a Kindle reports a failed USB close and lets the reader retry', async () => {
+  const { device } = fakeKindle();
+  const conn = await KindleConnection.open(device);
+  let attempts = 0;
+  const close = device.close.bind(device);
+  device.close = async () => {
+    if (++attempts === 1) throw new Error('USB interface still open');
+    await close();
+  };
+
+  await assert.rejects(conn.close(), /USB interface still open/);
+  assert.equal(device.opened, true);
+  await conn.close();
+  assert.equal(device.opened, false);
+});

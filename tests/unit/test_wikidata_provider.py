@@ -153,9 +153,8 @@ def test_non_finite_series_positions_are_not_returned(monkeypatch, ordinal):
 def test_manual_search_only_contacts_wikidata_after_user_opt_in(monkeypatch, enabled):
     """Exercise the real Flask handler and observe HTTP calls and wire results."""
     import inspect
-    from flask import Flask
     from types import SimpleNamespace
-    from cps import search_metadata as search
+    from cps import app, search_metadata as search
 
     calls = _api(monkeypatch, {"Q10": WORK}, _labels(Q100="James Patterson", Q200="Alex Cross"))
     monkeypatch.setattr(search, "cl", [wd.Wikidata()])
@@ -165,9 +164,8 @@ def test_manual_search_only_contacts_wikidata_after_user_opt_in(monkeypatch, ena
     monkeypatch.setattr(search, "_get_provider_hierarchy", lambda: ["ibdb"])
     monkeypatch.setattr(search, "get_locale", lambda: "en")
     monkeypatch.setattr(search, "boost_covers", lambda _: None)
-    app = Flask(__name__)
-    app.add_url_rule("/metadata/search", view_func=inspect.unwrap(search.metadata_search), methods=["POST"])
-    payload = app.test_client().post("/metadata/search", data={"query": "Cross Kill James Patterson"}).get_json()
+    with app.test_request_context("/metadata/search", method="POST", data={"query": "Cross Kill James Patterson"}):
+        payload = inspect.unwrap(search.metadata_search)().get_json()
     assert len(calls) == (3 if enabled else 0)
     assert len(payload["results"]) == (1 if enabled else 0)
     assert payload["providers"][0]["status"] == ("ok" if enabled else "disabled")
@@ -186,15 +184,14 @@ def test_cover_picker_requires_wikidata_opt_in(monkeypatch):
 def test_provider_settings_do_not_silently_enable_wikidata_for_ingest(monkeypatch, configured):
     """Settings must preserve opt-in even though their reorder list includes new providers."""
     import inspect
-    from flask import Flask
     from types import SimpleNamespace
-    from cps import search_metadata as search
+    from cps import app, search_metadata as search
 
     monkeypatch.setattr(search, "cl", [wd.Wikidata()])
     monkeypatch.setattr(search, "current_user", SimpleNamespace(view_settings={}))
     monkeypatch.setattr(search, "_get_global_provider_enabled_map", lambda: {})
     monkeypatch.setattr(search, "_get_provider_hierarchy", lambda: ["wikidata"] if configured else ["ibdb"])
-    with Flask(__name__).test_request_context("/metadata/provider"):
+    with app.test_request_context("/metadata/provider"):
         (provider,) = inspect.unwrap(search.metadata_provider)().get_json()
     assert provider["active"] is False
     assert provider["default_ingest_enabled"] is configured

@@ -26,6 +26,7 @@ import { Upload } from './pages/Upload';
 import { Admin } from './pages/Admin';
 import { AdminDevices } from './pages/AdminDevices';
 import { AdminAcquisition } from './pages/AdminAcquisition';
+import { AdminValueMaps } from './pages/AdminValueMaps';
 import { FindBooks } from './pages/FindBooks';
 import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
@@ -290,6 +291,9 @@ export function App() {
           </Route>
           <Route path={SPA_ROUTES.adminAcquisition}>
             {() => me.role?.admin ? <AdminAcquisition /> : <NotFound />}
+          </Route>
+          <Route path={SPA_ROUTES.adminValueMaps}>
+            {() => me.role?.admin ? <AdminValueMaps /> : <NotFound />}
           </Route>
           <Route path={SPA_ROUTES.admin}>{() => <Admin />}</Route>
 

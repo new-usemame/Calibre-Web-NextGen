@@ -3251,7 +3251,7 @@ class NewBookProcessor:
             # Don't fail the import if checksum generation fails
 
     def set_library_permissions(self):
-        service_user.chown_to_service_user(self.library_dir, "[ingest-processor]")
+        service_user.chown_to_service_user(self.library_dir, "[ingest-processor]", skip_matching=True)
 
 
 def _truncate_overlong_ingest_name(filepath, max_length=150):

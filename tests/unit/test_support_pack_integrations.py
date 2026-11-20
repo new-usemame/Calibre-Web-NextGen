@@ -106,6 +106,28 @@ class TestDevices:
         assert kobo["reading_positions"] == 3 and kobo["rehydrate_pending"] == 2
         assert kobo["share_place_nudges_pending"] == 1
 
+    def test_user_chosen_koreader_labels_are_hashed_not_shown(self, tmp_path):
+        # KOReader's model is a label someone typed ("curl test", "Sams Kindle"),
+        # which passes the charset check but can still be a person's name.
+        path = tmp_path / "kor.db"
+        conn = sqlite3.connect(path)
+        conn.execute("CREATE TABLE device (id INTEGER PRIMARY KEY, public_id TEXT, user_id INTEGER, "
+                     "kind TEXT, model TEXT, platform TEXT)")
+        conn.executemany("INSERT INTO device VALUES (?,?,?,?,?,?)", [
+            (1, "p1", 3, "koreader", "Sams Kindle", "koreader"),
+            (2, "p2", 3, "kobo", "Kobo Clara BW", "nickel"),
+            (3, "p3", 3, "koreader", None, "koreader"),
+        ])
+        conn.commit()
+        conn.close()
+        devices = integ.collect_devices(str(path))["devices"]
+        kor, kobo, unnamed = devices
+        assert kor["model"] is None
+        assert kor["model_ref"] == "mdl_" + hashlib.sha256(b"Sams Kindle").hexdigest()[:8]
+        assert kobo["model"] == "Kobo Clara BW" and kobo["model_ref"] is None
+        assert unnamed["model"] is None and unnamed["model_ref"] is None
+        assert "Sams Kindle" not in json.dumps(devices)
+
     def test_accounts_are_relabelled_in_order_of_appearance(self, app_db):
         devices = integ.collect_devices(app_db)["devices"]
         assert [d["user"] for d in devices] == ["u1", "u2", "u1"]

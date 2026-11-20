@@ -18,9 +18,11 @@ to paste into a public issue:
 * **Short hashes, not identifiers.** A device is shown as ``dev_<8 hex>`` and
   an account as ``u1``, ``u2`` (order of first appearance). No tokens, no
   serials, no names, no addresses.
-* **Free-text device fields are charset-checked.** ``model``, ``platform`` and
-  ``firmware_version`` come from the client; a value outside a conservative
-  character set is replaced with ``(redacted)``.
+* **Free-text device fields are charset-checked, and user labels are hashed.**
+  ``platform`` and ``firmware_version`` come from the client; a value outside a
+  conservative character set is replaced with ``(redacted)``. ``model`` is shown
+  only for kinds where the hardware reports it (Kobo, browser reader). For
+  KOReader it is a label someone chose, so only a short hash is shown.
 * **Read-only, tolerant of older schemas.** ``app.db`` is opened read-only,
   columns and tables that do not exist yet are skipped rather than failing,
   and a failing sub-query degrades to that field only.
@@ -43,6 +45,12 @@ from .support_pack_state import _error, _open_readonly
 MAX_DEVICES_LISTED = 200
 MAX_KOSYNC_DEVICES = 50
 MAX_TASK_CLASSES = 30
+
+# Device kinds whose ``model`` is reported by the hardware or set by the server
+# ("Kobo Clara BW", "CWNG web reader"). For every other kind (KOReader) the
+# model is a label the client or user chose, so it can hold a person's name and
+# is reported as a short hash only.
+_MODEL_REPORTED_KINDS = frozenset({"kobo", "webreader"})
 
 _DEVICE_COLUMNS = (
     "id", "public_id", "user_id", "kind", "model", "platform", "firmware_version",
@@ -140,11 +148,16 @@ def collect_devices(app_db_path) -> dict:
             device_id = row.get("id")
             user_label = user_labels.setdefault(row.get("user_id"), f"u{len(user_labels) + 1}")
             pos = positions.get(device_id, (0, 0))
+            kind = _safe_text(row.get("kind"))
+            model_raw = row.get("model")
+            model_reported = kind in _MODEL_REPORTED_KINDS
             devices.append({
                 "ref": short_ref("dev", row.get("public_id", device_id)),
                 "user": user_label,
-                "kind": _safe_text(row.get("kind")),
-                "model": _safe_text(row.get("model")),
+                "kind": kind,
+                "model": _safe_text(model_raw) if model_reported else None,
+                "model_ref": (short_ref("mdl", model_raw)
+                              if not model_reported and model_raw else None),
                 "platform": _safe_text(row.get("platform")),
                 "firmware_version": _safe_text(row.get("firmware_version")),
                 "active": bool(row.get("active")) if "active" in row else None,

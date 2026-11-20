@@ -279,12 +279,27 @@ test('Help menu ends with a secure external Ko-fi support link', async ({ page }
   await expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(items.last()).toHaveText('Support on Ko-fi →');
 
-  for (let index = 0; index < 6; index += 1) await page.keyboard.press('Tab');
+  // One Tab per item reaches the last one. Counted, not hard-coded: an admin
+  // also sees "Get Support Pack", so the number of items depends on the role.
+  const itemCount = await items.count();
+  for (let index = 0; index < itemCount; index += 1) await page.keyboard.press('Tab');
   await expect(supportLink).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(panel).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test('admin Help menu offers the support pack as an in-place download of the sanitised endpoint', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: /^Help(?: — new updates available)?$/ });
+  await trigger.click();
+
+  const panel = page.getByText('Help & support').locator('..');
+  const packLink = panel.getByRole('link', { name: 'Get Support Pack' });
+  await expect(packLink).toHaveAttribute('href', '/admin/debug/support-pack');
+  // A download, not a new tab: no target, and the download attribute is present.
+  await expect(packLink).toHaveAttribute('download', '');
+  await expect(packLink).not.toHaveAttribute('target', /.*/);
 });
 
 test('Help menu renders the Ko-fi label from an authenticated translated catalog', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud, LifeBuoy } from 'lucide-react';
+import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud, LifeBuoy, FileArchive } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { KofiMark, KOFI_URL } from './KofiMark';
@@ -11,7 +11,7 @@ import { useT } from '../lib/i18n';
 import { collectContext, reportTarget } from '../lib/reportBuilder';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
-import { canUploadBooks, showsProjectSupport } from '../lib/permissions';
+import { canDownloadSupportPack, canUploadBooks, showsProjectSupport, SUPPORT_PACK_URL } from '../lib/permissions';
 
 interface TopBarProps {
   userName: string;
@@ -107,6 +107,8 @@ interface MenuItemProps {
   to?: string;
   /** External URL — opens in a new tab. */
   href?: string;
+  /** With `href`: a same-origin file download. Saves in place instead of opening a tab. */
+  download?: boolean;
   danger?: boolean;
   /** Optional trailing element (e.g. an unread dot), pinned to the right. */
   trailing?: ReactNode;
@@ -114,7 +116,7 @@ interface MenuItemProps {
   onSelect: () => void;
 }
 
-function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }: MenuItemProps) {
+function MenuItem({ icon, label, to, href, download, danger, trailing, onClick, onSelect }: MenuItemProps) {
   const cls = danger ? `${styles.menuItem} ${styles.menuItemDanger}` : styles.menuItem;
   const handle = () => { onClick?.(); onSelect(); };
   // Disclosure pattern (not an ARIA menu): plain links/buttons, icons decorative.
@@ -131,6 +133,15 @@ function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }
       <Link href={to} className={cls} onClick={onSelect}>
         {inner}
       </Link>
+    );
+  }
+  if (href && download) {
+    // File download from this server (the classic /admin/... endpoint): the
+    // browser saves it, so no new tab and no SPA navigation.
+    return (
+      <a className={cls} href={href} download onClick={onSelect}>
+        {inner}
+      </a>
     );
   }
   if (href) {
@@ -193,6 +204,9 @@ function HelpMenu() {
             label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />}
           {showProjectLinks && <MenuItem icon={<DiscordMark size={15} />} label={t('Ask in Discord')} href={HELP_LINKS.discord} onSelect={close} />}
           {hostSupport && <MenuItem icon={<LifeBuoy size={15} />} label={me.support?.label || t('Contact support')} href={hostSupport} onSelect={close} />}
+          {canDownloadSupportPack(me) && <MenuItem
+            icon={<FileArchive size={15} />}
+            label={t('Get Support Pack')} href={SUPPORT_PACK_URL} download onSelect={close} />}
           <MenuItem icon={<BookOpen size={15} />} label={t('Documentation')} href={HELP_LINKS.docs} onSelect={close} />
           {showProjectLinks && <MenuItem icon={<KofiMark size={16} />} label={t('Support on Ko-fi →')} href={KOFI_URL} onSelect={close} />}
         </div>

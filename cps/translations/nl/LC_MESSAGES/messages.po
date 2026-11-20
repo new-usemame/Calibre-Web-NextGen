@@ -14382,7 +14382,7 @@ msgstr ""
 
 #: cps/templates/admin.html
 msgid "Get Support Pack"
-msgstr ""
+msgstr "Ondersteuningspakket ophalen"
 
 #: cps/templates/admin.html
 msgid ""

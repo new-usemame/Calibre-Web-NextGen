@@ -278,6 +278,7 @@ def metadata_provider():
                 # Global omission means available; best-effort defaults are a
                 # per-user/ingest opt-in, not hidden from the SPA toggle list.
                 "globally_enabled": bool(global_enabled.get(c.__id__, True)),
+                "requires_ingest_opt_in": c.__id__ in ORDER_OPT_IN_METADATA_PROVIDERS,
                 # The settings page lists new providers in its reorder control.
                 # Saving that page must not opt into a new service implicitly.
                 "default_ingest_enabled": (c.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS or
@@ -310,7 +311,9 @@ def metadata_change_active_provider(prov_name):
         # Respect global disablement for preview search as well
         global_enabled = _get_global_provider_enabled_map()
         if provider is not None:
-            if bool(global_enabled.get(provider.__id__, True)):
+            selected = (provider.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS
+                        or metadata_provider_enabled(provider.__id__, active))
+            if selected and bool(global_enabled.get(provider.__id__, True)):
                 try:
                     # parallel.run_blocking, not a bare call: this runs on the
                     # request greenlet and the provider blocks on its own

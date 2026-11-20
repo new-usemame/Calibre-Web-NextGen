@@ -463,6 +463,31 @@ msgstr ""
 "De valda böckerna stämmer inte överens med denna förhandsvisning. Ladda upp "
 "enhetens databas igen."
 
+#: cps/admin.py cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cover_flag_repair.html
+msgid "Restore missing covers"
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "This is not available for Google Drive libraries."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr ""
+
 #: cps/admin.py
 msgid "Boolean restrictions must be Yes, No, or Undefined."
 msgstr ""
@@ -4300,9 +4325,9 @@ msgid "Tags (comma separated)"
 msgstr "Taggar (kommaseparerade)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
-#: cps/templates/tasks.html
+#: cps/templates/config_view_edit.html cps/templates/cover_flag_repair.html
+#: cps/templates/cwa_settings.html cps/templates/hardcover_missing_ids.html
+#: cps/templates/shelf_edit.html cps/templates/tasks.html
 msgid "Title"
 msgstr "Titel"
 
@@ -8727,8 +8752,8 @@ msgstr "Namn på förinställning"
 msgid "Preset saved."
 msgstr "Förinställningen har sparats."
 
-#: cps/spa_strings.py cps/templates/duplicates.html
-#: cps/templates/kobo_reconcile.html
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Förhandsvisa"
 
@@ -9116,7 +9141,7 @@ msgstr ""
 msgid "Resolved {groups} groups and deleted {deleted} books."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid "Restore"
 msgstr "Återställ"
 
@@ -12164,6 +12189,75 @@ msgstr ""
 msgid "Could not change image fit. Try again."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"Find books that have a cover.jpg in their folder but are marked as having no "
+"cover, so the cover is never shown."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"A cover that was removed on purpose in the book editor also looks like this. "
+"Select only the books whose cover you want back."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Scan library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Scanning…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No books need their cover restored."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} cover(s) restored."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not restore covers."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{selected} of {count} selected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Books with a cover file but no cover"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restore the cover of {title}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Restore selected covers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Select all books"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "Applies when you choose My Library. The user adds books from the global "
@@ -13703,7 +13797,7 @@ msgstr "Inga resultat hittades! Försök med ett annat sökord."
 msgid "This Field is Required"
 msgstr "Detta fält är obligatoriskt"
 
-#: cps/templates/book_table.html
+#: cps/templates/book_table.html cps/templates/cover_flag_repair.html
 msgid "Select all"
 msgstr "Markera alla"
 
@@ -15393,6 +15487,30 @@ msgstr "Lägg till tillåtna/avvisade taggar"
 #: cps/templates/config_view_edit.html
 msgid "Add Allowed/Denied custom column values"
 msgstr "Lägg till tillåtna/avvisade anpassade kolumnvärden"
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d covers were restored."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books were skipped because they changed since the scan."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books have a cover file but are marked as having no cover."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "Restore the cover of %(title)s"
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+msgid "Restore the covers of the selected books?"
+msgstr ""
 
 #: cps/templates/cover_picker.html
 msgid ""

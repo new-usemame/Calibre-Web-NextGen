@@ -344,6 +344,35 @@ def test_kobo_page_uses_the_exact_chapter_not_a_filename_suffix(hardcover_epub):
     }
 
 
+def test_kobo_page_is_omitted_when_the_chapter_basename_is_ambiguous(hardcover_epub):
+    """c1.html in both a/ and b/ names no single chapter, so no page is sent."""
+    import zipfile
+
+    book, path = hardcover_epub
+    with zipfile.ZipFile(path) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    files["OEBPS/a/c1.html"] = files.pop("OEBPS/c0.html")
+    files["OEBPS/b/c1.html"] = files.pop("OEBPS/c1.html")
+    opf = files["OEBPS/content.opf"].replace(b'"c1.html"', b'"b/c1.html"')
+    files["OEBPS/content.opf"] = opf.replace(b'"c0.html"', b'"a/c1.html"')
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    client = _RecordingHardcoverClient()
+    exact = {"chapterFilename": "OEBPS/b/c1.html", "chapterProgress": 0.5}
+    result = _make_handler(client).push(
+        FakeAnnotation(), book, FakeUser(), {"location": {"span": exact}})
+    assert result.status == "synced", result.error_message
+    # The rewritten book still places a full path, so the omission below is the ambiguity.
+    assert client.sent[-1]["metadata"]["position"]["percent"] == 75.0
+    ambiguous = {"chapterFilename": "c1.html", "chapterProgress": 0.5}
+    result = _make_handler(client).push(
+        FakeAnnotation(), book, FakeUser(), {"location": {"span": ambiguous}})
+    assert result.status == "synced", result.error_message
+    assert client.sent[-1]["metadata"] is None
+    assert "hello" in client.sent[-1]["entry"]
+
+
 @pytest.mark.parametrize("chapter_progress, percent, page", [(0, 50, 100), (0.5, 75, 150), (1, 100, 200)])
 def test_valid_kobo_position_reaches_the_journal_request(hardcover_epub, chapter_progress, percent, page):
     """Exercise the real EPUB calculator, handler and GraphQL client together."""

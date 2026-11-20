@@ -84,6 +84,7 @@ msgstr ""
 "%(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "Проверить совпадения метаданных из сервиса Hardcover"
 
@@ -109,6 +110,53 @@ msgstr "Нет ожидающих совпадений для отклонени
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "Отклонено %(count)s совпадение(ий)"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr ""
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr ""
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr ""
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr ""
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr ""
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "Все"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr ""
 
 #: cps/admin.py
 #, python-brace-format
@@ -151,11 +199,6 @@ msgstr "Пользовательский столбец №%(column)d отсут
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "Редактировать пользователей"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "Все"
 
 #: cps/admin.py
 msgid "User not found"
@@ -224,6 +267,12 @@ msgstr "Параметр не найден"
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
 msgstr "База данных настроек недоступна для записи"
+
+#: cps/admin.py
+#, python-brace-format
+msgid ""
+"Could not save the custom column hierarchy setting for {count} column(s)."
+msgstr ""
 
 #: cps/admin.py
 #, python-format
@@ -433,6 +482,31 @@ msgid ""
 msgstr ""
 "Выбранные книги не соответствуют этому предпросмотру. Загрузите базу данных "
 "устройства ещё раз."
+
+#: cps/admin.py cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cover_flag_repair.html
+msgid "Restore missing covers"
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "This is not available for Google Drive libraries."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr ""
 
 #: cps/admin.py
 msgid "Boolean restrictions must be Yes, No, or Undefined."
@@ -2361,6 +2435,7 @@ msgstr "Непрочитанные книги"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "Авторы"
@@ -3076,11 +3151,11 @@ msgstr "Не удалось переименовать тег"
 msgid "Tag renamed to {name}"
 msgstr "Тег переименован в {name}"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You must be signed in"
 msgstr "Необходимо выполнить вход"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You are not allowed to edit metadata"
 msgstr "У вас нет прав на редактирование метаданных"
 
@@ -3109,8 +3184,8 @@ msgid "Page not found"
 msgstr "Страница не найдена"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/email_edit.html cps/templates/shelf.html
-#: cps/templates/user_table.html
+#: cps/templates/custom_column_modal.html cps/templates/email_edit.html
+#: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Add"
 msgstr "Добавить"
 
@@ -3935,9 +4010,10 @@ msgstr "Тёмная тема"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/admin.html cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/duplicates.html
-#: cps/templates/modal_dialogs.html cps/templates/read.html
-#: cps/templates/user_edit.html cps/templates/user_table.html
+#: cps/templates/book_table.html cps/templates/cc_value_editor.html
+#: cps/templates/duplicates.html cps/templates/modal_dialogs.html
+#: cps/templates/read.html cps/templates/user_edit.html
+#: cps/templates/user_table.html
 msgid "Delete"
 msgstr "Удалить"
 
@@ -3986,7 +4062,7 @@ msgstr "Описание содержит"
 msgid "Deselect {title}"
 msgstr "Снять выделение с {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "Редактировать метаданные"
 
@@ -4096,7 +4172,7 @@ msgid "Mark unread"
 msgstr "Пометить как непрочитанное"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/duplicates.html
+#: cps/templates/cc_value_editor.html cps/templates/duplicates.html
 msgid "Merge"
 msgstr "Объединить"
 
@@ -4323,7 +4399,8 @@ msgid "Tags (comma separated)"
 msgstr "Теги (через запятую)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
+#: cps/templates/config_view_edit.html cps/templates/cover_flag_repair.html
+#: cps/templates/cwa_settings.html cps/templates/hardcover_missing_ids.html
 #: cps/templates/shelf_edit.html cps/templates/tasks.html
 msgid "Title"
 msgstr "Название"
@@ -4609,6 +4686,7 @@ msgid "Customize navigation"
 msgstr "Настроить навигацию"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
+#: cps/templates/cc_value_editor.html
 msgid "Done"
 msgstr "Готово"
 
@@ -5173,6 +5251,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -5262,6 +5357,10 @@ msgstr "1 аннотация назначена этому источнику"
 msgid "1 annotation from this source"
 msgstr "1 аннотация из этого источника"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "1 level"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 выбрано."
@@ -5300,8 +5399,8 @@ msgstr ""
 "Поиск дубликатов уже выполняется. Этот список обновится после завершения."
 
 #: cps/spa_strings.py
-msgid "A few random picks from your library"
-msgstr "Несколько случайных книг из вашей библиотеки"
+msgid "A few random picks from your Discover source"
+msgstr "Несколько случайных книг из вашего источника «Обзор»"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5321,6 +5420,20 @@ msgid ""
 msgstr ""
 "Необходим однократный полный поиск дубликатов. Используйте кнопку «Поиск "
 "дубликатов» выше, чтобы запустить его."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into itself"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into one of its own sub-values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid ""
+"A value created beside another stays on the same level, so its name cannot "
+"contain a dot. Use the Create new button for a sub-value."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "API endpoint"
@@ -5354,12 +5467,29 @@ msgstr ""
 "Получение сейчас не готово. Попросите администратора проверить его статус."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Действия для {title}"
+
+#: cps/spa_strings.py
 msgid "Active"
 msgstr "Активно"
 
 #: cps/spa_strings.py
 msgid "Add a connection"
 msgstr "Добавить подключение"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Add a review"
+msgstr "Добавить отзыв"
+
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr "Добавить книги"
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr "Добавить книги на полку"
 
 #: cps/spa_strings.py
 msgid "Add connection"
@@ -5372,6 +5502,15 @@ msgstr "Добавить группу"
 #: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "Добавить идентификатор"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"Добавлять имена вложенных папок импорта в теги книги или существующий "
+"пользовательский столбец. Существующие значения сохраняются; файлы в корне "
+"папки импорта не добавляют ярлыков."
 
 #: cps/spa_strings.py
 msgid "Add link"
@@ -5386,6 +5525,10 @@ msgid "Add or replace this line in the [OneStoreServices] section:"
 msgstr "Добавьте или замените эту строку в разделе [OneStoreServices]:"
 
 #: cps/spa_strings.py
+msgid "Add selected"
+msgstr "Добавить выбранное"
+
+#: cps/spa_strings.py
 msgid "Add to existing"
 msgstr "Добавить к существующим"
 
@@ -5396,6 +5539,11 @@ msgstr "Добавить в избранное"
 #: cps/spa_strings.py
 msgid "Add to library"
 msgstr "Добавить в библиотеку"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr "Добавить {title} на полку"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
@@ -5457,9 +5605,21 @@ msgstr ""
 msgid "All catalogs"
 msgstr "Все каталоги"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "All levels"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Все полки"
+
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "All tags"
+msgstr "Все теги"
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "Разрешить завершённые книги MOBI 6 без DRM"
 
 #: cps/spa_strings.py
 msgid "Allow remote (magic-link) login"
@@ -5480,6 +5640,14 @@ msgstr "Разрешённые группы (через запятую)"
 #: cps/spa_strings.py
 msgid "Allowed torrent tracker origins"
 msgstr "Разрешённые источники торрент-трекеров"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already first at this level"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already last at this level"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Also add the book to My Library"
@@ -5531,6 +5699,21 @@ msgstr "Любая серия"
 msgid "Any tags"
 msgstr "Любые теги"
 
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+"Применяется только к этому клиенту загрузки. Настройка формата загрузки на "
+"сервере также должна разрешать MOBI. Применяются обычные настройки "
+"конвертации; без конвертации MOBI можно скачать, но нельзя открыть в веб-"
+"читалке."
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
@@ -5576,6 +5759,10 @@ msgstr "Архив"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "В архиве"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Arial"
+msgstr "Arial"
 
 #: cps/spa_strings.py
 msgid "Arrangement"
@@ -5643,6 +5830,14 @@ msgstr "Автоматически создавать пользователей
 msgid "Auto-create users on first login"
 msgstr "Автоматически создавать пользователей при первом входе"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Automatic"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr "Доступно пользователям"
@@ -5683,6 +5878,14 @@ msgid "Basic settings"
 msgstr "Основные настройки"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "Бета"
 
@@ -5704,6 +5907,10 @@ msgid "Bold"
 msgstr "Жирный"
 
 #: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "Книга добавлена в вашу активность."
+
+#: cps/spa_strings.py
 msgid "Book category ID"
 msgstr "ID категории книг"
 
@@ -5722,6 +5929,10 @@ msgstr "Скачивание списка книг началось."
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Порядок книг"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "Книга запрошена. Администратор должен одобрить это."
 
 #: cps/spa_strings.py
 msgid "Book sources"
@@ -5838,6 +6049,10 @@ msgid "Bulleted list"
 msgstr "Маркированный список"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "Путь к CA-сертификату"
 
@@ -5880,6 +6095,7 @@ msgstr "Можно загружать книги"
 #: cps/templates/book_review.html cps/templates/book_table.html
 #: cps/templates/config_db.html cps/templates/config_edit.html
 #: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/custom_column_modal.html
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
 #: cps/templates/duplicates.html cps/templates/layout.html
@@ -5932,10 +6148,6 @@ msgid "Catalogs and download clients"
 msgstr "Каталоги и клиенты загрузки"
 
 #: cps/spa_strings.py
-msgid "Categories"
-msgstr "Категории"
-
-#: cps/spa_strings.py
 msgid "Center"
 msgstr "По центру"
 
@@ -5950,6 +6162,20 @@ msgstr "Путь к сертификату"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "Изменить"
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "Изменить источник для «Обзора»"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -5969,6 +6195,10 @@ msgid "Checking…"
 msgstr "Проверка…"
 
 #: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "Выберите книгу из этой загрузки"
+
+#: cps/spa_strings.py
 msgid "Choose a cover"
 msgstr "Выбрать обложку"
 
@@ -5980,9 +6210,23 @@ msgstr "Выберите изображение обложки для загру
 msgid "Choose a download client connection"
 msgstr "Выберите подключение клиента загрузки"
 
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr ""
+"Выберите группу тегов, чтобы просмотреть книги этой группы и её вложенных "
+"тегов."
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Choose an image…"
 msgstr "Выберите изображение…"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "Выбрать другую книгу"
 
 #: cps/spa_strings.py
 msgid "Choose another place"
@@ -5991,6 +6235,14 @@ msgstr "Выбрать другое место"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "Выбрать поля"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files stay "
+"in the configuration volume across upgrades."
+msgstr ""
+"Выберите шрифты, которыми вам разрешено делиться с читателями этого сервера. "
+"Файлы сохраняются в томе конфигурации при обновлениях."
 
 #: cps/spa_strings.py
 msgid "Choose visible columns"
@@ -6106,6 +6358,10 @@ msgstr ""
 "чтобы подтвердить связь с вашей библиотекой."
 
 #: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "Подключение изменено. Перезагрузите его настройки перед сохранением."
 
@@ -6170,8 +6426,29 @@ msgid "Copy sync URL"
 msgstr "Копировать URL для синхронизации"
 
 #: cps/spa_strings.py
+msgid "Correct the minimum books value to see results."
+msgstr ""
+"Исправьте значение минимального количества книг, чтобы увидеть результаты."
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr "Не удалось добавить книги на полку. Пожалуйста, попробуйте снова."
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr "Не удалось добавить выбранные книги. Пожалуйста, попробуйте снова."
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not assign."
 msgstr "Не удалось назначить."
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not complete the action."
@@ -6182,12 +6459,24 @@ msgid "Could not copy. Select the address and copy it manually."
 msgstr "Не удалось скопировать. Выделите адрес и скопируйте его вручную."
 
 #: cps/spa_strings.py
+msgid "Could not create"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr "Не удалось создать полку."
 
 #: cps/spa_strings.py
 msgid "Could not create the shelf."
 msgstr "Не удалось создать полку."
+
+#: cps/spa_strings.py
+msgid "Could not delete"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not delete review."
+msgstr "Не удалось удалить отзыв."
 
 #: cps/spa_strings.py
 msgid "Could not delete shelf."
@@ -6206,8 +6495,16 @@ msgid "Could not export the book list. Please try again."
 msgstr "Не удалось экспортировать список книг. Пожалуйста, попробуйте снова."
 
 #: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "Не удалось загрузить источники для «Обзора»."
+
+#: cps/spa_strings.py
 msgid "Could not load books"
 msgstr "Не удалось загрузить книги"
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr "Не удалось загрузить книги."
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -6238,8 +6535,16 @@ msgid "Could not load highlights and notes."
 msgstr "Не удалось загрузить выделения и заметки."
 
 #: cps/spa_strings.py
+msgid "Could not load ingest folder settings."
+msgstr "Не удалось загрузить настройки папки импорта."
+
+#: cps/spa_strings.py
 msgid "Could not load pairing details."
 msgstr "Не удалось загрузить данные о сопряжении."
+
+#: cps/spa_strings.py
+msgid "Could not load reader fonts."
+msgstr "Не удалось загрузить шрифты читалки."
 
 #: cps/spa_strings.py
 msgid "Could not load reading places."
@@ -6258,12 +6563,20 @@ msgid "Could not load stats."
 msgstr "Не удалось загрузить статистику."
 
 #: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "Не удалось загрузить теги. Попробуйте ещё раз."
+
+#: cps/spa_strings.py
 msgid "Could not load tasks."
 msgstr "Не удалось загрузить задачи."
 
 #: cps/spa_strings.py
 msgid "Could not load the device board."
 msgstr "Не удалось загрузить панель устройства."
+
+#: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load this device library."
@@ -6277,9 +6590,29 @@ msgstr "Не удалось загрузить этот текстовый фа�
 msgid "Could not load users."
 msgstr "Не удалось загрузить пользователей."
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not load your rating."
+msgstr "Не удалось загрузить вашу оценку."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not load your review."
+msgstr "Не удалось загрузить ваш отзыв."
+
 #: cps/spa_strings.py
 msgid "Could not look up who asked"
 msgstr "Не удалось определить, кто запросил"
+
+#: cps/spa_strings.py
+msgid "Could not merge"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not move"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
@@ -6298,6 +6631,11 @@ msgid "Could not open the synced position."
 msgstr "Не удалось открыть синхронизированную позицию."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not preview the resolution."
 msgstr ""
 
@@ -6309,6 +6647,10 @@ msgstr "Не удалось прочитать этот архив комикс�
 msgid "Could not reload metadata"
 msgstr "Не удалось перезагрузить метаданные"
 
+#: cps/spa_strings.py
+msgid "Could not remove font."
+msgstr "Не удалось удалить шрифт."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not remove this book from Currently Reading."
 msgstr "Не удалось удалить эту книгу из «Читаю сейчас»."
@@ -6316,6 +6658,10 @@ msgstr "Не удалось удалить эту книгу из «Читаю �
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "Не удалось удалить этот источник. Попробуйте снова."
+
+#: cps/spa_strings.py
+msgid "Could not rename"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not rename shelf."
@@ -6345,6 +6691,15 @@ msgstr ""
 msgid "Could not restore this source. Try again."
 msgstr "Не удалось восстановить этот источник. Попробуйте снова."
 
+#: cps/spa_strings.py cps/web.py
+msgid "Could not save Discover source. Please try again."
+msgstr ""
+"Не удалось сохранить источник для «Обзора». Пожалуйста, попробуйте снова."
+
+#: cps/spa_strings.py
+msgid "Could not save ingest folder settings."
+msgstr "Не удалось сохранить настройки папки импорта."
+
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
 msgstr "Не удалось сохранить порядок."
@@ -6352,6 +6707,14 @@ msgstr "Не удалось сохранить порядок."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Не удалось сохранить настройки читалки."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not save review."
+msgstr "Не удалось сохранить отзыв."
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save that highlight."
@@ -6377,6 +6740,10 @@ msgstr "Не удалось сохранить полку."
 msgid "Could not save title."
 msgstr "Не удалось сохранить название."
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not save your rating."
+msgstr "Не удалось сохранить вашу оценку."
+
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Не удалось сохранить вашу позицию чтения."
@@ -6401,13 +6768,25 @@ msgstr "Не удалось запустить поиск дубликатов."
 msgid "Could not update pairing details."
 msgstr "Не удалось обновить данные о сопряжении."
 
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "Не удалось обновить статус прочтения. Пожалуйста, попробуйте снова."
+
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Не удалось обновить полку."
 
 #: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr "Не удалось обновить эту книгу. Попробуйте снова."
+
+#: cps/spa_strings.py
 msgid "Could not update your account setting."
 msgstr "Не удалось обновить настройку аккаунта."
+
+#: cps/spa_strings.py
+msgid "Could not upload font."
+msgstr "Не удалось загрузить шрифт."
 
 #: cps/spa_strings.py
 msgid "Couldn’t start a magic link. Please try again."
@@ -6443,6 +6822,19 @@ msgstr ""
 msgid "Cover updated from the selected result."
 msgstr "Обложка обновлена из выбранного результата."
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Create a value just below this one"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Create a value just below {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Create account"
 msgstr "Создать учётную запись"
@@ -6455,6 +6847,10 @@ msgstr "Создать учётную запись"
 msgid "Create failed."
 msgstr "Не удалось создать."
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Create new"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Create shelf"
 msgstr "Создать полку"
@@ -6466,6 +6862,20 @@ msgstr "Создать полку и добавить книгу"
 #: cps/spa_strings.py
 msgid "Create user"
 msgstr "Создать пользователя"
+
+#: cps/spa_strings.py
+msgid "Create value"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name} just below {anchor}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6492,6 +6902,10 @@ msgstr "Текущий"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current cover"
 msgstr "Текущая обложка"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Current library"
+msgstr "Текущая библиотека"
 
 #: cps/spa_strings.py
 msgid "Current password"
@@ -6522,6 +6936,25 @@ msgstr "Пользовательские цвета"
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "Пользовательские колонки"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut a value first, then choose where it should go"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Cut {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Data hoarder? This will help users organize their accounts!"
@@ -6587,6 +7020,10 @@ msgstr "Не удалось удалить."
 msgid "Delete from device"
 msgstr "Удалить с устройства"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete review"
+msgstr "Удалить отзыв"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete shelf \"{name}\"? This cannot be undone."
@@ -6637,6 +7074,14 @@ msgstr ""
 "удалены."
 
 #: cps/spa_strings.py
+msgid "Delete values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete your review?"
+msgstr "Удалить ваш отзыв?"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Delete {name}"
 msgstr "Удалить {name}"
@@ -6659,6 +7104,11 @@ msgstr "Удалённое устройство"
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "Тег {name} удалён"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Deleted {count} values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6751,6 +7201,10 @@ msgstr ""
 "сохранения прогресса чтения или аннотаций."
 
 #: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr "Статусы «Не дочитано» и «Отложено» сохраняют вашу позицию чтения."
+
+#: cps/spa_strings.py
 msgid "Different edition"
 msgstr "Другое издание"
 
@@ -6758,13 +7212,29 @@ msgstr "Другое издание"
 msgid "Disable standard password login"
 msgstr "Отключить стандартный вход по паролю"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Disabled"
+msgstr "Отключено"
+
 #: cps/spa_strings.py
 msgid "Disabled books"
 msgstr "Отключённые книги"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Подборки в «Обзоре» обновлены."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Discover source"
+msgstr "Источник для «Обзора»"
+
+#: cps/spa_strings.py cps/web.py
+msgid "Discover source saved."
+msgstr "Источник для «Обзора» сохранён."
 
 #: cps/spa_strings.py
 msgid "Discover — Random Picks"
@@ -6786,6 +7256,10 @@ msgstr "Пропустить эту группу"
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Display"
 msgstr "Отображение"
+
+#: cps/spa_strings.py
+msgid "Display name (optional)"
+msgstr "Отображаемое имя (необязательно)"
 
 #: cps/spa_strings.py
 msgid "Documentation"
@@ -6839,12 +7313,24 @@ msgid "Downloading"
 msgstr "Загрузка"
 
 #: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "Перетащите на полку или выберите полку"
+
+#: cps/spa_strings.py
 msgid "Drawing the cover…"
 msgstr "Отрисовка обложки…"
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "Перетащите файлы сюда или нажмите, чтобы выбрать"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6941,6 +7427,10 @@ msgstr "Редактировать заметку"
 msgid "Edit public shelves"
 msgstr "Редактировать общедоступные полки"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Edit review"
+msgstr "Редактировать отзыв"
+
 #: cps/spa_strings.py
 msgid "Edit shared library cover"
 msgstr "Редактировать общую обложку библиотеки"
@@ -6953,6 +7443,11 @@ msgstr "Редактировать смарт-полку"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Редактировать название для «{title}»"
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+#: cps/templates/cc_value_editor.html
+msgid "Edit values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6997,6 +7492,47 @@ msgstr "Почтовый сервер"
 msgid "Email settings saved."
 msgstr "Настройки электронной почты сохранены."
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "Пусто"
@@ -7016,6 +7552,10 @@ msgstr "Включено"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Шифрование"
+
+#: cps/spa_strings.py
+msgid "Enter a whole number of at least 1."
+msgstr "Введите целое число не менее 1."
 
 #: cps/spa_strings.py
 msgid "Enter at least 2 characters"
@@ -7038,6 +7578,27 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
+"Every action is on the row it applies to. Renaming renames everything below "
+"the value. To move a value, tick it and press Cut, then tick the value it "
+"should go under and press Paste."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Every action is on the row it applies to. To merge, tick two or more values, "
+"then use Merge on the one that should survive."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
 "Каждая книга синхронизируется по мере готовности. Ниже вы можете исключить "
@@ -7049,8 +7610,16 @@ msgstr ""
 "Каждое заполненное поле заменит существующие значения для каждой книги."
 
 #: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Exact place"
 msgstr "Точное место"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "Пример:"
 
 #: cps/spa_strings.py
 msgid "Excluded"
@@ -7102,6 +7671,10 @@ msgstr "Сбой"
 msgid "Failed to load."
 msgstr "Не удалось загрузить."
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Favorite"
+msgstr "Избранное"
+
 #: cps/spa_strings.py
 msgid "Feature"
 msgstr "Функция"
@@ -7109,6 +7682,14 @@ msgstr "Функция"
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
 msgstr "Загрузить метаданные из сети"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "Поля шаблона имени файла и примеры"
+
+#: cps/spa_strings.py
+msgid "Field"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Files"
@@ -7131,12 +7712,20 @@ msgid "Fill style"
 msgstr "Стиль заливки"
 
 #: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Filter"
 msgstr "Фильтр"
 
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Фильтровать по устройству"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7166,6 +7755,15 @@ msgstr ""
 "Завершите или отмените невыполненные запросы перед редактированием этого "
 "подключения."
 
+#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
+#: cps/templates/search_form.html
+msgid "Finished"
+msgstr "Завершено"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "Первый символ:"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Follow link: {label}"
@@ -7178,6 +7776,22 @@ msgstr "Шрифт"
 #: cps/spa_strings.py
 msgid "Font family"
 msgstr "Семейство шрифтов"
+
+#: cps/spa_strings.py
+msgid "Font file"
+msgstr "Файл шрифта"
+
+#: cps/spa_strings.py
+msgid "Font file is too large."
+msgstr "Файл шрифта слишком большой."
+
+#: cps/spa_strings.py
+msgid "Font is available in both EPUB readers."
+msgstr "Шрифт доступен в обеих читалках EPUB."
+
+#: cps/spa_strings.py
+msgid "Font removed."
+msgstr "Шрифт удалён."
 
 #: cps/spa_strings.py
 msgid "Font size"
@@ -7194,6 +7808,12 @@ msgid ""
 msgstr ""
 "Для читалки, которую вы можете подключить к этому компьютеру. Плагин уже "
 "знает ваш сервер и аккаунт: на читалке ничего вводить не нужно."
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Force full kobo sync"
@@ -7227,6 +7847,11 @@ msgstr "Форматы — включить"
 #: cps/spa_strings.py
 msgid "Formatting is kept where the book page supports it."
 msgstr "Форматирование сохраняется там, где страница книги это поддерживает."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "Найдено доступных книг: {count}."
 
 #: cps/spa_strings.py
 msgid "From address"
@@ -7369,6 +7994,10 @@ msgid "Hide Discover section"
 msgstr "Скрыть раздел «Обзор»"
 
 #: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "Скрыть доступные книги"
+
+#: cps/spa_strings.py
 msgid "Hide device details"
 msgstr "Скрыть сведения об устройстве"
 
@@ -7411,12 +8040,24 @@ msgid "Highlights and notes"
 msgstr "Выделения и заметки"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "Популярное"
 
 #: cps/spa_strings.py
 msgid "Hot — Most Downloaded"
 msgstr "Популярное — Самые скачиваемые"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Household average"
+msgstr "Средняя оценка по домохозяйству"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "How many levels of values to show"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
@@ -7476,6 +8117,10 @@ msgstr ""
 "данные остаются привязанными к их первоначальному источнику."
 
 #: cps/spa_strings.py
+msgid "Image fit"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Изображение из {source}"
@@ -7488,6 +8133,15 @@ msgstr "Импорт"
 msgid "Import and export"
 msgstr "Импорт и экспорт"
 
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "Импортировать эту книгу"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "Импортировать эту книгу: {filename}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Импортировано как"
@@ -7499,6 +8153,11 @@ msgstr "Импортировано в библиотеку"
 #: cps/spa_strings.py
 msgid "Importing"
 msgstr "Импорт"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+"В KOReader включите «Использовать имена файлов сервера» для каталога OPDS."
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -7516,13 +8175,29 @@ msgstr ""
 msgid "Inactive"
 msgstr "Неактивно"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Include nested folders"
+msgstr "Включить вложенные папки"
+
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Включено"
 
 #: cps/spa_strings.py
+msgid "Incoming value"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Indexer preset"
 msgstr "Пресет индексатора"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Ingest folder labels"
+msgstr "Ярлыки папок импорта"
+
+#: cps/spa_strings.py
+msgid "Ingest folder settings saved."
+msgstr "Настройки папки импорта сохранены."
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -7566,9 +8241,21 @@ msgstr "Прогресс KOReader"
 msgid "KOReader sync is not enabled on this server."
 msgstr "Синхронизация KOReader не включена на этом сервере."
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "KaiTi"
+msgstr "KaiTi"
+
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "Сохранить подключение"
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep your thoughts about this book here."
+msgstr "Сохраняйте свои мысли об этой книге здесь."
 
 #: cps/spa_strings.py
 msgid "Keep the best format"
@@ -7683,6 +8370,28 @@ msgstr "Последняя синхронизация"
 msgid "Leave a field empty to use its default."
 msgstr "Оставьте поле пустым, чтобы использовать значение по умолчанию."
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+"Оставьте пустым, чтобы сохранить текущее имя файла (название и первый "
+"автор). Не включайте расширение файла."
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Leave blank to keep the existing filename. Example: {series} #{series_index} "
+"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
+"the file extension is added automatically."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr ""
+"Оставьте пустым, чтобы показывать любое количество книг. Минимум "
+"включительно."
+
 #: cps/spa_strings.py
 msgid ""
 "Leave the credential blank to keep it. Saving switches the connection off "
@@ -7731,6 +8440,11 @@ msgstr ""
 msgid "Lettering"
 msgstr "Надписи"
 
+#: cps/spa_strings.py cps/templates/detail.html
+#: cps/templates/library_rating.html
+msgid "Library rating"
+msgstr "Рейтинг библиотеки"
+
 #: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Настройки библиотеки"
@@ -7763,6 +8477,10 @@ msgstr "Загрузить ещё"
 #: cps/templates/read.html
 msgid "Loading"
 msgstr "Загрузка"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "Загрузка доступных книг…"
 
 #: cps/spa_strings.py
 msgid "Loading device annotations…"
@@ -7916,13 +8634,49 @@ msgid "Member user filter"
 msgstr "Фильтр пользователей-участников"
 
 #: cps/spa_strings.py
+msgid "Merge and rename"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Merge formats into the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Merge into {name}"
+msgstr "Объединить с {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Merge into {name}"
-msgstr "Объединить с {name}"
+msgid "Merge the other selected values into {name}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Merge the selected values into {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7930,8 +8684,30 @@ msgid "Merged into {name}"
 msgstr "Объединено с {name}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged {count} values into {name}, moving {books} book(s)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "URL метаданных (автообнаружение OIDC)"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr "Microsoft YaHei"
+
+#: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Min"
@@ -7942,8 +8718,21 @@ msgid "Mine"
 msgstr "Мои"
 
 #: cps/spa_strings.py
+msgid "Minimum books"
+msgstr "Минимум книг"
+
+#: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "Минимальная оценка"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"Отсутствующие метаданные становятся пустым текстом. Для названия и серии "
+"используются их имена для сортировки. Слеши заменяются на подчёркивания, а "
+"не на папки."
 
 #: cps/spa_strings.py
 msgid "Mixed lettering — set per line in Advanced."
@@ -7965,10 +8754,14 @@ msgid "More actions for {name}"
 msgstr "Дополнительные действия для {name}"
 
 #: cps/spa_strings.py
+msgid "Most books first"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move down"
 msgstr "Переместить вниз"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move up"
 msgstr "Переместить вверх"
 
@@ -7977,10 +8770,30 @@ msgstr "Переместить вверх"
 msgid "Move {name} down"
 msgstr "Переместить {name} вниз"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} down one place"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Move {name} up"
 msgstr "Переместить {name} вверх"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} up one place"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} to the top level"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} under {parent}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8034,12 +8847,26 @@ msgstr "Новая функция!"
 
 #: cps/spa_strings.py
 msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
+"library."
+msgstr ""
+"Новые аккаунты синхронизируют только выбранные полки. Если книги не "
+"появляются, добавьте их на полку и включите для неё отметку синхронизации с "
+"читалкой. Снимите этот флажок, чтобы синхронизировать всю библиотеку."
+
+#: cps/spa_strings.py
+msgid ""
 "New authors, tags, publishers, and languages will be added after each book's "
 "existing values. Filled single-value fields will be replaced."
 msgstr ""
 "Новые авторы, теги, издатели и языки будут добавлены после существующих "
 "значений каждой книги. Заполненные поля с одиночными значениями будут "
 "заменены."
+
+#: cps/spa_strings.py
+msgid "New name"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "New password"
@@ -8061,9 +8888,29 @@ msgstr "Новая смарт-полка"
 msgid "New user"
 msgstr "Новый пользователь"
 
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "New value"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid "New: My Library"
 msgstr "Новое: Моя библиотека"
+
+#: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Newest"
@@ -8078,7 +8925,8 @@ msgid "Newznab / Torznab indexer"
 msgstr "Индексатор Newznab / Torznab"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "Далее"
 
@@ -8097,6 +8945,14 @@ msgstr "Ни один из принятых форматов загрузки н
 #: cps/spa_strings.py
 msgid "No approval needed"
 msgstr "Одобрение не требуется"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "В этой загрузке нет доступных книг."
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -8175,8 +9031,8 @@ msgstr "В этой книге совпадений не найдено."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "No matching {items} for \"{query}\"."
-msgstr "В разделе «{items}» нет совпадений по запросу «{query}»."
+msgid "No matching {items} for the selected filters."
+msgstr "Нет подходящих {items} для выбранных фильтров."
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
@@ -8197,6 +9053,10 @@ msgstr "Позиций чтения с этого устройства пока 
 #: cps/spa_strings.py
 msgid "No registered devices."
 msgstr "Нет зарегистрированных устройств."
+
+#: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No saved reading places yet."
@@ -8226,6 +9086,14 @@ msgstr "Не найдено поддерживаемых файлов книг �
 msgid "No tasks running."
 msgstr "Нет запущенных задач."
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "No unread books in this Discover source."
+msgstr "В этом источнике для «Обзора» нет непрочитанных книг."
+
+#: cps/spa_strings.py
+msgid "No uploaded fonts yet."
+msgstr "Пока нет загруженных шрифтов."
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "No valid ISBN found in the scanned text."
 msgstr "В отсканированном тексте не найдено действительных ISBN."
@@ -8233,6 +9101,10 @@ msgstr "В отсканированном тексте не найдено де�
 #: cps/spa_strings.py
 msgid "No values in this column yet"
 msgstr "В этом столбце пока нет значений"
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8293,6 +9165,10 @@ msgid "Notes"
 msgstr "Заметки"
 
 #: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
@@ -8342,6 +9218,10 @@ msgstr "Нумерованный список"
 msgid "OPDS catalog"
 msgstr "Каталог OPDS"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "Шаблон имени файла для загрузки через OPDS"
+
 #: cps/spa_strings.py
 msgid ""
 "Off by default. Nothing is fetched and no permission changes until you turn "
@@ -8349,6 +9229,13 @@ msgid ""
 msgstr ""
 "Отключено по умолчанию. Ничего не загружается, и никакие права не меняются, "
 "пока вы это не включите."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. If "
+"you are the only person sharing a rating for a book, the average is your "
+"score."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8374,6 +9261,10 @@ msgid ""
 msgstr ""
 "На другом устройстве, где вы уже выполнили вход, отсканируйте этот код или "
 "откройте ссылку ниже, чтобы авторизовать это устройство."
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr "На полке"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8404,6 +9295,11 @@ msgstr "На этом устройстве"
 msgid "One column"
 msgstr "Одна колонка"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+"Меняются только подборки в «Обзоре»; книги остаются в вашей библиотеке."
+
 #: cps/spa_strings.py
 msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
@@ -8412,6 +9308,22 @@ msgstr ""
 "Синхронизируются только книги, выбранные ниже. При переключении на этот "
 "режим изначально ничего не выбрано — вы выбираете каждую книгу "
 "самостоятельно."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Only values without sub-values can be deleted. Move or rename it first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8528,6 +9440,10 @@ msgstr "Читалки (eReaders) других пользователей:"
 msgid "PDF reader"
 msgstr "PDF-читалка"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "Номер в серии с дополнением нулями:"
+
 #: cps/spa_strings.py
 msgid "Page margins"
 msgstr "Поля страницы"
@@ -8546,7 +9462,7 @@ msgstr "Страница {number}"
 msgid "Page {page} of {pages}"
 msgstr "Страница {page} из {pages}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr "Разбиение на страницы"
 
@@ -8574,6 +9490,23 @@ msgstr "Пароль"
 #: cps/spa_strings.py
 msgid "Password (leave blank to keep)"
 msgstr "Пароль (оставьте пустым, чтобы не менять)"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Paste"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Paste at top level"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Paste cancelled."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Paste under {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
@@ -8650,8 +9583,8 @@ msgstr "Название пресета"
 msgid "Preset saved."
 msgstr "Пресет сохранён."
 
-#: cps/spa_strings.py cps/templates/duplicates.html
-#: cps/templates/kobo_reconcile.html
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Предварительный просмотр"
 
@@ -8684,13 +9617,22 @@ msgstr "Предпросмотр {source}. Его сохранённая поз�
 msgid "Previewing…"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "Предыдущий"
 
 #: cps/spa_strings.py
 msgid "Previous page"
 msgstr "Предыдущая страница"
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Private to your account. This does not change the shared Description."
+msgstr "Приватно для вашего аккаунта. Это не изменяет общее описание."
 
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
@@ -8726,10 +9668,6 @@ msgid "Rating"
 msgstr "Рейтинг"
 
 #: cps/spa_strings.py
-msgid "Rating (stars)"
-msgstr "Рейтинг (звёзды)"
-
-#: cps/spa_strings.py
 msgid ""
 "Re-enter the credential when changing the connection to a different server."
 msgstr ""
@@ -8748,8 +9686,19 @@ msgid "Read status filter"
 msgstr "Фильтр по статусу прочтения"
 
 #: cps/spa_strings.py
+msgid "Reader fonts"
+msgstr "Шрифты читалки"
+
+#: cps/spa_strings.py
 msgid "Reader settings saved."
 msgstr "Настройки читалки сохранены."
+
+#: cps/spa_strings.py
+msgid ""
+"Readers using this font return to Book default when they next open a book."
+msgstr ""
+"Читатели, использующие этот шрифт, вернутся к шрифту по умолчанию для книги "
+"при следующем её открытии."
 
 #: cps/spa_strings.py
 msgid "Reading app"
@@ -8778,6 +9727,14 @@ msgstr "Места чтения"
 #: cps/spa_strings.py
 msgid "Reading positions"
 msgstr "Позиции чтения"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Reading status"
+msgstr "Статус прочтения"
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "Статус прочтения обновлён"
 
 #: cps/spa_strings.py
 msgid "Ready to run requests."
@@ -8847,8 +9804,21 @@ msgid "Remember me"
 msgstr "Запомнить меня"
 
 #: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
+msgid "Remove"
+msgstr "Удалить"
+
+#: cps/spa_strings.py
 msgid "Remove device"
 msgstr "Удалить устройство"
+
+#: cps/spa_strings.py
+msgid "Remove font"
+msgstr "Удалить шрифт"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from Currently Reading"
@@ -8887,13 +9857,28 @@ msgid "Remove rule"
 msgstr "Удалить правило"
 
 #: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag \"{tag}\""
 msgstr "Удалить тег «{tag}»"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr "Удалить эти"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8909,13 +9894,36 @@ msgid "Removed from Currently Reading."
 msgstr "Удалено из «Читаю сейчас»."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Rename"
 msgstr "Переименовать"
 
 #: cps/spa_strings.py
+msgid "Rename value"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Rename {name}"
 msgstr "Переименовать {name}"
+
+#: cps/spa_strings.py
+msgid "Rename, merge, delete, move or create values"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed and merged {count} values"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reorder"
@@ -8975,9 +9983,22 @@ msgid "Request release"
 msgstr "Запросить релиз"
 
 #: cps/spa_strings.py
+msgid "Request this book"
+msgstr "Запросить эту книгу"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "Запросить эту книгу: {filename}"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
 msgstr "Запросить {format}"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "Запрошено"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
@@ -8995,6 +10016,11 @@ msgstr "Запрошено. Администратор должен одобри
 #: cps/spa_strings.py
 msgid "Requests are paused"
 msgstr "Запросы приостановлены"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr ""
+"Запросы приостановлены. Вы по-прежнему можете просматривать доступные книги."
 
 #: cps/spa_strings.py
 msgid "Requests cannot run yet:"
@@ -9031,7 +10057,7 @@ msgstr ""
 msgid "Resolved {groups} groups and deleted {deleted} books."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid "Restore"
 msgstr "Восстановить"
 
@@ -9044,6 +10070,11 @@ msgstr ""
 #, python-brace-format
 msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "Восстановлен предыдущий режим библиотеки для аккаунтов: {accounts}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restoring…"
@@ -9081,6 +10112,18 @@ msgstr "Повторная попытка."
 msgid "Reverse-proxy header login"
 msgstr "Вход по заголовку обратного прокси"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review deleted."
+msgstr "Отзыв удалён."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review or note"
+msgstr "Отзыв или заметка"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review saved."
+msgstr "Отзыв сохранён."
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
@@ -9101,6 +10144,14 @@ msgstr "Строк при подгрузке"
 #: cps/spa_strings.py
 msgid "Rule group"
 msgstr "Группа правил"
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -9135,6 +10186,10 @@ msgstr "Та же папка завершённых загрузок внутр�
 msgid "Save"
 msgstr "Сохранить"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Save Discover source"
+msgstr "Сохранить источник для «Обзора»"
+
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "Сохранить как пресет"
@@ -9152,6 +10207,10 @@ msgid "Save for the whole library"
 msgstr "Сохранить для всей библиотеки"
 
 #: cps/spa_strings.py
+msgid "Save ingest folder settings"
+msgstr "Сохранить настройки папки импорта"
+
+#: cps/spa_strings.py
 msgid "Save name"
 msgstr "Сохранить название"
 
@@ -9162,6 +10221,18 @@ msgstr "Сохранить заметку"
 #: cps/spa_strings.py
 msgid "Save preset"
 msgstr "Сохранить пресет"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Save rating"
+msgstr "Сохранить оценку"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Save review"
+msgstr "Сохранить отзыв"
+
+#: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save security settings"
@@ -9174,6 +10245,10 @@ msgstr "Сохранить настройки"
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "Сохраните файл, безопасно извлеките Kobo, затем перезапустите его."
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9224,6 +10299,10 @@ msgid "Search inside book"
 msgstr "Искать внутри книги"
 
 #: cps/spa_strings.py
+msgid "Search library"
+msgstr "Искать в библиотеке"
+
+#: cps/spa_strings.py
 msgid "Search remaining catalogs"
 msgstr "Искать в оставшихся каталогах"
 
@@ -9242,6 +10321,10 @@ msgstr "Искать в этой книге"
 #: cps/spa_strings.py
 msgid "Search this catalog"
 msgstr "Искать в этом каталоге"
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr "Поиск по названию, автору, серии…"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -9463,6 +10546,10 @@ msgstr "Настройки для {name}"
 msgid "Settings saved."
 msgstr "Настройки сохранены."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Share my ratings in the household average"
+msgstr "Поделиться моими оценками в среднем по домохозяйству"
+
 #: cps/spa_strings.py
 msgid "Share with everyone"
 msgstr "Поделиться со всеми"
@@ -9495,7 +10582,13 @@ msgstr "Настройки полки"
 msgid "Shelf visibility saved."
 msgstr "Видимость полки сохранена."
 
-#: cps/spa_strings.py cps/templates/readcbr.html
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Shelf: {name}"
+msgstr "Полка: {name}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#: cps/templates/readcbr.html
 msgid "Show"
 msgstr "Показать"
 
@@ -9541,6 +10634,10 @@ msgstr "Показать сведения об устройстве"
 msgid "Show e-reader previews on each candidate"
 msgstr "Показывать превью для читалки для каждого кандидата"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Show every value again"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Show fewer tags"
 msgstr "Показать меньше тегов"
@@ -9557,21 +10654,30 @@ msgstr "Показывать в моей ленте OPDS"
 msgid "Show less"
 msgstr "Показать меньше"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show library rating"
+msgstr "Показать рейтинг библиотеки"
+
 #: cps/spa_strings.py
 msgid "Show more"
 msgstr "Показать больше"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Show only {name} and its sub-values"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Показать пароль"
 
 #: cps/spa_strings.py
-msgid "Show shelf tags"
-msgstr "Показать теги полки"
-
-#: cps/spa_strings.py
 msgid "Show shelf drag handles"
 msgstr "Показывать ручки для перетаскивания полок"
+
+#: cps/spa_strings.py
+msgid "Show shelf tags"
+msgstr "Показать теги полки"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9583,6 +10689,14 @@ msgstr ""
 "таким, каким вы его оставили — переключитесь обратно в любое время, и он "
 "будет на месте. При следующем обновлении ваша читалка синхронизирует "
 "глобальную библиотеку."
+
+#: cps/spa_strings.py
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr "Показывать оценку Calibre рядом с вашей собственной."
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9616,33 +10730,13 @@ msgstr ""
 "Отображается книг из последней инвентаризации устройства: {shown} из {total}."
 
 #: cps/spa_strings.py
-msgid "Minimum books"
-msgstr "Минимум книг"
-
-#: cps/spa_strings.py
-msgid "Leave blank to show any number of books. The minimum is inclusive."
-msgstr ""
-"Оставьте пустым, чтобы показывать любое количество книг. Минимум "
-"включительно."
-
-#: cps/spa_strings.py
-msgid "Enter a whole number of at least 1."
-msgstr "Введите целое число не менее 1."
-
-#: cps/spa_strings.py
-msgid "Correct the minimum books value to see results."
-msgstr ""
-"Исправьте значение минимального количества книг, чтобы увидеть результаты."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "No matching {items} for the selected filters."
-msgstr "Нет подходящих {items} для выбранных фильтров."
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} {items}."
 msgstr "Отображается {shown} из {total} {items}."
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -9672,6 +10766,10 @@ msgstr "Вход"
 msgid "Signing in…"
 msgstr "Выполняется вход…"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "SimSun"
+msgstr "SimSun"
+
 #: cps/spa_strings.py
 msgid "Site title"
 msgstr "Название сайта"
@@ -9681,12 +10779,31 @@ msgid "Size (pt)"
 msgstr "Размер (pt)"
 
 #: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Smart shelf"
 msgstr "Смарт-полка"
 
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Смарт-полка не найдена."
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Smart shelf: {name}"
+msgstr "Смарт-полка: {name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9715,6 +10832,10 @@ msgstr ""
 "качества"
 
 #: cps/spa_strings.py
+msgid "Something is already there. Move it first."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Something went wrong"
 msgstr "Что-то пошло не так"
 
@@ -9725,6 +10846,10 @@ msgstr "Что-то пошло не так. Попробуйте снова."
 #: cps/spa_strings.py
 msgid "Sort order"
 msgstr "Порядок сортировки"
+
+#: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Source details"
@@ -9756,7 +10881,8 @@ msgstr "Начато чтение"
 msgid "Starting scan…"
 msgstr "Запуск поиска…"
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "Статус"
 
@@ -9842,6 +10968,11 @@ msgid "Sync to e-readers"
 msgstr "Синхронизировать с читалками"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr "TTF, OTF, WOFF или WOFF2, до {n} МБ на файл."
+
+#: cps/spa_strings.py
 msgid "Table view"
 msgstr "Табличный вид"
 
@@ -9921,12 +11052,28 @@ msgstr ""
 "метаданные облака никогда не разрешаются."
 
 #: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "Этот выбор книги устарел. Обновление списка…"
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "Этот выбор книги устарел. Список был обновлён; выберите снова."
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "Эту книгу не удалось запросить. Попробуйте снова."
+
+#: cps/spa_strings.py
 msgid "That catalog no longer exists."
 msgstr "Этот каталог больше не существует."
 
 #: cps/spa_strings.py
 msgid "That choice expired. Refresh the page and pick the file again."
 msgstr "Этот выбор истёк. Обновите страницу и выберите файл снова."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "That name cannot be used"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "That page expired. Go back to the top and try again."
@@ -9957,6 +11104,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "That request is no longer waiting."
 msgstr "Этот запрос больше не находится в ожидании."
+
+#: cps/spa_strings.py
+msgid "That value is already at the bottom of its level."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That value is already at the top of its level."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The Calibre library folder could not be found."
@@ -10002,12 +11157,28 @@ msgstr ""
 "выбранной книги. Книги без них останутся без изменений."
 
 #: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "Доступные книги не удалось загрузить. Попробуйте снова."
+
+#: cps/spa_strings.py
 msgid "The background scheduler is not running."
 msgstr "Фоновый планировщик не запущен."
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr "Книга всё ещё открывается. Попробуйте снова через мгновение."
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr ""
+"Книга или завершённая загрузка изменилась. Восстановите исходные файлы перед "
+"повторной попыткой."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
@@ -10032,6 +11203,21 @@ msgstr "Не удалось загрузить каталоги."
 
 #: cps/spa_strings.py
 msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr ""
+"Выбор устарел, и доступные книги не удалось обновить. Попробуйте снова."
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr ""
+"Выбранная книга больше не находится в завершённой загрузке. Восстановите её "
+"исходный файл перед повторной попыткой."
+
+#: cps/spa_strings.py
+msgid ""
 "The completed download contains multiple books. A single-book release is "
 "required."
 msgstr ""
@@ -10040,6 +11226,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "The completed download contains no usable EPUB or PDF."
 msgstr "Завершённая загрузка не содержит пригодных файлов EPUB или PDF."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -10148,6 +11340,10 @@ msgid "The list of people could not be loaded."
 msgstr "Не удалось загрузить список людей."
 
 #: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "Не удалось изменить пресет. Попробуйте снова."
 
@@ -10175,6 +11371,21 @@ msgstr "Не удалось остановить запрос."
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "The scan reached its limit. More ISBNs may be present in the file."
 msgstr "Сканирование достигло своего предела. В файле могут быть другие ISBN."
+
+#: cps/spa_strings.py
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+"Выбранный столбец недоступен. Выберите другую цель или отключите ярлыки "
+"папок перед импортом."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"The selected values are removed from {count} book(s). The books are kept — "
+"they simply lose the value. There is no undo."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -10263,6 +11474,10 @@ msgid "There are no other accounts on this server yet."
 msgstr "На этом сервере пока нет других аккаунтов."
 
 #: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
 msgstr "Эти результаты не удалось обновить, и они могут быть устаревшими."
 
@@ -10280,6 +11495,17 @@ msgid ""
 msgstr ""
 "Эти настройки не удалось обновить, поэтому отображаемые данные могут быть "
 "устаревшими."
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"These values are folded into {name}. Their books keep a value, but the "
+"values themselves are gone. There is no undo."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html cps/web.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr "Этот источник для «Обзора» недоступен. Выберите другой источник."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -10354,6 +11580,10 @@ msgid ""
 msgstr ""
 "Эта база данных содержит права доступа от старого экспериментального Store. "
 "Их необходимо проверить, прежде чем можно будет включить источники книг."
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
@@ -10462,6 +11692,10 @@ msgid "This release’s download address is not trusted by this connection."
 msgstr ""
 "Адрес загрузки этого релиза не является доверенным для этого подключения."
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "This removes your private review or note for this book."
+msgstr "Это удалит ваш приватный отзыв или заметку к этой книге."
+
 #: cps/spa_strings.py
 msgid ""
 "This request came from a different network than the one you are using. If "
@@ -10474,6 +11708,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
 msgstr "Этот запрос требует повторного одобрения администратором."
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr ""
+"Это правило нельзя редактировать здесь. Оно будет сохранено, пока вы его не "
+"удалите."
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -10493,6 +11733,46 @@ msgid ""
 msgstr ""
 "Этот торрент использует трекер за пределами источников, разрешенных "
 "администратором."
+
+#: cps/spa_strings.py
+msgid "This value has sub-values, so they are renamed too."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will be created at the same level as {name}, just below it."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. There is no undo."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick another value to merge into this one"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Tick the value it should go under, then press Paste on that row. The valid "
+"rows are highlighted."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before cutting it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before moving it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to merge the others into it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to paste into it"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -10576,7 +11856,8 @@ msgstr "Доверять заголовку аутентификации"
 msgid "Try My Library"
 msgstr "Попробовать «Мою библиотеку»"
 
-#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+#: cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr "Попробовать снова"
 
@@ -10628,10 +11909,19 @@ msgstr ""
 msgid "Unarchive"
 msgstr "Разархивировать"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+#, python-brace-format
+msgid "Unavailable column: {name}"
+msgstr "Недоступный столбец: {name}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #, python-brace-format
 msgid "Unavailable files: {formats}"
 msgstr "Недоступные файлы: {formats}"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Unavailable source"
+msgstr "Недоступный источник"
 
 #: cps/spa_strings.py
 msgid "Undo"
@@ -10640,6 +11930,10 @@ msgstr "Отменить"
 #: cps/spa_strings.py
 msgid "Undoing…"
 msgstr "Отмена…"
+
+#: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unhide"
@@ -10673,9 +11967,22 @@ msgstr "Разблокируйте обложку, чтобы изменить �
 msgid "Unpin sidebar"
 msgstr "Открепить боковую панель"
 
+#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
+#: cps/web.py
+msgid "Unrated"
+msgstr "Без оценки"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Unseeded books"
 msgstr "Неподготовленные книги"
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "Неподдерживаемое правило"
 
 #: cps/spa_strings.py
 msgid "Untitled"
@@ -10702,6 +12009,14 @@ msgid "Update failed."
 msgstr "Не удалось обновить."
 
 #: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Upload a book"
 msgstr "Загрузить книгу"
 
@@ -10714,6 +12029,22 @@ msgid "Upload books"
 msgstr "Загрузить книги"
 
 #: cps/spa_strings.py
+msgid "Upload font"
+msgstr "Загрузить шрифт"
+
+#: cps/spa_strings.py
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font choices "
+"stay available."
+msgstr ""
+"Загрузите шрифты один раз для всех пользователей читалок EPUB. Существующие "
+"варианты шрифтов останутся доступными."
+
+#: cps/spa_strings.py
+msgid "Uploaded reader fonts"
+msgstr "Загруженные шрифты читалки"
+
+#: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "Загрузка недоступна для вашего аккаунта на этом сервере."
 
@@ -10721,6 +12052,10 @@ msgstr "Загрузка недоступна для вашего аккаунт
 #, python-brace-format
 msgid "Use ISBN {isbn}"
 msgstr "Использовать ISBN {isbn}"
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10750,6 +12085,12 @@ msgstr "Использовать эту обложку"
 #: cps/spa_strings.py
 msgid "Use this design"
 msgstr "Использовать этот дизайн"
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Use {series:|(|) }{title} to omit the series prefix when no series is set."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
@@ -10799,6 +12140,14 @@ msgstr ""
 msgid "Using the image behind that Google link"
 msgstr "Использование изображения по этой ссылке Google"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Value not found"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Versions"
 msgstr "Версии"
@@ -10837,8 +12186,20 @@ msgid "Waiting for approval"
 msgstr "Ожидание одобрения"
 
 #: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
 msgstr "Ожидаем вашей авторизации…"
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "Ожидание выбора книги"
 
 #: cps/spa_strings.py
 msgid ""
@@ -10928,6 +12289,10 @@ msgstr "Написать заметку"
 msgid "Write a note…"
 msgstr "Написать заметку…"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Write subfolder names to"
+msgstr "Записывать имена вложенных папок в"
+
 #: cps/spa_strings.py
 msgid "You are not allowed to edit this shelf"
 msgstr "Вам не разрешено редактировать эту полку"
@@ -11011,6 +12376,22 @@ msgstr ""
 msgid "Your personal digital library"
 msgstr "Ваша личная цифровая библиотека"
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating"
+msgstr "Ваша оценка"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating saved."
+msgstr "Ваша оценка сохранена."
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, highest first"
+msgstr "Ваша оценка, сначала высокие"
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, lowest first"
+msgstr "Ваша оценка, сначала низкие"
+
 #: cps/spa_strings.py
 msgid "Your requests"
 msgstr "Ваши запросы"
@@ -11019,11 +12400,21 @@ msgstr "Ваши запросы"
 msgid "Your requests could not be loaded. They have not been lost."
 msgstr "Не удалось загрузить ваши запросы. Они не потеряны."
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Your review"
+msgstr "Ваш отзыв"
+
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 "Отображается сохранённый адрес вашей читалки — измените его только для этой "
 "отправки."
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid ""
+"Your score does not change the Calibre library rating. Sharing is off unless "
+"you opt in in your account."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "all rules"
@@ -11062,9 +12453,17 @@ msgstr "читалка"
 msgid "e.g. Unread sci-fi"
 msgstr "напр., Непрочитанная научная фантастика"
 
+#: cps/spa_strings.py cps/templates/email_edit.html
+msgid "eReader attachment filename template"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "eReader email subject"
 msgstr "Тема письма для читалки"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "has sub-values"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "just now"
@@ -11116,13 +12515,10 @@ msgstr "Каталогов ещё не проверено: {count}."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{count} column"
-msgstr "Колонок: {count}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr "Колонок: {count}"
+msgid ""
+"{count} existing value(s) will be merged into this one. You will be asked to "
+"confirm."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11144,6 +12540,11 @@ msgstr "{count} файлов поставлено в очередь на имп�
 msgid "{count} files rejected"
 msgstr "{count} файлов отклонено"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} levels"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} matches"
@@ -11164,6 +12565,11 @@ msgstr "{count} результатов"
 msgid "{count} results for \"{query}\""
 msgstr "Результатов для «{query}»: {count}"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} value(s) hidden by the filters above"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{deleted} books in {groups} groups would be deleted."
@@ -11173,6 +12579,12 @@ msgstr ""
 #, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} из {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr ""
+"Не удалось добавить книг: {failed} из {total}. Они остаются выбранными."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11188,6 +12600,21 @@ msgstr "{free} свободно из {total}"
 #, python-brace-format
 msgid "{name} hex value"
 msgstr "Hex-значение {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} is ready to paste. Choose where it should go."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved down one place."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved up one place."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11242,6 +12669,21 @@ msgstr "{n} назначено устройству {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr "Добавлено книг на полку {shelf}: {n}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "Книг в последней инвентаризации: {n}"
 
@@ -11267,6 +12709,16 @@ msgstr "{n} выделений и заметок"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} of {max} characters"
+msgstr "Символов: {n} из {max}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
 msgstr "{ok} из {total} назначено устройству {name}."
 
@@ -11282,17 +12734,38 @@ msgstr "{percent}% прочитано"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{rating} out of 5"
+msgstr "{rating} из 5"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{seeded} of {total} books seeded"
 msgstr "Подготовлено книг: {seeded} из {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} байт"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+"Добавлено на полку {shelf}: {succeeded}; с ошибкой: {failed}. Книги с "
+"ошибкой остаются выбранными для повторной попытки."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
-msgid "…and {count} more groups"
+msgid ""
+"“{name}” has sub-values, so it cannot be merged away. Move or rename it "
+"instead."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11310,44 +12783,6 @@ msgstr "← Вернуться ко входу"
 #: cps/spa_strings.py
 msgid "← Library"
 msgstr "← Библиотека"
-
-#: cps/spa_strings.py
-msgid "Add books"
-msgstr "Добавить книги"
-
-#: cps/spa_strings.py
-msgid "Add books to shelf"
-msgstr "Добавить книги на полку"
-
-#: cps/spa_strings.py
-msgid "Add selected"
-msgstr "Добавить выбранное"
-
-#: cps/spa_strings.py
-msgid "Could not add the selected books. Please try again."
-msgstr "Не удалось добавить выбранные книги. Пожалуйста, попробуйте снова."
-
-#: cps/spa_strings.py
-msgid "Could not load books."
-msgstr "Не удалось загрузить книги."
-
-#: cps/spa_strings.py
-msgid "On shelf"
-msgstr "На полке"
-
-#: cps/spa_strings.py
-msgid "Search library"
-msgstr "Искать в библиотеке"
-
-#: cps/spa_strings.py
-msgid "Search title, author, series…"
-msgstr "Поиск по названию, автору, серии…"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{failed} of {total} books could not be added. They remain selected."
-msgstr ""
-"Не удалось добавить книг: {failed} из {total}. Они остаются выбранными."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Password requirements:"
@@ -11388,144 +12823,8 @@ msgid "including {rules}"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"New accounts sync only selected shelves. If no books arrive, add books to a "
-"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
-"library."
-msgstr ""
-"Новые аккаунты синхронизируют только выбранные полки. Если книги не "
-"появляются, добавьте их на полку и включите для неё отметку синхронизации с "
-"читалкой. Снимите этот флажок, чтобы синхронизировать всю библиотеку."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Действия для {title}"
-
-#: cps/spa_strings.py
-msgid "Could not update this book. Try again."
-msgstr "Не удалось обновить эту книгу. Попробуйте снова."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Избранное"
-
-#: cps/spa_strings.py
-msgid ""
-"Choose fonts you are allowed to share with this server’s readers. Files stay "
-"in the configuration volume across upgrades."
-msgstr ""
-"Выберите шрифты, которыми вам разрешено делиться с читателями этого сервера. "
-"Файлы сохраняются в томе конфигурации при обновлениях."
-
-#: cps/spa_strings.py
-msgid "Could not load reader fonts."
-msgstr "Не удалось загрузить шрифты читалки."
-
-#: cps/spa_strings.py
-msgid "Could not remove font."
-msgstr "Не удалось удалить шрифт."
-
-#: cps/spa_strings.py
-msgid "Could not upload font."
-msgstr "Не удалось загрузить шрифт."
-
-#: cps/spa_strings.py
-msgid "Display name (optional)"
-msgstr "Отображаемое имя (необязательно)"
-
-#: cps/spa_strings.py
-msgid "Font file"
-msgstr "Файл шрифта"
-
-#: cps/spa_strings.py
-msgid "Font file is too large."
-msgstr "Файл шрифта слишком большой."
-
-#: cps/spa_strings.py
-msgid "Font is available in both EPUB readers."
-msgstr "Шрифт доступен в обеих читалках EPUB."
-
-#: cps/spa_strings.py
-msgid "Font removed."
-msgstr "Шрифт удалён."
-
-#: cps/spa_strings.py
-msgid "No uploaded fonts yet."
-msgstr "Пока нет загруженных шрифтов."
-
-#: cps/spa_strings.py
-msgid "Reader fonts"
-msgstr "Шрифты читалки"
-
-#: cps/spa_strings.py
-msgid ""
-"Readers using this font return to Book default when they next open a book."
-msgstr ""
-"Читатели, использующие этот шрифт, вернутся к шрифту по умолчанию для книги "
-"при следующем её открытии."
-
-#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
-#: cps/templates/user_table.html
-msgid "Remove"
-msgstr "Удалить"
-
-#: cps/spa_strings.py
-msgid "Remove font"
-msgstr "Удалить шрифт"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
-msgstr "TTF, OTF, WOFF или WOFF2, до {n} МБ на файл."
-
-#: cps/spa_strings.py
-msgid "Upload font"
-msgstr "Загрузить шрифт"
-
-#: cps/spa_strings.py
-msgid ""
-"Upload fonts once for everyone using the EPUB readers. Existing font choices "
-"stay available."
-msgstr ""
-"Загрузите шрифты один раз для всех пользователей читалок EPUB. Существующие "
-"варианты шрифтов останутся доступными."
-
-#: cps/spa_strings.py
-msgid "Uploaded reader fonts"
-msgstr "Загруженные шрифты читалки"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "Arial"
-msgstr "Arial"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "KaiTi"
-msgstr "KaiTi"
-
-#: cps/spa_strings.py
 msgid "Keep"
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "Microsoft YaHei"
-msgstr "Microsoft YaHei"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "SimSun"
-msgstr "SimSun"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Your review"
-msgstr "Ваш отзыв"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Private to your account. This does not change the shared Description."
-msgstr "Приватно для вашего аккаунта. Это не изменяет общее описание."
-
-#: cps/spa_strings.py
-msgid "Keep your thoughts about this book here."
-msgstr "Сохраняйте свои мысли об этой книге здесь."
 
 #: cps/spa_strings.py
 msgid ""
@@ -11533,547 +12832,26 @@ msgid ""
 "strategy you choose."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review or note"
-msgstr "Отзыв или заметка"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Add a review"
-msgstr "Добавить отзыв"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Edit review"
-msgstr "Редактировать отзыв"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Save review"
-msgstr "Сохранить отзыв"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete review"
-msgstr "Удалить отзыв"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete your review?"
-msgstr "Удалить ваш отзыв?"
-
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {count} duplicate books?"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
-msgid "This removes your private review or note for this book."
-msgstr "Это удалит ваш приватный отзыв или заметку к этой книге."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review saved."
-msgstr "Отзыв сохранён."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review deleted."
-msgstr "Отзыв удалён."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not load your review."
-msgstr "Не удалось загрузить ваш отзыв."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not save review."
-msgstr "Не удалось сохранить отзыв."
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not delete review."
-msgstr "Не удалось удалить отзыв."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} of {max} characters"
-msgstr "Символов: {n} из {max}"
-
-#: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review text exceeds 10000 characters"
 msgstr "Текст отзыва превышает 10000 символов"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Disabled"
-msgstr "Отключено"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Ingest folder labels"
-msgstr "Ярлыки папок импорта"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Add ingest subfolder names to book tags or an existing custom column. "
-"Existing values are kept; files in the ingest root add no labels."
-msgstr ""
-"Добавлять имена вложенных папок импорта в теги книги или существующий "
-"пользовательский столбец. Существующие значения сохраняются; файлы в корне "
-"папки импорта не добавляют ярлыков."
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"For example, ingest/James/scifi adds James by default. Include nested "
-"folders to add scifi too."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Write subfolder names to"
-msgstr "Записывать имена вложенных папок в"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Include nested folders"
-msgstr "Включить вложенные папки"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Custom columns must already exist and use comma-separated text, like tags. "
-"Create them in Calibre desktop first."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-#, python-brace-format
-msgid "Unavailable column: {name}"
-msgstr "Недоступный столбец: {name}"
-
-#: cps/spa_strings.py
-msgid ""
-"The selected column is unavailable. Choose another target or disable folder "
-"labels before importing."
-msgstr ""
-"Выбранный столбец недоступен. Выберите другую цель или отключите ярлыки "
-"папок перед импортом."
-
-#: cps/spa_strings.py
-msgid "Could not load ingest folder settings."
-msgstr "Не удалось загрузить настройки папки импорта."
-
-#: cps/spa_strings.py
-msgid "Could not save ingest folder settings."
-msgstr "Не удалось сохранить настройки папки импорта."
-
-#: cps/spa_strings.py
-msgid "Ingest folder settings saved."
-msgstr "Настройки папки импорта сохранены."
-
-#: cps/spa_strings.py
-msgid "Save ingest folder settings"
-msgstr "Сохранить настройки папки импорта"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Discover source"
-msgstr "Источник для «Обзора»"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Current library"
-msgstr "Текущая библиотека"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Shelf: {name}"
-msgstr "Полка: {name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Smart shelf: {name}"
-msgstr "Смарт-полка: {name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Unavailable source"
-msgstr "Недоступный источник"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Save Discover source"
-msgstr "Сохранить источник для «Обзора»"
-
-#: cps/spa_strings.py
-msgid "Change Discover source"
-msgstr "Изменить источник для «Обзора»"
-
-#: cps/spa_strings.py cps/web.py
-msgid "Discover source saved."
-msgstr "Источник для «Обзора» сохранён."
-
-#: cps/spa_strings.py
-msgid "Could not load Discover sources."
-msgstr "Не удалось загрузить источники для «Обзора»."
-
-#: cps/spa_strings.py cps/web.py
-msgid "Could not save Discover source. Please try again."
-msgstr ""
-"Не удалось сохранить источник для «Обзора». Пожалуйста, попробуйте снова."
-
-#: cps/spa_strings.py cps/templates/index.html cps/web.py
-msgid "This Discover source is unavailable. Choose another source."
-msgstr "Этот источник для «Обзора» недоступен. Выберите другой источник."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "No unread books in this Discover source."
-msgstr "В этом источнике для «Обзора» нет непрочитанных книг."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Only Discover picks change; books remain in your library."
-msgstr ""
-"Меняются только подборки в «Обзоре»; книги остаются в вашей библиотеке."
-
-#: cps/spa_strings.py
-msgid "A few random picks from your Discover source"
-msgstr "Несколько случайных книг из вашего источника «Обзор»"
-
-#: cps/spa_strings.py cps/templates/detail.html
-msgid "Reading status"
-msgstr "Статус прочтения"
-
-#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
-#: cps/templates/search_form.html
-msgid "Finished"
-msgstr "Завершено"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Update status"
 msgstr "Обновить статус"
-
-#: cps/spa_strings.py
-msgid "Reading status updated"
-msgstr "Статус прочтения обновлён"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not update reading status."
 msgstr "Не удалось обновить статус прочтения."
 
 #: cps/spa_strings.py
-msgid "Could not update reading status. Please try again."
-msgstr "Не удалось обновить статус прочтения. Пожалуйста, попробуйте снова."
-
-#: cps/spa_strings.py
-msgid "Did not finish and On hold keep your reading position."
-msgstr "Статусы «Не дочитано» и «Отложено» сохраняют вашу позицию чтения."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Add {title} to a shelf"
-msgstr "Добавить {title} на полку"
-
-#: cps/spa_strings.py
-msgid "Drag to a shelf, or choose a shelf"
-msgstr "Перетащите на полку или выберите полку"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} book(s) added to {shelf}."
-msgstr "Добавлено книг на полку {shelf}: {n}."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
-"for retry."
-msgstr ""
-"Добавлено на полку {shelf}: {succeeded}; с ошибкой: {failed}. Книги с "
-"ошибкой остаются выбранными для повторной попытки."
-
-#: cps/spa_strings.py
-msgid "Could not add books to the shelf. Please try again."
-msgstr "Не удалось добавить книги на полку. Пожалуйста, попробуйте снова."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Example:"
-msgstr "Пример:"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Filename template fields and examples"
-msgstr "Поля шаблона имени файла и примеры"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "First character:"
-msgstr "Первый символ:"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "In KOReader, enable Use server filenames for the OPDS catalog."
-msgstr ""
-"В KOReader включите «Использовать имена файлов сервера» для каталога OPDS."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Leave blank to keep the current title and first-author filename. Do not "
-"include the file extension."
-msgstr ""
-"Оставьте пустым, чтобы сохранить текущее имя файла (название и первый "
-"автор). Не включайте расширение файла."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Missing metadata becomes empty text. Title and series use their sort names. "
-"Slashes become underscores, not folders."
-msgstr ""
-"Отсутствующие метаданные становятся пустым текстом. Для названия и серии "
-"используются их имена для сортировки. Слеши заменяются на подчёркивания, а "
-"не на папки."
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "OPDS download filename template"
-msgstr "Шаблон имени файла для загрузки через OPDS"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Padded series number:"
-msgstr "Номер в серии с дополнением нулями:"
-
-#: cps/spa_strings.py
-msgid "Waiting for you to choose a book"
-msgstr "Ожидание выбора книги"
-
-#: cps/spa_strings.py
-msgid "Book requested. An administrator has to approve it."
-msgstr "Книга запрошена. Администратор должен одобрить это."
-
-#: cps/spa_strings.py
-msgid "Book added to your activity."
-msgstr "Книга добавлена в вашу активность."
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. Refreshing the list…"
-msgstr "Этот выбор книги устарел. Обновление списка…"
-
-#: cps/spa_strings.py
-msgid "Requests are paused. You can still view the available books."
-msgstr ""
-"Запросы приостановлены. Вы по-прежнему можете просматривать доступные книги."
-
-#: cps/spa_strings.py
-msgid "That book could not be requested. Try again."
-msgstr "Эту книгу не удалось запросить. Попробуйте снова."
-
-#: cps/spa_strings.py
-msgid ""
-"The choice was out of date and the available books could not be refreshed. "
-"Try again."
-msgstr ""
-"Выбор устарел, и доступные книги не удалось обновить. Попробуйте снова."
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. The list was refreshed; choose again."
-msgstr "Этот выбор книги устарел. Список был обновлён; выберите снова."
-
-#: cps/spa_strings.py
-msgid "The available books could not be loaded. Try again."
-msgstr "Доступные книги не удалось загрузить. Попробуйте снова."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Found {count} available books."
-msgstr "Найдено доступных книг: {count}."
-
-#: cps/spa_strings.py
-msgid "Choose a book from this download"
-msgstr "Выберите книгу из этой загрузки"
-
-#: cps/spa_strings.py
-msgid "Hide available books"
-msgstr "Скрыть доступные книги"
-
-#: cps/spa_strings.py
-msgid "Choose another book"
-msgstr "Выбрать другую книгу"
-
-#: cps/spa_strings.py
-msgid "Loading available books…"
-msgstr "Загрузка доступных книг…"
-
-#: cps/spa_strings.py
-msgid "No books are available in this download."
-msgstr "В этой загрузке нет доступных книг."
-
-#: cps/spa_strings.py
-msgid "Import this book"
-msgstr "Импортировать эту книгу"
-
-#: cps/spa_strings.py
-msgid "Request this book"
-msgstr "Запросить эту книгу"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Import this book: {filename}"
-msgstr "Импортировать эту книгу: {filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Request this book: {filename}"
-msgstr "Запросить эту книгу: {filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{size} bytes"
-msgstr "{size} байт"
-
-#: cps/spa_strings.py
-msgid "Requested"
-msgstr "Запрошено"
-
-#: cps/spa_strings.py
-msgid ""
-"The chosen book is no longer in the completed download. Restore its original "
-"file before trying again."
-msgstr ""
-"Выбранная книга больше не находится в завершённой загрузке. Восстановите её "
-"исходный файл перед повторной попыткой."
-
-#: cps/spa_strings.py
-msgid ""
-"The book or completed download changed. Restore its original files before "
-"trying again."
-msgstr ""
-"Книга или завершённая загрузка изменилась. Восстановите исходные файлы перед "
-"повторной попыткой."
-
-#: cps/spa_strings.py
-msgid ""
-"The completed download exceeds the safe file limits. Choose a smaller "
-"release."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Unsupported rule"
-msgstr "Неподдерживаемое правило"
-
-#: cps/spa_strings.py
-msgid "This rule cannot be edited here. It will be kept unless you remove it."
-msgstr ""
-"Это правило нельзя редактировать здесь. Оно будет сохранено, пока вы его не "
-"удалите."
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "All tags"
-msgstr "Все теги"
-
-#: cps/spa_strings.py
-msgid "Could not load tags. Please try again."
-msgstr "Не удалось загрузить теги. Попробуйте ещё раз."
-
-#: cps/spa_strings.py
-msgid "Allow completed DRM-free MOBI 6 books"
-msgstr "Разрешить завершённые книги MOBI 6 без DRM"
-
-#: cps/spa_strings.py
-msgid ""
-"Applies only to this download client. The server upload-format setting must "
-"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
-"can be downloaded but cannot be opened in the web reader."
-msgstr ""
-"Применяется только к этому клиенту загрузки. Настройка формата загрузки на "
-"сервере также должна разрешать MOBI. Применяются обычные настройки "
-"конвертации; без конвертации MOBI можно скачать, но нельзя открыть в веб-"
-"читалке."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not load your rating."
-msgstr "Не удалось загрузить вашу оценку."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not save your rating."
-msgstr "Не удалось сохранить вашу оценку."
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Household average"
-msgstr "Средняя оценка по домохозяйству"
-
-#: cps/spa_strings.py cps/templates/detail.html
-#: cps/templates/library_rating.html
-msgid "Library rating"
-msgstr "Рейтинг библиотеки"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid ""
-"Off by default. Only opted-in ratings count, and names are never shown. If "
-"you are the only person sharing a rating for a book, the average is your "
-"score."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Save rating"
-msgstr "Сохранить оценку"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Share my ratings in the household average"
-msgstr "Поделиться моими оценками в среднем по домохозяйству"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Show library rating"
-msgstr "Показать рейтинг библиотеки"
-
-#: cps/spa_strings.py
-msgid "Show the labelled Calibre score alongside your own rating."
-msgstr "Показывать оценку Calibre рядом с вашей собственной."
-
-#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
-#: cps/web.py
-msgid "Unrated"
-msgstr "Без оценки"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating"
-msgstr "Ваша оценка"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating saved."
-msgstr "Ваша оценка сохранена."
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, highest first"
-msgstr "Ваша оценка, сначала высокие"
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, lowest first"
-msgstr "Ваша оценка, сначала низкие"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid ""
-"Your score does not change the Calibre library rating. Sharing is off unless "
-"you opt in in your account."
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{rating} out of 5"
-msgstr "{rating} из 5"
-
-#: cps/spa_strings.py
 msgid "Your rating (stars)"
 msgstr "Ваша оценка (звёзды)"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-msgid "eReader attachment filename template"
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Leave blank to keep the existing filename. Example: {series} #{series_index} "
-"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
-"the file extension is added automatically."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "Choose a tag group to browse books from it and its subtags."
-msgstr ""
-"Выберите группу тегов, чтобы просмотреть книги этой группы и её вложенных "
-"тегов."
-
-#: cps/spa_strings.py
-msgid "Sleep screen"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Sleep screen for {name}"
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set sleep screen"
@@ -12083,103 +12861,73 @@ msgstr ""
 msgid "Replace image"
 msgstr ""
 
-#: cps/spa_strings.py
-msgid "Remove sleep screen"
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"Find books that have a cover.jpg in their folder but are marked as having no "
+"cover, so the cover is never shown."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"A cover that was removed on purpose in the book editor also looks like this. "
+"Select only the books whose cover you want back."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Scan library"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Choose an image"
+msgid "Scanning…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Sleep screen preview for {name}"
+msgid "{count} book(s) have a cover file but are marked as having no cover."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Shown when this device sleeps in KOReader."
+msgid "No books need their cover restored."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "The native Kindle lock screen is unchanged."
+#, python-brace-format
+msgid "{count} cover(s) restored."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Waiting for next sync"
+#, python-brace-format
+msgid "{count} book(s) were skipped because they changed since the scan."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Applied on device"
+msgid "Could not restore covers."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Removal waiting for sync"
+#, python-brace-format
+msgid "{selected} of {count} selected"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Previous settings restored"
+msgid "Books with a cover file but no cover"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Waiting for device details"
+#, python-brace-format
+msgid "Restore the cover of {title}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Restore selected covers"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Update the CWNG plugin"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Update the CWNG plugin on this device, then sync."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Connect this device and use Sync now in KOReader."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "This device cannot show a custom KOReader sleep screen."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Use a JPEG or PNG image up to 10 MiB."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not save sleep screen. Try again."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not apply sleep screen"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"Remove this image? Your previous KOReader sleep-screen settings will return "
-"after the next sync."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Image fit"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Automatic"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Fill the screen"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Show the whole image"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not change image fit. Try again."
+msgid "Select all books"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12205,40 +12953,54 @@ msgstr ""
 msgid "Start My Library empty"
 msgstr ""
 
-#: cps/spa_strings.py
-msgid "Keep this copy"
-msgstr ""
+# Book-edit custom-column value picker (#2434).
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Apply selection"
+msgstr "Применить выбор"
 
 #: cps/spa_strings.py
-msgid "Merge this copy"
-msgstr ""
+msgid "Choose from stored values"
+msgstr "Выбрать из сохранённых значений"
 
-#: cps/spa_strings.py
-msgid "Merge into the kept copy"
-msgstr ""
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing hierarchy"
+msgstr "Выбрать из существующей иерархии"
 
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
-"copy is deleted."
-msgstr ""
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing values"
+msgstr "Выбрать из существующих значений"
 
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
-"those copies are deleted."
-msgstr ""
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Could not load the values for this column."
+msgstr "Не удалось загрузить значения этого столбца."
 
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Merged into “{title}”."
-msgstr ""
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Enter one value without commas."
+msgstr "Введите одно значение без запятых."
 
-#: cps/spa_strings.py
-msgid "Could not merge these books."
-msgstr ""
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Loading values..."
+msgstr "Загрузка значений..."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values match the filter."
+msgstr "Нет значений, соответствующих фильтру."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values stored for this column yet. Add one below."
+msgstr "В этом столбце пока нет значений. Добавьте значение ниже."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values"
+msgstr "Поиск или фильтрация значений"
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values..."
+msgstr "Поиск или фильтрация значений..."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "e.g. Category.SubCategory.Item"
+msgstr "например, Категория.Подкатегория.Элемент"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12694,6 +13456,169 @@ msgstr "Неверный ID книги."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "Тег не удалось удалить"
+
+#: cps/api/cc_values.py
+msgid "Name cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Value cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "One of the selected values no longer exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Delete those instead."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Move or rename it instead of merging."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into one of its sub-values"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value cannot be changed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a node to rename"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node name cannot contain a comma"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. Continue?"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value name is already in use"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be renamed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to move"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a direction to move it"
+msgstr ""
+
+#: cps/api/cc_values.py cps/templates/cc_value_editor.html
+msgid "The values for this column could not be loaded."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "That value is already at the {end} of its level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "top"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "bottom"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be moved"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose the value to merge into"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be merged"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be deleted"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "This column is a flat list; values cannot be moved."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose where to move it"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "Moving there would merge {count} value(s). Move them one at a time."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value with that name is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Name the value to create"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to place the new one after"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid ""
+"A new value can only be placed beside the one it was created from, not in a "
+"different level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value already exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be created"
+msgstr ""
 
 #: cps/api/magicshelves.py
 msgid "You are not allowed to view this shelf"
@@ -13734,7 +14659,7 @@ msgstr "Результатов не найдено! Попробуйте дру�
 msgid "This Field is Required"
 msgstr "Это поле обязательно"
 
-#: cps/templates/book_table.html
+#: cps/templates/book_table.html cps/templates/cover_flag_repair.html
 msgid "Select all"
 msgstr "Выбрать всё"
 
@@ -13951,6 +14876,56 @@ msgstr "Развернуть всё"
 #: cps/templates/cc_list.html
 msgid "Collapse all"
 msgstr "Свернуть всё"
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"{name} is ready to paste. Tick the value it should go under, then press "
+"Paste on that row."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "New name for {name}"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "New value. Use dots for a hierarchy, e.g. Arts.Mystery."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"New value, placed just below {name}. Same level, so the name cannot contain "
+"a dot."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "This will merge into existing value(s). There is no undo. Continue?"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"Remove {name}? The books are kept — they simply lose the value. There is no "
+"undo."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"Renaming renames everything below the value. To move one, tick it and press "
+"Cut, then tick the value it should go under and press Paste."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"To merge, tick two or more values, then use Merge on the one that should "
+"survive."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "Number of books"
+msgstr ""
 
 #: cps/templates/config_db.html
 msgid "Troubleshooting your DB"
@@ -15279,9 +16254,32 @@ msgstr ""
 "Регулярное выражение (regex) для скрытия пользовательских столбцов в "
 "интерфейсе."
 
+#: cps/templates/config_view_edit.html
+msgid "Magic Shelves"
+msgstr "Умные полки"
+
 #: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
 msgid "Sort by"
 msgstr "Сортировать по"
+
+#: cps/templates/config_view_edit.html
+msgid "Custom column hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Automatic follows the hierarchy preference in Calibre. Older libraries "
+"without that preference infer the hierarchy from their values. Choose an "
+"explicit mode to override it for this website."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Always a hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Never a hierarchy"
+msgstr ""
 
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
@@ -15479,6 +16477,30 @@ msgstr "Добавить разрешённые/запрещённые теги"
 msgid "Add Allowed/Denied custom column values"
 msgstr "Добавить разрешённые/запрещённые значения пользовательских столбцов"
 
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d covers were restored."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books were skipped because they changed since the scan."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books have a cover file but are marked as having no cover."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "Restore the cover of %(title)s"
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+msgid "Restore the covers of the selected books?"
+msgstr ""
+
 #: cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -15535,6 +16557,14 @@ msgstr "Заменить обложку этим вариантом?"
 #: cps/templates/cover_picker.html
 msgid "Rendering e-reader previews:"
 msgstr "Создание превью для e-reader:"
+
+#: cps/templates/custom_column_modal.html
+msgid "Select values"
+msgstr "Выбрать значения"
+
+#: cps/templates/custom_column_modal.html
+msgid "Add a new value"
+msgstr "Добавить новое значение"
 
 #: cps/templates/cwa_api_stats.html
 msgid "API Usage Analytics"
@@ -18106,6 +19136,61 @@ msgstr "Токен Kobo:"
 msgid "List"
 msgstr "Список"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "Действия"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr ""
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Проверка совпадений Hardcover 🔖"
@@ -19321,10 +20406,6 @@ msgid "Run Time"
 msgstr "Время выполнения"
 
 #: cps/templates/tasks.html
-msgid "Actions"
-msgstr "Действия"
-
-#: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"
 msgstr "Предстоящие запланированные отправки"
 
@@ -20006,6 +21087,27 @@ msgstr "Показывать выбранные полки в OPDS"
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
 
+#~ msgid "A few random picks from your library"
+#~ msgstr "Несколько случайных книг из вашей библиотеки"
+
+#~ msgid "Categories"
+#~ msgstr "Категории"
+
+#, python-brace-format
+#~ msgid "No matching {items} for \"{query}\"."
+#~ msgstr "В разделе «{items}» нет совпадений по запросу «{query}»."
+
+#~ msgid "Rating (stars)"
+#~ msgstr "Рейтинг (звёзды)"
+
+#, python-brace-format
+#~ msgid "{count} column"
+#~ msgstr "Колонок: {count}"
+
+#, python-brace-format
+#~ msgid "{count} columns"
+#~ msgstr "Колонок: {count}"
+
 #~ msgid ""
 #~ "When enabled, fetched metadata will only replace existing data if it "
 #~ "appears to be better quality (e.g., longer descriptions, higher "
@@ -20055,9 +21157,6 @@ msgstr "Показать раздел прочитанного/непрочит�
 
 #~ msgid "This category does not exist in SABnzbd."
 #~ msgstr "Эта категория не существует в SABnzbd."
-
-#~ msgid "Magic Shelves"
-#~ msgstr "Умные полки"
 
 #~ msgid "Books organized in magic shelves"
 #~ msgstr "Книги, расставленные на умных полках"

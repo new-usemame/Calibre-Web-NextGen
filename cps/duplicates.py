@@ -251,16 +251,16 @@ def select_book_to_keep(books, strategy):
         return None
     
     if strategy == 'newest':
-        # Keep the most recently added book
-        return max(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MIN))
+        # Keep the most recently added book; on an exact tie the higher id (added later) wins
+        return max(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MIN), b.id))
 
     elif strategy == 'oldest':
-        # Keep the earliest added book
-        return min(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MAX))
+        # Keep the earliest added book; on an exact tie the lower id (added first) wins
+        return min(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MAX), b.id))
 
     elif strategy == 'merge':
-        # Merge into the newest book by default
-        return max(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MIN))
+        # Merge into the newest book by default (same tie-break as 'newest')
+        return max(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MIN), b.id))
     
     elif strategy == 'highest_quality_format':
         # Get format priority from settings

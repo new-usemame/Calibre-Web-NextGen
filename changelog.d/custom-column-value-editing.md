@@ -1,0 +1,4 @@
+### Added
+
+- **Edit custom column values in both interfaces.** Rename, merge, delete, move, create and reorder tag-like custom column values in the Classic interface and the New UI. Renaming or moving a branch carries its books and sub-values; merges require confirmation, and deleting a value keeps its books. Curated sibling order survives renames, including implicit parent categories. Enumeration columns keep Calibre's allowed values. Thanks to @Rol3333. (#2600)
+- **Choose how a custom column is displayed.** UI Configuration now offers Automatic, Always a hierarchy and Never a hierarchy for each browsable column. Automatic follows Calibre's hierarchy preference, with value-based detection for older libraries. The explicit modes apply consistently to the sidebar, book details, Classic, New UI and OPDS. Thanks to @Rol3333. (#2600)

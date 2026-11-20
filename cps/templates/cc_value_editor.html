@@ -1,0 +1,176 @@
+{# Custom-column VALUE editor for the classic interface.
+
+   Renders IN PLACE on /custom_column/<id>, the same way the new interface's
+   "Edit values" replaces the browse view rather than opening anything over
+   it. A modal was tried first and was wrong on both counts the users noticed:
+   it covered the tree it was editing, and it was a small box in the middle of
+   a screen that had plenty of room.
+
+   The panel is server-rendered from `edit_rows` (see web.py::cc_value_edit_rows),
+   which already carries each node's `available` flags — computed by the same
+   hierarchy.node_availability the JSON tree publishes. So this partial holds
+   no rules: whether a value may be deleted or used as a merge source is
+   decided once, in hierarchy.py, and read here and by the SPA alike.
+
+   cc_value_editor.js only adds the two things the server cannot precompute,
+   because both depend on what the user has selected right now: which rows may
+   receive the cut value, and which rows may host a merge. Those are the only
+   client-side rules, and the script names the server-side rule it mirrors.
+
+   Gated on `may_edit_values`, which is current_user.role_edit() — the same
+   permission every value-write endpoint enforces. #}
+<section id="ccValuesEditor" class="cc-values-editor" hidden
+         data-col-id="{{ col_id }}"
+         data-hierarchical="{{ '1' if hierarchical|default(true) else '0' }}"
+         aria-label="{{ _('Edit values') }}"
+         data-strings='{{ {
+            "rename": _("Rename"),
+            "renameValue": _("Rename {name}"),
+            "cut": _("Cut"),
+            "cutValue": _("Cut {name}"),
+            "paste": _("Paste"),
+            "pasteUnder": _("Paste under {name}"),
+        "moveUp": _("Move up"),
+        "moveDown": _("Move down"),
+        "moveUpValue": _("Move {name} up one place"),
+        "moveDownValue": _("Move {name} down one place"),
+        "tickToMove": _("Tick this value before moving it"),
+        "alreadyAtTop": _("Already first at this level"),
+        "alreadyAtBottom": _("Already last at this level"),
+            "merge": _("Merge"),
+            "mergeInto": _("Merge into {name}"),
+            "mergeSelectedInto": _("Merge the selected values into {name}"),
+            "delete": _("Delete"),
+            "deleteValue": _("Delete {name}"),
+            "hasSubValues": _("has sub-values"),
+            "tickToCut": _("Tick this value before cutting it"),
+            "tickToPaste": _("Tick this value to paste into it"),
+            "cutFirst": _("Cut a value first, then choose where it should go"),
+            "intoItself": _("A value cannot be pasted into itself"),
+            "intoOwnSub": _("A value cannot be pasted into one of its own sub-values"),
+            "tickToMerge": _("Tick this value to merge the others into it"),
+            "tickAnother": _("Tick another value to merge into this one"),
+            "sourceHasChildren": _("“{name}” has sub-values, so it cannot be merged away. Move or rename it instead."),
+            "deleteNeedsLeaf": _("Only values without sub-values can be deleted. Move or rename it first."),
+            "editValues": _("Edit values"),
+            "done": _("Done"),
+            "readyToPaste": _("{name} is ready to paste. Tick the value it should go under, then press Paste on that row."),
+            "renamePrompt": _("New name for {name}"),
+            "createPrompt": _("New value. Use dots for a hierarchy, e.g. Arts.Mystery."),
+        "createBesidePrompt": _("New value, placed just below {name}. Same level, so the name cannot contain a dot."),
+        "besideNoDot": _("A value created beside another stays on the same level, so its name cannot contain a dot. Use the Create new button for a sub-value."),
+        "allLevels": _("All levels"),
+        "oneLevel": _("1 level"),
+        "manyLevels": _("{count} levels"),
+        "hiddenByNarrowing": _("{count} value(s) hidden by the filters above"),
+            "renameMergeConfirm": _("This will merge into existing value(s). There is no undo. Continue?"),
+            "mergeConfirm": _("These values are folded into {name}. Their books keep a value, but the values themselves are gone. There is no undo."),
+            "deleteConfirm": _("Remove {name}? The books are kept — they simply lose the value. There is no undo."),
+            "nameInUse": _("That name cannot be used"),
+            "notAllowed": _("You are not allowed to edit metadata"),
+            "notFound": _("Value not found"),
+            "signIn": _("You must be signed in"),
+            "loadFailed": _("The values for this column could not be loaded."),
+            "hintHier": _("Renaming renames everything below the value. To move one, tick it and press Cut, then tick the value it should go under and press Paste."),
+            "hintFlat": _("To merge, tick two or more values, then use Merge on the one that should survive.")
+         }|tojson }}'>
+
+  {# Every failure lands HERE, at the top of the panel. Rendered below the
+     value list it was off-screen on a real column, so a refused action read
+     as "nothing happened" — the original symptom of this feature's bug. #}
+  <div id="ccValuesError" class="alert alert-danger" role="alert" hidden></div>
+  <div id="ccValuesBanner" class="alert alert-info" role="status" hidden></div>
+
+  <p class="hierarchy-hint" id="ccValuesHint">
+    {{ _('Renaming renames everything below the value. To move one, tick it and press Cut, then tick the value it should go under and press Paste.') if hierarchical|default(true) else _('To merge, tick two or more values, then use Merge on the one that should survive.') }}
+  </p>
+
+  {# Narrowing controls. A column of several thousand values is unusable
+     unfiltered, and the fix is a VIEW filter rather than paging: every row is
+     already in the page, so this is client-side and costs no round trip --
+     the same reasoning as server-rendering the rows in the first place.
+     Built here rather than server-side because the options depend on the
+     deepest level actually present, which the script reads off data-depth. #}
+  <div class="cc-values-controls" id="ccValuesControls">
+    <label class="cc-values-depth-label" for="ccValuesDepth">{{ _('Show') }}</label>
+    <select id="ccValuesDepth" class="form-control input-sm cc-values-depth"
+            aria-label="{{ _('How many levels of values to show') }}">
+      <option value="0">{{ _('All levels') }}</option>
+    </select>
+    <span class="cc-values-focus" id="ccValuesFocus" hidden>
+      <span class="cc-values-focus-text" id="ccValuesFocusText"></span>
+      <button type="button" class="btn btn-default btn-xs cc-values-focus-clear"
+              id="ccValuesFocusClear" title="{{ _('Show every value again') }}"
+              aria-label="{{ _('Show every value again') }}">
+        <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+      </button>
+    </span>
+    <span class="cc-values-hidden-note" id="ccValuesHiddenNote" role="status"></span>
+  </div>
+
+  {# How far each level of nesting shifts right, and the gutter a root row keeps.
+     Was 18px/level, which read as a flat list once a column was three or four
+     levels deep -- the nesting was there but invisible. 40px makes the depth
+     obvious at a glance. Mirrored by INDENT_PX in CcValueEditor.tsx; the two must
+     stay equal or the same tree would indent differently per interface. #}
+  {% set indent_px = 40 %}
+  {% set indent_root_px = 6 %}
+  <ul class="list-unstyled cc-values-list">
+    {% for row in edit_rows %}
+      <li class="cc-values-row" data-path="{{ row.path }}"
+          data-depth="{{ row.depth }}"
+          data-can-delete="{{ '1' if row.can_delete else '0' }}"
+          data-can-merge-source="{{ '1' if row.can_merge_source else '0' }}"
+          data-can-move-up="{{ '1' if row.can_move_up else '0' }}"
+          data-can-move-down="{{ '1' if row.can_move_down else '0' }}"
+          data-has-children="{{ '1' if row.has_children else '0' }}">
+        <label class="cc-values-check" style="padding-left: {{ row.depth * indent_px + indent_root_px }}px;">
+          <input type="checkbox" class="cc-values-tick">
+          {# A stored value is arbitrary text an edit-role user typed, so it is
+             escaped here and never interpolated as markup. #}
+          <span class="cc-values-name">{{ row.name }}</span>
+        </label>
+        {# Book count: icon first, then the number. `glyphicon-book` is the
+           only book glyph in the shipped Bootstrap 3 build. The hover title
+           says what the number counts; the chip itself is an indicator, not a
+           control, so it looks like the row buttons but is not clickable. #}
+        <span class="badge cc-values-count" title="{{ _('Number of books') }}">
+          <span class="glyphicon glyphicon-book" aria-hidden="true"></span>
+          {{ row.total_count }}
+        </span>
+        {% if row.has_children %}
+          {# Icon replaces the text; the text survives as the accessible name
+             (aria-label for screen readers, title as the hover tooltip). #}
+          <span class="label label-default cc-values-tag"
+                title="{{ _('has sub-values') }}"
+                aria-label="{{ _('has sub-values') }}">
+            <span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>
+          </span>
+        {% endif %}
+        <span class="cc-values-actions"></span>
+        {# Per-row create, so a new value lands BESIDE the one you clicked
+           rather than at the top of the column. The parent is not in the
+           markup: the row's data-path carries it, and the script derives the
+           level from that -- one source of truth rather than two that can
+           disagree. #}
+        <button type="button" class="btn btn-default btn-xs cc-values-create-under"
+                data-path="{{ row.path }}"
+                title="{{ _('Create a value just below this one') }}"
+                aria-label="{{ _('Create a value just below {name}').format(name=row.name) }}">
+          <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+        </button>
+        {# Narrow to this value and everything under it. Only offered where it
+           would actually narrow something -- a leaf is the only row that
+           cannot. #}
+        {% if row.has_children %}
+        <button type="button" class="btn btn-default btn-xs cc-values-focus-here"
+                data-path="{{ row.path }}" data-name="{{ row.name }}"
+                title="{{ _('Show only {name} and its sub-values').format(name=row.name) }}"
+                aria-label="{{ _('Show only {name} and its sub-values').format(name=row.name) }}">
+          <span class="glyphicon glyphicon-filter" aria-hidden="true"></span>
+        </button>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>

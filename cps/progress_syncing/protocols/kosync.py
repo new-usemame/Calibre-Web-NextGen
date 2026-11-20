@@ -1054,7 +1054,7 @@ def get_progress_record(user_id, document_checksum, book_id,
 
 def record_percentage_only_progress(user_id, book_id, percentage: float,
                                     device: str, device_id=None,
-                                    _return_outcome=False, web_cfi=None):
+                                    _return_outcome=False, web_cfi=None, received_at=None):
     """Publish a percentage-only reading position onto the carrier KOReader reads.
 
     KOReader pulls from ``KOSyncProgress``; until now the only writer was
@@ -1072,12 +1072,16 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
     locator described an earlier position, so handing it back would send the
     device behind where the user actually is.
 
+    ``received_at`` can bind the row to the server receipt of the accepted
+    bookmark that produced it. It does not change furthest-wins arbitration;
+    callers without a bookmark keep the receipt taken here.
+
     Returns True when the row was written. The caller commits.
     """
     if percentage is None or not book_id:
         return False
 
-    now = datetime.now(timezone.utc)
+    now = received_at if received_at is not None else datetime.now(timezone.utc)
 
     outcome = _conditional_kosync_progress(
         user_id=user_id,

@@ -72,6 +72,7 @@ mimetypes.add_type('application/vnd.adobe.adept+xml', '.acsm')
 mimetypes.add_type('application/vnd.readium.lcp.license.v1.0+json', '.lcpl')
 mimetypes.add_type('application/vnd.amazon.ebook', '.kfx')
 mimetypes.add_type('application/zip', '.kfx-zip')
+mimetypes.add_type('application/zip', '.fbz')
 
 log = logger.create()
 
@@ -617,6 +618,20 @@ def create_app(config=None, services=None):
         except Exception as ex:
             log.error("Custom column visibility seed failed: %s", ex)
 
+        # The custom-column sidecar lives in app.db but is reached through
+        # CalibreDB's session, so it needs metadata.db attached -- i.e. after
+        # calibre_db.init_db() above. Creates its tables and reconciles them
+        # against the library. Inert on a fresh install: with no curated order
+        # rows the prune step scans nothing, and is_hierarchy stays NULL, which
+        # means "keep deriving it from the data".
+        try:
+            from . import cc_sidecar
+            cc_sidecar.reconcile()
+        except Exception as ex:
+            # A missing sidecar costs the curated order and nothing else, so this
+            # must never be fatal -- same reasoning as the visibility seed above.
+            log.error("Custom column sidecar reconcile failed: %s", ex)
+
         updater_thread.init_updater(runtime_config, web_server)
     # Perform dry run of updater and exit afterward
     if cli_param.dry_run:
@@ -778,6 +793,12 @@ def create_app(config=None, services=None):
                 # Counts are cached server-side; drop the copy older versions
                 # kept in the session cookie (#2386).
                 session.pop('magic_shelf_counts', None)
+                if calibre_db._desktop_compat:
+                    # Calibre desktop writes the library between requests, so drop
+                    # the counts when metadata.db changed, before they are read.
+                    # Dropping them on every request stalled big libraries (#2862).
+                    magic_shelf.forget_book_counts_if_library_changed(
+                        getattr(calibre_db, "_metadata_db_path", None))
                 for shelf in g.magic_shelves_access:
                     shelf.book_count = magic_shelf.cached_book_count_for_magic_shelf(
                         current_user.id, shelf.id)
@@ -858,9 +879,6 @@ def create_app(config=None, services=None):
                 calibre_db.session.expire_all()
             except Exception as e:
                 log.debug("DESKTOP_COMPAT_MODE: rollback failed, snapshot may be stale: %s", e)
-        # Clear the shelf count cache so sidebar counts stay fresh.
-        from . import magic_shelf
-        magic_shelf.forget_book_counts()
 
     @application.teardown_appcontext
     def shutdown_session(exception=None):

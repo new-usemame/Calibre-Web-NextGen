@@ -25,6 +25,7 @@ from sqlalchemy.sql.expression import func
 
 from . import constants, logger, isoLanguages, gdriveutils, uploader, helper, kobo_sync_status
 from . import user_book_data
+from . import hierarchy
 from .clean_html import clean_string
 from . import config, ub, db, calibre_db
 from .config_sql import uploads_enabled
@@ -88,6 +89,19 @@ def delete_book_from_details(book_id):
 @user_login_required
 def delete_book_ajax(book_id, book_format):
     return delete_book_from_table(book_id, book_format, False, request.form.to_dict().get('location', ""))
+
+
+@editbook.route("/ajax/get_cc_tree/<int:c_id>")
+@user_login_required
+@edit_required
+def get_cc_tree(c_id):
+    """Choices for the custom-column picker on the book-edit page.
+
+    Serves BOTH modes: a hierarchical column gets an indented tree, a flat
+    one a plain list. The response carries the mode explicitly so the client
+    never has to re-detect it.
+    """
+    return jsonify(cc_picker_values(c_id))
 
 
 @editbook.route("/admin/book/<int:book_id>", methods=['GET'])
@@ -249,6 +263,44 @@ def convert_bookformat(book_id):
     return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
 
 
+def cc_picker_values(c_id):
+    """Choices from books this editor may access, independent of browse toggles.
+
+    Keep raw stored spellings for selection. Canonical paths determine only
+    indentation and virtual parents, otherwise Apply would rename old values.
+    """
+    cc = next((column for column in calibre_db.get_cc_columns(
+        config, filter_config_custom_read=False) if column.id == c_id
+        and column.datatype == 'text' and not column.mark_for_delete), None)
+    cc_class = db.cc_classes.get(c_id)
+    if cc is None or cc_class is None:
+        abort(404)
+    rel = getattr(db.Books, 'custom_column_' + str(c_id))
+    try:
+        rows = (calibre_db.session.query(cc_class.value)
+                .select_from(db.Books).join(rel)
+                .filter(calibre_db.common_filters(allow_show_archived=True,
+                                                 allow_show_hidden=True,
+                                                 allow_show_global=True))
+                .distinct().all())
+    except OperationalError:
+        log.error("Failed to read custom column %s values for the edit picker", c_id)
+        abort(503)
+    values = {value for (value,) in rows if value is not None and value.strip()}
+    hierarchical = not calibre_db.is_flat_cc_column(c_id)
+    entries = []
+    if hierarchical:
+        def flatten(nodes, depth):
+            for node in nodes:
+                for value in sorted(node['raw_values'] or {node['path']}, key=str.lower):
+                    entries.append({'value': value, 'depth': depth})
+                flatten(node['children'], depth + 1)
+        flatten(hierarchy.parse_tag_hierarchy(values), 0)
+    else:
+        entries = [{'value': value, 'depth': 0} for value in sorted(values, key=str.lower)]
+    return {'hierarchical': hierarchical, 'is_multiple': bool(cc.is_multiple), 'entries': entries}
+
+
 @editbook.route("/ajax/getcustomenum/<int:c_id>")
 @user_login_required
 def table_get_custom_enum(c_id):
@@ -374,7 +426,7 @@ def edit_selected_books():
                     })
                     continue
 
-            helper.mark_book_modified(book, set_dirty=metadata_changed)
+            helper.mark_book_modified(book, set_dirty=metadata_changed, metadata_only=True)
             try:
                 calibre_db.session.commit()
             except (OperationalError, IntegrityError, StaleDataError) as e:
@@ -439,6 +491,31 @@ def edit_selected_books():
         return json.dumps({'success': True})
     return ""
 
+# Calibre exports FB2 books as "Title.fb2.zip" but names the format "fbz"
+# everywhere else — its input plugins and this project's ingest pipeline both
+# match ".fbz" only. The upload gates read just the last dotted segment, so
+# the double extension used to be rejected as "zip". Normalizing it here
+# keeps validation, the ingest staging name and the format-add gate on one
+# canonical name.
+_FB2_ZIP_SUFFIX = ".fb2.zip"
+
+
+def _normalized_upload_filename(filename):
+    """Map a trailing ".fb2.zip" (any case) to Calibre's canonical ".fbz"."""
+    name = filename or ""
+    if name.lower().endswith(_FB2_ZIP_SUFFIX):
+        return name[:-len(_FB2_ZIP_SUFFIX)] + ".fbz"
+    return name
+
+
+def _uploaded_file_extension(filename):
+    """Last dotted segment after fb2.zip normalization, or None without one."""
+    name = _normalized_upload_filename(filename)
+    if '.' not in name:
+        return None
+    return name.rsplit('.', 1)[-1].lower()
+
+
 # Helper to validate upload according to server settings
 def _validate_uploaded_file(uploaded_file):
     allowed_extensions = config.config_upload_formats.split(',')
@@ -447,8 +524,8 @@ def _validate_uploaded_file(uploaded_file):
             if not validate_mime_type(uploaded_file, allowed_extensions):
                 flash(_("File type isn't allowed to be uploaded to this server"), category="error")
                 return False
-    if '.' in uploaded_file.filename:
-        file_ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
+    file_ext = _uploaded_file_extension(uploaded_file.filename)
+    if file_ext is not None:
         if file_ext not in allowed_extensions and '' not in allowed_extensions:
             flash(_("File extension '%(ext)s' is not allowed to be uploaded to this server",
                     ext=file_ext), category="error")
@@ -468,6 +545,29 @@ def _get_ingest_owner_id(variable):
         return 1000
 
 
+def _safe_upload_basename(filename):
+    """Sanitize an upload's name for the ingest staging file, keeping its extension.
+
+    ``secure_filename()`` transliterates to ASCII and then strips leading and
+    trailing dots, so a name whose stem has no ASCII characters (``龙蛋.epub``,
+    ``файл.epub``) collapses to ``epub`` with no dot.  The ingest service reads
+    the format from the staged name's last suffix, so it rejected and deleted
+    such files after the upload had already been reported as queued (#2701).
+
+    The stem and the last suffix are sanitized separately: the suffix is the
+    same one ``_validate_uploaded_file`` checked, and a stem that sanitizes to
+    nothing becomes ``book``.  The browser-supplied name still reaches ingest
+    unchanged through the sidecar's ``original_filename``.
+    """
+    name = os.path.basename(filename or "")
+    stem, dot, extension = name.rpartition(".")
+    if not dot:
+        return secure_filename(name) or "book"
+    safe_stem = secure_filename(stem) or "book"
+    safe_extension = secure_filename(extension)
+    return f"{safe_stem}.{safe_extension}" if safe_extension else safe_stem
+
+
 def _get_ingest_path(uploaded_file, prefix_parts=None):
     ingest_dir = get_ingest_dir()
     try:
@@ -478,7 +578,8 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
     # Ensure proper ownership of ingest directory (fix for issue #603)
     try:
         nsm = network_share_mode_enabled()
-        if not (nsm and ingest_dir == "/cwa-book-ingest"):
+        # Like cwa-init, a network share is never chowned, wherever it is mounted.
+        if not nsm:
             # Set ownership to abc:abc (uid=1000, gid=1000)
             uid = _get_ingest_owner_id("PUID")
             gid = _get_ingest_owner_id("PGID")
@@ -493,7 +594,11 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
 
     _ensure_ingest_dir_writable(ingest_dir)
 
-    base_name = secure_filename(uploaded_file.filename)
+    # Calibre's ".fb2.zip" export is staged as ".fbz" — the only form the
+    # ingest pipeline's format matching knows (see _FB2_ZIP_SUFFIX).
+    # Normalization runs before the stem/suffix split in
+    # _safe_upload_basename, whose "last suffix" would otherwise be "zip".
+    base_name = _safe_upload_basename(_normalized_upload_filename(uploaded_file.filename))
     # CWA change: use timestamp for more predictable sorting vs uuid
     unique = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     prefix = "_".join([str(p) for p in (prefix_parts or []) if p])
@@ -762,7 +867,7 @@ def edit_book_param(param, vals):
             log_value = vals.get('value', '')
         else:
             return _("Parameter not found"), 400
-        helper.mark_book_modified(book, set_dirty=metadata_changed)
+        helper.mark_book_modified(book, set_dirty=metadata_changed, metadata_only=True)
 
         calibre_db.session.commit()
         # revert change for sort if automatic fields link is deactivated
@@ -873,6 +978,7 @@ def delete_selected_books():
     if vals:
         for book_id in vals:
             delete_book_from_table(book_id, "", True, skip_cache_invalidation=True)
+        _refresh_duplicate_cache_after_delete(vals)
         _queue_duplicate_scan_after_change(vals)
         return json.dumps({'success': True})
     return ""
@@ -953,9 +1059,45 @@ def merge_list_book():
                 # cursor provenance as ordinary metadata edits.
                 helper.mark_book_modified(to_book)
             calibre_db.session.commit()
+            _refresh_duplicate_cache_after_delete([to_book.id] + vals)
             _queue_duplicate_scan_after_change([to_book.id] + vals)
             return json.dumps({'success': True})
     return ""
+
+
+def _invalidate_duplicate_cache():
+    try:
+        from cps.cwa_db_loader import load_cwa_db
+
+        load_cwa_db().CWA_DB().invalidate_duplicate_cache()
+    except Exception as e:
+        log.error("Failed to invalidate duplicate cache after deletion: %s", str(e))
+
+
+def _refresh_duplicate_cache_after_delete(book_ids):
+    """Recompute only the duplicate groups the given books belonged to.
+
+    Rebuilding every group here loaded the whole library's duplicates inside
+    the request, once per deleted book, and blocked the worker on large
+    libraries (#2751). The incremental merge reads each book's group members
+    from its key rows before dropping the rows of books that no longer exist,
+    so a batch must call it once after all its deletes rather than delete key
+    rows book by book. If it fails, the cache is marked stale instead.
+    """
+    try:
+        from cps.duplicate_index import merge_affected_groups_into_cache
+        from cps.cwa_db_loader import load_cwa_db
+
+        merge_affected_groups_into_cache(
+            book_ids, load_cwa_db().CWA_DB().cwa_settings, preserve_pending=True
+        )
+    except Exception as e:
+        log.warning(
+            "Failed to refresh duplicate index/cache after deleting books %s: %s",
+            list(book_ids),
+            str(e),
+        )
+        _invalidate_duplicate_cache()
 
 
 def _queue_duplicate_scan_after_change(book_ids=None):
@@ -1065,7 +1207,8 @@ def do_edit_book(book_id, upload_formats=None):
                 modify_date = True
             modify_date |= edit_book_ratings(to_save, book)
         else:
-            to_save, edit_error = upload_book_formats(upload_formats, book, book_id, book.has_cover)
+            to_save, edit_error, format_written = upload_book_formats(upload_formats, book, book_id, book.has_cover)
+            modify_date |= format_written
 
         cover_upload_success = upload_cover(request, book)
         if cover_upload_success or to_save.get("format_cover"):
@@ -1143,6 +1286,7 @@ def do_edit_book(book_id, upload_formats=None):
         if config.config_kobo_sync and config.hardcover_sync_enabled():
             modify_date |= edit_hardcover_blacklist(book_id, to_save)
 
+        previous_pubdate = book.pubdate
         if to_save.get("pubdate"):
             try:
                 # Accept year-only ("2020") and year-month ("2020-05") in
@@ -1155,10 +1299,14 @@ def do_edit_book(book_id, upload_formats=None):
                 edit_error = True
         else:
             book.pubdate = db.Books.DEFAULT_PUBDATE
+        modify_date |= book.pubdate != previous_pubdate
 
         # Stage 3: Commit all changes to the database.
         if modify_date:
-            helper.mark_book_modified(book)
+            if not upload_formats and cover_stage is None and book.has_cover == previous_cover_metadata[0]:
+                helper.mark_book_modified(book, metadata_only=True)
+            else:
+                helper.mark_book_modified(book)
 
         # Hold the process-shared metadata.db write lock for the
         # duration of the commit. Coordinates with the ingest_processor
@@ -1856,48 +2004,13 @@ def delete_book_from_table(
                             ex,
                         )
 
-            refreshed_duplicate_cache = False
-            if not book_format:
-                try:
-                    from cps.duplicate_index import (
-                        _current_max_book_id,
-                        delete_book_keys,
-                        get_duplicate_groups_from_index,
-                    )
-                    from cps.cwa_db_loader import load_cwa_db
-
-                    CWA_DB = load_cwa_db().CWA_DB
-
-                    delete_book_keys([book_id])
-                    cwa_db = CWA_DB()
-                    duplicate_groups = get_duplicate_groups_from_index(
-                        cwa_db.cwa_settings, include_dismissed=True
-                    )
-                    cwa_db.update_duplicate_cache(
-                        duplicate_groups, len(duplicate_groups), _current_max_book_id()
-                    )
-                    refreshed_duplicate_cache = True
-                except Exception as e:
-                    log.warning(
-                        "Failed to refresh duplicate index/cache after deleting book %s: %s",
-                        book_id,
-                        str(e),
-                    )
-
-            # Skip cache invalidation when batching, or when the indexed refresh
-            # above already handled it; otherwise mark the cache as stale.
-            if not skip_cache_invalidation and not refreshed_duplicate_cache:
-                try:
-                    from cps.cwa_db_loader import load_cwa_db
-
-                    CWA_DB = load_cwa_db().CWA_DB
-                    cwa_db = CWA_DB()
-                    cwa_db.invalidate_duplicate_cache()
-                except Exception as e:
-                    log.error(
-                        "Failed to invalidate duplicate cache after deletion: %s",
-                        str(e),
-                    )
+            # A batching caller (bulk delete, merge) refreshes the duplicate
+            # cache once for its whole selection, so it skips this per-book work.
+            if not skip_cache_invalidation:
+                if book_format:
+                    _invalidate_duplicate_cache()
+                else:
+                    _refresh_duplicate_cache_after_delete([book_id])
 
         except Exception as ex:
             log.error_or_exception(ex)
@@ -1963,6 +2076,25 @@ def render_edit_book(book_id):
         lang.language_name = isoLanguages.get_language_name(get_locale(), lang.lang_code)
 
     book.authors = calibre_db.order_authors([book])
+
+    # Every text custom column gets the picker button, in one of two modes.
+    # The detector is the single source of truth the browse surfaces already
+    # use (get_hierarchical_column_ids), so a column never offers a tree here
+    # while the browse page shows a flat list. Fail CLOSED on an error: an
+    # unknown mode must not silently offer a wrong-shaped list.
+    cc_picker_modes = {}
+    try:
+        hier_ids = calibre_db.get_hierarchical_column_ids()
+        eligible_ids = {column.id for column in calibre_db.get_cc_columns(
+            config, filter_config_custom_read=False) if not column.mark_for_delete}
+        for c in cc:
+            if c.datatype == 'text' and c.id in eligible_ids:
+                cc_picker_modes[c.id] = 'hierarchical' if c.id in hier_ids else 'flat'
+    except Exception as ex:  # noqa: BLE001 - a picker must never break the page
+        log.error("Could not classify custom columns for the edit picker: %s", ex)
+        cc_picker_modes = {}
+    for c in cc:
+        c.cc_picker_mode = cc_picker_modes.get(c.id)
 
     author_names = []
     for authr in book.authors:
@@ -2321,6 +2453,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
     # Check and handle Uploaded file
     to_save = dict()
     error = False
+    format_written = False
     allowed_extensions = config.config_upload_formats.split(',')
     for requested_file in requested_files:
         current_filename = requested_file.filename
@@ -2334,8 +2467,8 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                 flash(_("User has no rights to upload additional file formats"), category="error")
                 error = True
                 continue
-            if '.' in current_filename:
-                file_ext = current_filename.rsplit('.', 1)[-1].lower()
+            file_ext = _uploaded_file_extension(current_filename)
+            if file_ext is not None:
                 if file_ext not in allowed_extensions and '' not in allowed_extensions:
                     flash(_("File extension '%(ext)s' is not allowed to be uploaded to this server", ext=file_ext),
                           category="error")
@@ -2371,6 +2504,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                 flash(_("Failed to store file %(file)s.", file=saved_filename), category="error")
                 error = True
                 continue
+            format_written = True
 
             if file_ext == "kepub":
                 # An uploaded KEPUB never passes through conversion, and the
@@ -2435,7 +2569,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
     #    for lang_code in to_save['languages'].split(','):
     #        langs.append(isoLanguages.get_language_name(get_locale(), lang_code))
     #    to_save['languages'] = ",".join(langs)
-    return to_save, error
+    return to_save, error, format_written
 
 
 def upload_cover(cover_request, book):

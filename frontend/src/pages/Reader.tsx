@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
-  useReadingSources, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
+  useReadingSources, useRecordReaderOpen, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { Button } from '../components/Button';
@@ -113,7 +113,7 @@ interface AnnRow {
   highlighted_text: string | null;
   note_text: string | null;
   highlight_color: string | null;
-  /** 'webreader' | 'kobo' | 'koreader' | 'textquote' | null — shown so a device highlight is
+  /** 'webreader' | 'kobo' | 'koreader' | 'textquote' | 'crosspoint' | null — shown so a device highlight is
    *  identifiable, and because only some origins carry a usable CFI. */
   source: string | null;
   /** Public id of the device that MADE this highlight, or null. Resolved
@@ -331,6 +331,13 @@ export function Reader({ id }: { id: string }) {
   const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
   const { data: fontCatalog, isFetched: isFontsFetched, error: fontsError } = useReaderFonts();
   const saveBookmark = useSaveBookmark(id);
+  // #2750: one open per book, outside lookup mode, so reading here puts the
+  // book on Currently Reading like the classic reader. A guest's 401 is ignored.
+  const { mutate: recordReaderOpen } = useRecordReaderOpen(id);
+  const bookLoaded = Boolean(book);
+  useEffect(() => {
+    if (bookLoaded && !lookupMode) recordReaderOpen();
+  }, [id, bookLoaded, lookupMode, recordReaderOpen]);
   const saveSettings = useSaveReaderSettings();
   const readingSources = useReadingSources(id, placesOpen);
 
@@ -367,6 +374,9 @@ export function Reader({ id }: { id: string }) {
   // data.json on mount so a tapped highlight can show its note without a
   // round-trip, and kept in step with every create/edit/remove.
   const notesRef = useRef<Map<string, string>>(new Map());
+  // True while a composer save is waiting on the server (#2550, #2778).
+  const composerSaveInFlightRef = useRef(false);
+  const [composerSaving, setComposerSaving] = useState(false);
   /* public_id -> label, from the same response as the rows. An OLDER backend
    * omits the envelope entirely, which is how a client can tell; an empty map
    * then means every row is simply unlabelled rather than wrong. */
@@ -479,9 +489,21 @@ export function Reader({ id }: { id: string }) {
   // Every saved highlight for this book, kept in step locally on each write so
   // the drawer never needs a refetch to look right.
   const [annList, setAnnList] = useState<AnnRow[]>([]);
+  // State of the data.json load (#2780). A failed load, one still under way and
+  // a book with no highlights all leave annList empty, and only the last may
+  // say "No highlights yet": someone told that may conclude theirs were lost.
+  const [annLoad, setAnnLoad] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  // Set by the open-book effect once the book is ready; the drawer's retry
+  // calls it. Null before then and after the book closes.
+  const loadAnnotationsRef = useRef<(() => void) | null>(null);
+  // Ids created in this session since the last successful load: the only rows
+  // a load answer that does not list them is allowed to keep.
+  const createdSinceLoadRef = useRef<Set<string>>(new Set());
   const preferredAnnotation = useRef(new Map<string, string>());
   useEffect(() => {
     setAnnList([]);
+    setAnnLoad('loading');
+    createdSinceLoadRef.current = new Set();
     preferredAnnotation.current.clear();
   }, [id]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -514,6 +536,11 @@ export function Reader({ id }: { id: string }) {
   // through this ref: a closure kept the values from when the book opened and
   // put them back at the next chapter (#2254).
   const fontChoices: ReaderFont[] = useMemo(() => fontCatalog?.items ?? BUILTIN_READER_FONTS, [fontCatalog]);
+  // Only an uploaded font needs the catalog before the first page: its
+  // @font-face rule comes from there. A built-in renders without it, so a slow
+  // or failing catalog request (retried with backoff, about 7s on an error)
+  // must not hold the book.
+  const fontsReady = isFontsFetched || BUILTIN_READER_FONTS.some(font => font.id === fontFamily);
   const fontCssFamily = readerFontFamily(fontChoices, fontFamily);
   const fontFaceCss = useMemo(() => readerFontFaceCss(fontChoices, window.location.origin), [fontChoices]);
   const appearanceRef = useRef({ theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread });
@@ -546,6 +573,10 @@ export function Reader({ id }: { id: string }) {
     color: string;
     note: string;
   } | null>(null);
+  // The composer as last rendered, for a save that resolves after the reader
+  // may have closed it or opened another (#2550).
+  const composerRef = useRef(composer);
+  composerRef.current = composer;
 
   const epubFormat = book?.formats.find((f) => f.format.toLowerCase() === 'epub');
   const epubContentUrl = epubFormat
@@ -859,10 +890,12 @@ export function Reader({ id }: { id: string }) {
   // so the just-created highlight is immediately removable (#782).
   // Write a new highlight (optionally carrying a note) and paint it. Takes the
   // selection explicitly rather than reading `pendingSel`, because the note
-  // composer clears that state before it saves.
+  // composer clears that state before it saves. Resolves false when the server
+  // refused the write; the caller tells the reader and keeps what they need to
+  // retry (#2550), so the text selection is only cleared after a stored write.
   const persistHighlight = useCallback(async (
     cfiRange: string, text: string, color: string, note: string,
-  ) => {
+  ): Promise<boolean> => {
     try {
       // The create route answers with the stored row (`_data_json_row`), so the
       // listed row is built from what the SERVER recorded, falling back to what
@@ -878,7 +911,10 @@ export function Reader({ id }: { id: string }) {
       });
       const newId = created?.annotation_id ?? '';
       if (note && newId) notesRef.current.set(newId, note);
-      setAnnList((rows) => [...rows, {
+      // A highlights load that answered after this save may already list
+      // the row (#2780 retry), so replace by id rather than append twice.
+      if (newId) createdSinceLoadRef.current.add(newId);
+      setAnnList((rows) => [...rows.filter((r) => !newId || r.annotation_id !== newId), {
         annotation_id: newId,
         cfi_range: created?.cfi_range ?? cfiRange,
         highlighted_text: created?.highlighted_text ?? text,
@@ -891,18 +927,26 @@ export function Reader({ id }: { id: string }) {
         position_type: created?.position_type ?? 'cfi',
       }]);
       paintHighlight(cfiRange, color, newId, !!note);
-    } catch { /* surfaced as no-op; user can retry */ }
+    } catch {
+      return false;
+    }
     try {
       (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
     } catch { /* noop */ }
+    return true;
   }, [id, paintHighlight]);
 
-  const createHighlight = useCallback((color: string) => {
+  // One-tap colour highlight. On a refused write the selection and its colour
+  // choices come back, so another tap retries the same highlight.
+  const createHighlight = useCallback(async (color: string) => {
     const sel = pendingSel;
     if (!sel) return;
     setPendingSel(null);
-    void persistHighlight(sel.cfiRange, sel.text, color, '');
-  }, [pendingSel, persistHighlight]);
+    if (!await persistHighlight(sel.cfiRange, sel.text, color, '')) {
+      setPendingSel((cur) => cur ?? sel);
+      announce(t('Could not save that highlight.'), { assertive: true });
+    }
+  }, [pendingSel, persistHighlight, announce, t]);
 
   // "Add note" on a fresh selection — hand the selection to the composer, which
   // creates the highlight and its note together on save.
@@ -960,23 +1004,42 @@ export function Reader({ id }: { id: string }) {
 
   // Single write of record for the composer, so Save and Remove note cannot
   // drift apart. Create mode POSTs highlight+note together; edit mode PATCHes
-  // note_text (an empty string clears it). Silent on failure, as everywhere
-  // else in this reader — the server stays the source of truth.
+  // note_text (an empty string clears it), or DELETEs an unanchored row whose
+  // note is removed; standalone POSTs an unanchored note.
+  //
+  // The composer stays open until the server has the change, so a failed save
+  // keeps the typed note (and, for a create, the selection) for a retry that
+  // sends the same request (#2550 create, #2778 edit, removal, standalone).
+  // While a save is in flight a second press is ignored: a repeated create
+  // would store the same note twice.
   const commitNote = useCallback(async (
     c: NonNullable<typeof composer>, rawNote: string,
   ) => {
     const note = rawNote.trim();
-    setComposer(null);
-    if (c.mode === 'standalone') {
-      // An empty standalone note is nothing at all — the backend rejects it, and
-      // silently discarding is kinder than an error for a field the reader
-      // simply left blank.
-      if (!note) return;
-      try {
+    // An empty standalone note is nothing at all: the backend rejects it, and
+    // silently discarding is kinder than an error for a field the reader
+    // simply left blank. An edit with no row id has nothing to write to.
+    if ((c.mode === 'standalone' && !note) || (c.mode === 'edit' && !c.annotationId)) {
+      setComposer(null);
+      return;
+    }
+    if (composerSaveInFlightRef.current) return;
+    composerSaveInFlightRef.current = true;
+    setComposerSaving(true);
+    // What to announce once the server has the change; null when it refused.
+    let saved: string | null = null;
+    try {
+      if (c.mode === 'create') {
+        if (await persistHighlight(c.cfiRange, c.text, c.color, note)) {
+          saved = note ? t('Note saved') : t('Highlight saved');
+        }
+      } else if (c.mode === 'standalone') {
         const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
           position_type: 'unanchored', note_text: note,
         });
-        setAnnList((rows) => [...rows, {
+        if (created?.annotation_id) createdSinceLoadRef.current.add(created.annotation_id);
+        setAnnList((rows) => [...rows.filter((r) => !created?.annotation_id
+          || r.annotation_id !== created.annotation_id), {
           annotation_id: created?.annotation_id ?? '',
           cfi_range: null,
           highlighted_text: null,
@@ -985,33 +1048,40 @@ export function Reader({ id }: { id: string }) {
           source: created?.source ?? 'webreader',
           position_type: created?.position_type ?? 'unanchored',
         }]);
-        announce(t('Note saved'));
-      } catch { announce(t('Could not save that note.'), { assertive: true }); }
-      return;
-    }
-    if (c.mode === 'create') {
-      await persistHighlight(c.cfiRange, c.text, c.color, note);
-      announce(note ? t('Note saved') : t('Highlight saved'));
-      return;
-    }
-    if (!c.annotationId) return;
-    try {
-      if (c.unanchored && !note) {
+        saved = t('Note saved');
+      } else if (c.unanchored && !note) {
         // An unanchored row has no passage to retain after its note is removed.
-        await apiDelete(`/annotations/${id}/${c.annotationId}`);
-        notesRef.current.delete(c.annotationId);
-        setAnnList((rows) => rows.filter((row) => row.annotation_id !== c.annotationId));
-        announce(t('Note removed'));
-        return;
+        const annotationId = c.annotationId!;
+        await apiDelete(`/annotations/${id}/${annotationId}`);
+        notesRef.current.delete(annotationId);
+        setAnnList((rows) => rows.filter((row) => row.annotation_id !== annotationId));
+        saved = t('Note removed');
+      } else {
+        const annotationId = c.annotationId!;
+        await apiPatch(`/annotations/${id}/${annotationId}`, { note_text: note });
+        if (note) notesRef.current.set(annotationId, note);
+        else notesRef.current.delete(annotationId);
+        setAnnList((rows) => rows.map((r) =>
+          r.annotation_id === annotationId ? { ...r, note_text: note || null } : r));
+        repaintHighlight(c.cfiRange, c.color, annotationId, !!note);
+        saved = note ? t('Note saved') : t('Note removed');
       }
-      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note });
-      if (note) notesRef.current.set(c.annotationId, note);
-      else notesRef.current.delete(c.annotationId);
-      setAnnList((rows) => rows.map((r) =>
-        r.annotation_id === c.annotationId ? { ...r, note_text: note || null } : r));
-      repaintHighlight(c.cfiRange, c.color, c.annotationId, !!note);
-      announce(note ? t('Note saved') : t('Note removed'));
-    } catch { /* silent: server keeps the previous note */ }
+    } catch {
+      saved = null;
+    } finally {
+      composerSaveInFlightRef.current = false;
+      setComposerSaving(false);
+    }
+    if (saved === null) {
+      announce(t('Could not save that note.'), { assertive: true });
+      return;
+    }
+    // Close only the composer that made this save: the reader may have
+    // cancelled it and opened another while the request was in flight. Typing
+    // and colour changes are locked while saving, so it is still this object.
+    if (composerRef.current !== c) return;
+    setComposer(null);
+    announce(saved);
   }, [id, persistHighlight, repaintHighlight, announce, t]);
 
   /*
@@ -1117,25 +1187,35 @@ export function Reader({ id }: { id: string }) {
     if (composer) void commitNote(composer, '');
   }, [composer, commitNote]);
 
-  // Remove the tapped highlight server-side, then un-paint it (#782). Fails
-  // silently (the reader has no toast) and leaves the highlight painted on
-  // error — the row is still on the server, so keeping it painted stays honest.
+  // Remove or recolour the tapped highlight (#782). The popover closes while
+  // the request is out; a refusal reopens it on the same highlight and tells
+  // the reader, so another tap retries the same request (#2779). The paint is
+  // only changed once the server has the change, so it keeps matching the
+  // server either way. A reader who has since opened another highlight keeps
+  // that one: the failure is announced, but their popover is not replaced.
+  const reopenRefusedHighlight = useCallback((hl: NonNullable<typeof activeHl>) => {
+    setActiveHl((cur) => cur ?? hl);
+    announce(t('Could not save that highlight.'), { assertive: true });
+  }, [announce, t]);
+
   const removeHighlight = useCallback(async () => {
     const hl = activeHl;
     if (!hl) return;
     setActiveHl(null);
     try {
       await apiDelete(`/annotations/${id}/${hl.id}`);
-      notesRef.current.delete(hl.id);
-      setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
-      try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
-    } catch { /* silent: keep the highlight painted */ }
-  }, [activeHl, id]);
+    } catch {
+      reopenRefusedHighlight(hl);
+      return;
+    }
+    notesRef.current.delete(hl.id);
+    setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
+    try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
+  }, [activeHl, id, reopenRefusedHighlight]);
 
-  // Recolor the tapped highlight (PATCH supports highlight_color). epub.js keys
-  // an annotation by (cfiRange + type), so a new color is applied by removing
-  // the old paint and re-adding with the new fill. Silent on error (old paint
-  // is untouched, server keeps the prior color).
+  // PATCH supports highlight_color. epub.js keys an annotation by (cfiRange +
+  // type), so a new colour is applied by removing the old paint and re-adding
+  // it with the new fill.
   const recolorHighlight = useCallback(async (color: string) => {
     const hl = activeHl;
     if (!hl) return;
@@ -1143,12 +1223,15 @@ export function Reader({ id }: { id: string }) {
     if (hl.color === color) return;
     try {
       await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color });
-      setAnnList((rows) => rows.map((r) =>
-        r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
-      // Recolouring must not silently drop the note marker.
-      repaintHighlight(hl.cfiRange, color, hl.id, !!notesRef.current.get(hl.id));
-    } catch { /* silent: keep the highlight in its original color */ }
-  }, [activeHl, id, repaintHighlight]);
+    } catch {
+      reopenRefusedHighlight(hl);
+      return;
+    }
+    setAnnList((rows) => rows.map((r) =>
+      r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
+    // Recolouring must not silently drop the note marker.
+    repaintHighlight(hl.cfiRange, color, hl.id, !!notesRef.current.get(hl.id));
+  }, [activeHl, id, repaintHighlight, reopenRefusedHighlight]);
 
   useEffect(() => {
     savedCfiRef.current = savedBookmark?.bookmark ?? savedCfiRef.current;
@@ -1637,7 +1720,7 @@ export function Reader({ id }: { id: string }) {
 
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !isFontsFetched || !settingsHydrated) return;
+    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !fontsReady || !settingsHydrated) return;
     let cancelled = false;
     let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
@@ -1759,10 +1842,13 @@ export function Reader({ id }: { id: string }) {
           return epubBook.getRange(cfi);
         });
         if (cancelled) return;
-        // epub.js may emit delayed layout relocations after display resolves.
-        // Treat opening with a synced hint as a preview until a real page turn,
-        // or those layout events would stamp the local CFI newer than the hint.
-        previewingRef.current = !!resume;
+        // Opening a book is not reading it. epub.js reports the first display
+        // and its delayed layout settles as relocations, and saving those
+        // stamps the browser's place with the current time, which then
+        // outranks a Kobo or KOReader that really read further (#324). So
+        // every open is a preview until the reader moves themselves (a page
+        // turn, a link, a chapter); from then on relocations save again.
+        previewingRef.current = true;
         let initialTarget = savedCfiRef.current || undefined;
         if (initialTarget && resume?.mode === 'automatic' && resume.cfi) {
           initialTarget = resume.cfi;
@@ -1832,6 +1918,17 @@ export function Reader({ id }: { id: string }) {
             if (loc?.start?.cfi && epubBook.locations.length()) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
             }
+            // #2783: a place the reader saved before the index existed went out
+            // without a percentage, and the percentage is what the server shares
+            // with their other devices. Save that same place again now that it
+            // has one, or a reader who turned a page in the first seconds and
+            // then stopped would never share where they are.
+            const ownCfi = lastCfiRef.current;
+            if (readerMoved && ownCfi && lastPercentRef.current == null
+                && epubBook.locations.length()) {
+              const pct = epubBook.locations.percentageFromCfi(ownCfi) * 100;
+              if (Number.isFinite(pct) && pct > 0) persistCfi(ownCfi, pct);
+            }
           })
           .catch(() => {
             // Locations are best-effort. Without them the jump cannot happen,
@@ -1880,10 +1977,25 @@ export function Reader({ id }: { id: string }) {
         // Render existing highlights (the CFI-anchored ones we can place). Each
         // row carries its server annotation_id; paintHighlight stashes it in the
         // epub.js data param so a later tap can target the right row (#782).
-        fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
-          .then((r) => (r.ok ? r.json() : null))
+        //
+        // A failed load (non-OK status, network error, unreadable body) is
+        // recorded as failed rather than swallowed, so the drawer can say so and
+        // offer a retry; the book itself keeps working either way (#2780). Each
+        // call supersedes the one before it, so a slow first answer cannot land
+        // on top of a retry's.
+        let annLoadSeq = 0;
+        const loadAnnotations = () => {
+          const seq = ++annLoadSeq;
+          const stale = () => cancelled || seq !== annLoadSeq;
+          setAnnLoad('loading');
+          fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
+          .then((r) => {
+            if (!r.ok) throw new Error(`highlights load answered ${r.status}`);
+            return r.json();
+          })
           .then(async (d) => {
-            if (cancelled || !d) return;
+            if (stale()) return;
+            if (!d || typeof d !== 'object') throw new Error('highlights load returned no data');
             notesRef.current.clear();
             /*
              * Take the rows and the device map from the SAME response, and take
@@ -1903,20 +2015,38 @@ export function Reader({ id }: { id: string }) {
             // the original annotation and preserve its native source anchor.
             const displayRows = sourceRows.map((row) => hasNativeAnchor(row)
               ? { ...row, cfi_range: null } : row);
-            setAnnList(displayRows);
+            // Keep rows made in this session that the answer does not list yet:
+            // a highlight saved while the load had failed, or one whose save is
+            // still landing, must not vanish when a retry answers (#2780).
+            const listed = new Set(displayRows.map((row) => row.annotation_id));
+            const keep = createdSinceLoadRef.current;
+            createdSinceLoadRef.current = new Set();
+            setAnnList((current) => [
+              ...displayRows,
+              ...current.filter((row) => keep.has(row.annotation_id) && !listed.has(row.annotation_id)),
+            ]);
+            setAnnLoad('loaded');
             displayRows.forEach((a) => {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
             });
-            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, () => cancelled);
-            if (cancelled) return;
+            // Mapping KEPUB anchors is best-effort: the rows are already
+            // listed, so a failure here is not a failed load.
+            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, stale)
+              .catch(() => new Map<string, string>());
+            if (stale()) return;
             setAnnList((current) => current.map((row) => {
               const cfi = mapped.get(row.annotation_id);
               if (!cfi) return row;
               return { ...row, cfi_range: cfi };
             }));
           })
-          .catch(() => { /* highlights are best-effort */ });
+          .catch(() => {
+            if (!stale()) setAnnLoad('failed');
+          });
+        };
+        loadAnnotationsRef.current = loadAnnotations;
+        loadAnnotations();
 
         stopSelectionObserver = observeReaderSelections(rendition);
         // Capture a text selection → offer a highlight-color popover.
@@ -1936,6 +2066,8 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      loadAnnotationsRef.current = null;
+      setAnnLoad('loading');
       stopSelectionObserver?.();
       archiveRef.current = null;
       linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
@@ -1962,7 +2094,7 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, isFontsFetched, settingsHydrated]);
+  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, fontsReady, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.
@@ -2344,10 +2476,31 @@ export function Reader({ id }: { id: string }) {
               <StickyNote size={14} aria-hidden="true" focusable={false} />
               {t('Write a note')}
             </button>
+            {/* A failed load is not an empty book (#2780): say it failed and
+                offer the load again, instead of "No highlights yet". */}
+            {annLoad === 'failed' && (
+              <div className={styles.annLoadError} role="alert">
+                <p>{t('Could not load highlights and notes.')}</p>
+                <button
+                  type="button"
+                  className={styles.annRetry}
+                  onClick={() => {
+                    // The button unmounts as the retry starts; keep keyboard
+                    // focus inside the open drawer rather than on <body>.
+                    annRef.current?.focus();
+                    loadAnnotationsRef.current?.();
+                  }}
+                >
+                  {t('Try again')}
+                </button>
+              </div>
+            )}
             {annList.length === 0 ? (
-              <p className={styles.tocEmpty}>
-                {t('No highlights yet. Select text in the book to make one.')}
-              </p>
+              annLoad === 'loaded' && (
+                <p className={styles.tocEmpty}>
+                  {t('No highlights yet. Select text in the book to make one.')}
+                </p>
+              )
             ) : (
               <ul role="list">
                 {annList.map((row, index) => {
@@ -2585,7 +2738,7 @@ export function Reader({ id }: { id: string }) {
           <span className={styles.hiliteLabel}>{t('Highlight')}</span>
           {HILITE_ORDER.map((c) => (
             <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
-              onClick={() => createHighlight(c)} aria-label={colorLabel(c)} title={colorLabel(c)} />
+              onClick={() => { void createHighlight(c); }} aria-label={colorLabel(c)} title={colorLabel(c)} />
           ))}
           <button className={styles.hiliteNote} onClick={startNoteForSelection} title={t('Add note')}>
             <StickyNote size={15} aria-hidden="true" focusable={false} />
@@ -2647,6 +2800,7 @@ export function Reader({ id }: { id: string }) {
             <div className={styles.noteColors} role="group" aria-label={t('Highlight color')}>
               {HILITE_ORDER.map((c) => (
                 <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
+                  disabled={composerSaving}
                   onClick={() => setComposer((s) => (s ? { ...s, color: c } : s))}
                   aria-pressed={composer.color === c} aria-label={colorLabel(c)} title={colorLabel(c)} />
               ))}
@@ -2654,6 +2808,7 @@ export function Reader({ id }: { id: string }) {
           )}
           <textarea ref={noteFieldRef} className={styles.noteInput} rows={3}
             value={composer.note} aria-label={t('Note')} placeholder={t('Write a note…')}
+            readOnly={composerSaving}
             onChange={(e) => setComposer((s) => (s ? { ...s, note: e.target.value } : s))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
@@ -2665,7 +2820,8 @@ export function Reader({ id }: { id: string }) {
                 <span>{t('Remove note')}</span>
               </button>
             )}
-            <Button variant="primary" className={styles.noteSave} onClick={saveNote}>
+            <Button variant="primary" className={styles.noteSave} onClick={saveNote}
+              aria-disabled={composerSaving || undefined} aria-busy={composerSaving || undefined}>
               {t('Save note')}
             </Button>
           </div>

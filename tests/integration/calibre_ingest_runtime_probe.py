@@ -58,7 +58,6 @@ def _processor(module, root: Path, source: Path):
     processor.original_filename = source.name
     processor.last_added_book_id = None
     processor.last_added_book_ids = []
-    processor.last_added_ids_are_fallback = False
     processor.db = _ImportLog()
 
     for directory in (

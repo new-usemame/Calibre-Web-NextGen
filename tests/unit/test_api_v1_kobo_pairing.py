@@ -22,7 +22,7 @@ def _user(*, user_id=1, authenticated=True, anonymous=False, admin=False):
 
 
 def _ub(*, target_exists=True):
-    value = SimpleNamespace(id=1) if target_exists else None
+    value = SimpleNamespace(id=1, role_download=lambda: True) if target_exists else None
     session = MagicMock()
     session.query.return_value.filter.return_value.first.return_value = value
     return SimpleNamespace(
@@ -144,6 +144,7 @@ def test_get_views_existing_state_without_creating():
         response = inspect.unwrap(mod.get_kobo_sync_token)()
     assert _json(response) == {
         "configured": False,
+        "download_allowed": True,
         "is_localhost": False,
         "server_url": "https://books.example.test",
         "sync_url": None,
@@ -276,6 +277,7 @@ def test_device_json_serializes_naive_database_timestamps_as_utc():
         last_seen_at=observed,
         active=True,
         share_place=False,
+        align_percent=False,
     )
     inventory = SimpleNamespace(item_count=2, observed_at=observed)
     storage = SimpleNamespace(free_bytes=1, total_bytes=2, observed_at=observed)

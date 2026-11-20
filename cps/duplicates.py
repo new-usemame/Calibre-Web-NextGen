@@ -58,6 +58,9 @@ _AUTO_RESOLVE_LOCK = threading.Lock()
 
 def duplicate_resolution_root():
     """Directory where destructive duplicate resolution retains originals."""
+    resolver = getattr(constants, "processed_books_dir", None)
+    if callable(resolver):
+        return os.path.join(resolver(), "duplicate_resolutions")
     config_root = getattr(constants, "CONFIG_DIR", None)
     if not config_root:
         configured = (os.environ.get("CALIBRE_DBPATH") or "").strip()
@@ -248,16 +251,16 @@ def select_book_to_keep(books, strategy):
         return None
     
     if strategy == 'newest':
-        # Keep the most recently added book
-        return max(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MIN))
+        # Keep the most recently added book; on an exact tie the higher id (added later) wins
+        return max(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MIN), b.id))
 
     elif strategy == 'oldest':
-        # Keep the earliest added book
-        return min(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MAX))
+        # Keep the earliest added book; on an exact tie the lower id (added first) wins
+        return min(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MAX), b.id))
 
     elif strategy == 'merge':
-        # Merge into the newest book by default
-        return max(books, key=lambda b: _timestamp_or_default(b.timestamp, _AWARE_MIN))
+        # Merge into the newest book by default (same tie-break as 'newest')
+        return max(books, key=lambda b: (_timestamp_or_default(b.timestamp, _AWARE_MIN), b.id))
     
     elif strategy == 'highest_quality_format':
         # Get format priority from settings
@@ -1588,7 +1591,10 @@ def preview_resolution():
     log.info("[cwa-duplicates] Preview resolution endpoint called")
     try:
         from flask import request
-        strategy = request.json.get('strategy', 'newest')
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({'success': False, 'error': _('Invalid resolution request')}), 400
+        strategy = payload.get('strategy', 'newest')
         print(f"[cwa-duplicates] Preview strategy: {strategy}", flush=True)
         log.info("[cwa-duplicates] Preview strategy: %s", strategy)
         
@@ -1634,7 +1640,15 @@ def execute_resolution():
     """Execute auto-resolution"""
     try:
         from flask import request
-        strategy = request.json.get('strategy', 'newest')
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({'success': False, 'error': _('Invalid resolution request')}), 400
+        strategy = payload.get('strategy', 'newest')
+
+        # The SPA submits the complete preview it showed. Classic clients may
+        # omit this field, retaining their existing bulk-resolution behavior.
+        if 'expected_preview' in payload and not isinstance(payload['expected_preview'], list):
+            return jsonify({'success': False, 'error': _('Invalid resolution request')}), 400
         
         if not validate_resolution_strategy(strategy):
             return jsonify({
@@ -1654,7 +1668,8 @@ def execute_resolution():
             dry_run=False,
             user_id=current_user.id,
             trigger_type='manual',
-            duplicate_groups=duplicate_groups
+            duplicate_groups=duplicate_groups,
+            expected_preview=payload.get('expected_preview'),
         )
         
         return jsonify(result)
@@ -1700,7 +1715,59 @@ def _refresh_duplicate_cache_after_resolution(cwa_db):
             log.warning("[cwa-duplicates] Failed to invalidate cache after resolution: %s", str(invalidate_ex))
 
 
-def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trigger_type='manual', duplicate_groups=None):
+def _preview_edition_info(book):
+    """Publisher and publication year of a book, for the resolution preview.
+
+    Duplicate groups match on title/author/language, so two different
+    editions (for example two translations of the same classic) can land in
+    one group. Showing the publisher and year lets an admin spot those before
+    confirming a delete (#1902). Missing or Calibre-default values are None.
+    """
+    publisher = None
+    year = None
+    try:
+        names = [p.name for p in (getattr(book, 'publishers', None) or []) if getattr(p, 'name', None)]
+        publisher = ', '.join(names) or None
+    except Exception:
+        publisher = None
+    try:
+        pubdate = getattr(book, 'pubdate', None)
+        # Calibre stores 0101-01-01 when there is no publication date.
+        if pubdate and pubdate.year > 1000:
+            year = pubdate.year
+    except Exception:
+        year = None
+    return {'publisher': publisher, 'year': year}
+
+
+def _preview_resolution_group(group, book_to_keep, books_to_delete, strategy):
+    """The displayed plan is also the comparison used before a SPA deletion."""
+    kept_formats = list(dict.fromkeys(d.format for d in (book_to_keep.data or []) if d.format))
+    if strategy == 'merge':
+        for book in books_to_delete:
+            for data in book.data or []:
+                if data.format and data.format not in kept_formats:
+                    kept_formats.append(data.format)
+    return {
+        'group_hash': group['group_hash'],
+        'title': group['title'],
+        'author': group['author'],
+        'kept_book_id': book_to_keep.id,
+        'kept_book_timestamp': book_to_keep.timestamp.strftime('%Y-%m-%d %H:%M') if book_to_keep.timestamp else 'Unknown',
+        'kept_book_formats': kept_formats,
+        'kept_book_edition': _preview_edition_info(book_to_keep),
+        'deleted_book_ids': [b.id for b in books_to_delete],
+        'deleted_books_info': [{
+            'id': b.id,
+            'timestamp': b.timestamp.strftime('%Y-%m-%d %H:%M') if b.timestamp else 'Unknown',
+            'formats': [d.format for d in b.data] if b.data else [],
+            **_preview_edition_info(b)
+        } for b in books_to_delete],
+    }
+
+
+def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trigger_type='manual', duplicate_groups=None,
+                            expected_preview=None):
     """
     Automatically resolve duplicate books by keeping one and deleting others.
     
@@ -1710,6 +1777,7 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
         user_id: User ID triggering the resolution (for audit), None for system-initiated
         trigger_type: 'manual', 'scheduled', or 'automatic'
         duplicate_groups: Pre-scanned duplicate groups (avoids re-scanning). If None, will scan.
+        expected_preview: Optional SPA plan. Refuse changed plans before any deletion.
     
     Returns:
         dict with keys:
@@ -1745,7 +1813,7 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
         # Disk space check (strategy-dependent thresholds)
         try:
             import shutil as shutil_disk
-            stat = shutil_disk.disk_usage('/config')
+            stat = shutil_disk.disk_usage(constants.CONFIG_DIR)
             available_gb = stat.free / (1024**3)
             
             # Merge strategy needs more space (copies formats before deletion)
@@ -1786,7 +1854,7 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
             print(f"[cwa-duplicates] auto_resolve using {len(duplicate_groups)} pre-scanned groups (type: {type(duplicate_groups).__name__})", 
                   flush=True)
         
-        if not duplicate_groups:
+        if not duplicate_groups and expected_preview is None:
             return {
                 'success': True,
                 'resolved_count': 0,
@@ -1832,6 +1900,23 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                     'in_progress': True,
                 }
 
+            if expected_preview is not None:
+                current_preview = []
+                for group in duplicate_groups:
+                    keeper = select_book_to_keep(group['books'], strategy)
+                    if keeper:
+                        losers = [book for book in group['books'] if book.id != keeper.id]
+                        if losers:
+                            current_preview.append(_preview_resolution_group(group, keeper, losers, strategy))
+                # Check the whole plan under the destructive-resolution lock,
+                # before even the first backup/migration/delete. A late import
+                # or edition edit must not silently broaden a confirmed run.
+                if current_preview != expected_preview:
+                    result['success'] = False
+                    result['errors'].append(_(
+                        'Duplicate groups have changed. Preview the resolution again before deleting.'))
+                    return result
+
         for group in duplicate_groups:
             try:
                 # Select book to keep
@@ -1848,32 +1933,7 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                     continue  # Only one book in group, nothing to resolve
                 
                 if dry_run:
-                    kept_formats = []
-                    if book_to_keep.data:
-                        for data in book_to_keep.data:
-                            if data.format and data.format not in kept_formats:
-                                kept_formats.append(data.format)
-                    if strategy == 'merge':
-                        for book in books_to_delete:
-                            if book.data:
-                                for data in book.data:
-                                    if data.format and data.format not in kept_formats:
-                                        kept_formats.append(data.format)
-                    # Preview mode: just collect info
-                    result['preview'].append({
-                        'group_hash': group['group_hash'],
-                        'title': group['title'],
-                        'author': group['author'],
-                        'kept_book_id': book_to_keep.id,
-                        'kept_book_timestamp': book_to_keep.timestamp.strftime('%Y-%m-%d %H:%M') if book_to_keep.timestamp else 'Unknown',
-                        'kept_book_formats': kept_formats,
-                        'deleted_book_ids': [b.id for b in books_to_delete],
-                        'deleted_books_info': [{
-                            'id': b.id,
-                            'timestamp': b.timestamp.strftime('%Y-%m-%d %H:%M') if b.timestamp else 'Unknown',
-                            'formats': [d.format for d in b.data] if b.data else []
-                        } for b in books_to_delete]
-                    })
+                    result['preview'].append(_preview_resolution_group(group, book_to_keep, books_to_delete, strategy))
                     result['kept_count'] += 1
                     result['deleted_count'] += len(books_to_delete)
                     result['resolved_count'] += 1

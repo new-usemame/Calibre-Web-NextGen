@@ -19,6 +19,7 @@ except ImportError:
     Levenshtein = False
 
 from .. import logger
+from .isbn import ISBN_IDENTIFIER_TYPES, isbn13
 from ..clean_html import clean_string
 
 
@@ -115,13 +116,17 @@ def get_other_books(author_info, library_books=None):
 
     identifiers = []
     library_titles = []
+    owned_isbns = set()
     if library_books:
         identifiers = list(
             reduce(lambda acc, book: acc + [i.val for i in book.identifiers if i.val], library_books, []))
         library_titles = [book.title for book in library_books]
+        owned_isbns = {isbn13(i.val) for book in library_books for i in book.identifiers
+                       if (i.type or "").lower() in ISBN_IDENTIFIER_TYPES} - {None}
+    # A book is owned whichever ISBN form the library and Goodreads each hold.
 
     for book in author_info.books:
-        if book.isbn in identifiers:
+        if isbn13(book.isbn) in owned_isbns:
             continue
         if isinstance(book.gid, int):
             if book.gid in identifiers:

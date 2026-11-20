@@ -151,3 +151,130 @@ def test_a_chapter_split_in_two_maps_into_the_right_piece(tmp_path):
         "/body/DocFragment/body/p[1]/text().0")
     assert ka.xpointer_to_span(epub, kepub, "/body/DocFragment/body/p[2]/text().2") == (
         "OEBPS/c1.xhtml", "kobo.2.1")
+
+
+# kepubify's own blank page, byte for byte (kepub/transform.go,
+# transformDummyTitlepageAdd): it goes next to the OPF and second in the spine
+# when kepubify's heuristic says the book's first page is not a bare title page.
+_KEPUBIFY_DUMMY = (
+    '<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head>'
+    '<body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">'
+    'Page intentionally left blank by kepubify.</p></body></html>')
+
+
+def _with_kepubify_dummy(tmp_path, source, name):
+    """A copy of the KEPUB ``source`` with kepubify's dummy title page added."""
+    path = tmp_path / name
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(path, "w") as copy:
+        for info in original.infolist():
+            data = original.read(info)
+            if info.filename.endswith(".opf"):
+                opf = data.decode("utf-8")
+                opf = opf.replace("</manifest>", '<item id="kepubify-titlepage-dummy" href='
+                                  '"kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml"/>'
+                                  "</manifest>", 1)
+                first = opf.index("/>", opf.index("<itemref")) + 2
+                opf = opf[:first] + '<itemref idref="kepubify-titlepage-dummy"/>' + opf[first:]
+                data = opf.encode("utf-8")
+            copy.writestr(info, data)
+        copy.writestr("OEBPS/kepubify-titlepage-dummy.xhtml", _KEPUBIFY_DUMMY)
+    return path
+
+
+def test_kepubifys_blank_title_page_does_not_stop_a_place_crossing(tmp_path):
+    # #2804: with the dummy page the KEPUB holds 37 more characters than the
+    # EPUB ("Page intentionally left blank by kepubify."), so before the fix no
+    # place in such a book ever crossed, and a Kobo always got its own old page.
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    with zipfile.ZipFile(kepub) as archive:
+        spine = archive.read("OEBPS/content.opf").decode("utf-8")
+    assert spine.index("kepubify-titlepage-dummy") < spine.index('idref="pg-header"')
+    rows = _rows()
+    wrong = [row for row in rows
+             if ka.span_to_xpointer(EPUB, kepub, row["source"], row["span"]) != row["xpointer"]
+             or ka.xpointer_to_span(EPUB, kepub, row["xpointer"]) != (row["source"], row["span"])]
+    assert not wrong, wrong[:3]
+
+
+def test_a_dummy_page_does_not_excuse_other_differences(tmp_path):
+    # Leaving the blank page out must not loosen the proof: an EPUB whose text
+    # changed anywhere still matches nothing.
+    row = _rows()[0]
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    with zipfile.ZipFile(EPUB) as archive:
+        last = [n for n in archive.namelist() if n.endswith("-h-12.htm.html")][0]
+    edited = _copy_with(tmp_path, EPUB, "edited.epub", last, "Alice", "Alise")
+    assert ka.span_to_xpointer(edited, kepub, row["source"], row["span"]) is None
+    assert ka.xpointer_to_span(edited, kepub, row["xpointer"]) is None
+
+
+def test_an_epub_that_already_carries_the_dummy_page_still_aligns(tmp_path):
+    # A library EPUB made from a KEPUB keeps kepubify's page; the KEPUB made
+    # from it has the page too, and leaving it out of one side only would
+    # break a book that aligns today.
+    epub = _with_kepubify_dummy(tmp_path, EPUB, "dummy.epub")
+    kepub = _with_kepubify_dummy(tmp_path, KEPUB, "dummy.kepub.epub")
+    row = _rows()[0]
+    xpointer = ka.span_to_xpointer(epub, kepub, row["source"], row["span"])
+    assert xpointer is not None
+    assert ka.xpointer_to_span(epub, kepub, xpointer) == (row["source"], row["span"])
+
+
+def test_a_kobo_weights_by_document_size_not_by_text(tmp_path):
+    # #2821: a Kobo's percentage is its documents' share of the KEPUB's bytes
+    # (content.___FileSize), so a document with much markup per character
+    # counts for more than one of plain prose, unlike the web reader's text.
+    plain = "<p>" + "word " * 400 + "</p>"
+    marked = "".join(f'<p><span class="koboSpan" id="kobo.{i}.1">word </span></p>'
+                     for i in range(1, 401))
+    kepub = _book(tmp_path / "w.kepub.epub", [plain, marked], spans=True)
+    with zipfile.ZipFile(kepub) as archive:
+        first, second = (archive.getinfo(f"OEBPS/c{i}.xhtml").file_size for i in (0, 1))
+    start = ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.1.1")
+    middle = ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.200.1")
+    assert start == pytest.approx(100 * first / (first + second))
+    assert start < 25  # where the text, half of it before the second file, says 50
+    assert middle == pytest.approx(start + (100 - start) / 2, abs=1)
+
+
+def test_kepubifys_blank_page_counts_in_the_kobo_percentage_but_has_no_place(tmp_path):
+    # The helper puts the blank page after the first chapter, so the second
+    # chapter starts after both files' bytes.
+    base = _book(tmp_path / "b.kepub.epub", [
+        '<p><span class="koboSpan" id="kobo.1.1">One two three.</span></p>',
+        '<p><span class="koboSpan" id="kobo.1.1">Four five six.</span></p>'], spans=True)
+    kepub = _with_kepubify_dummy(tmp_path, base, "d.kepub.epub")
+    with zipfile.ZipFile(kepub) as archive:
+        sizes = {name: archive.getinfo(name).file_size for name in (
+            "OEBPS/c0.xhtml", "OEBPS/c1.xhtml", "OEBPS/kepubify-titlepage-dummy.xhtml")}
+    total = sum(sizes.values())
+    before = sizes["OEBPS/c0.xhtml"] + sizes["OEBPS/kepubify-titlepage-dummy.xhtml"]
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c1.xhtml", "kobo.1.1") == pytest.approx(
+        100 * before / total)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/kepubify-titlepage-dummy.xhtml",
+                                    "kobo.1.1") is None
+
+
+def test_the_kobo_percentage_needs_a_span_the_kepub_holds(tmp_path):
+    kepub = _book(tmp_path / "b.kepub.epub", [
+        '<p><span class="koboSpan" id="kobo.1.1">One.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "kobo.9.9") is None
+    assert ka.kobo_progress_percent(kepub, "OEBPS/nope.xhtml", "kobo.1.1") is None
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "bad") is None
+    assert ka.kobo_progress_percent(tmp_path / "missing.kepub", "OEBPS/c0.xhtml", "kobo.1.1") is None
+
+
+def test_an_empty_span_has_no_kobo_percentage(tmp_path):
+    """An empty span names no readable place, even at a chapter's end; its
+    offset must not be presented as the next chapter's percentage."""
+    kepub = _book(tmp_path / "empty.kepub.epub", [
+        '<p><span id="kobo.1.1">One.</span><span id="kobo.1.2"></span></p>',
+        '<p><span id="kobo.1.1">Two.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, "OEBPS/c0.xhtml", "kobo.1.2") is None
+
+
+@pytest.mark.parametrize("source, span", [(None, "kobo.1.1"), (1, "kobo.1.1"),
+                                         ("OEBPS/c0.xhtml", None), ("OEBPS/c0.xhtml", [])])
+def test_invalid_location_types_have_no_kobo_percentage(tmp_path, source, span):
+    kepub = _book(tmp_path / "b.kepub.epub", ['<p><span id="kobo.1.1">One.</span></p>'], spans=True)
+    assert ka.kobo_progress_percent(kepub, source, span) is None

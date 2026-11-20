@@ -86,6 +86,15 @@ def test_real_bootstrap(real_app):
     assert b"csrf_token" in response.data
 
 
+def test_dashboard_icon_is_served_without_signing_in(real_app):
+    # #2616: dashboards (Homepage, Heimdall) fetch this icon with no session,
+    # so the real app must hand it to an anonymous client as SVG.
+    response = real_app.test_client().get("/static/CalibreWebNextgen-square.svg")
+    assert response.status_code == 200
+    assert response.mimetype == "image/svg+xml"
+    assert b"<svg" in response.data
+
+
 def blueprint_probes(app):
     """Choose a real rule per blueprint; fail closed on unsupported converters."""
     from uuid import UUID
@@ -245,3 +254,90 @@ def test_native_lock_stalls_greenlets(real_app):
     assert all(job.ready() for job in jobs)
     assert events == ["lock_wait", "os_release", "lock_acquired", "greenlet_ran"]
     print("LOCK native unpatched: " + " -> ".join(events))
+
+def test_duplicate_resolution_confirms_the_preview_through_real_routes(real_app):
+    """The SPA wire preserves editions and rejects a stale plan before deleting.
+
+    Uses real authentication, CSRF, metadata/app databases, duplicate indexing,
+    backups and deletion. A newly imported copy must survive an old confirmation;
+    a fresh confirmation deletes only its listed losers and keeps their backup.
+    """
+    from datetime import datetime
+    from pathlib import Path
+    from cps import calibre_db, db
+    from cps.duplicates import CWA_DB, duplicate_resolution_root
+    from cps.duplicate_index import rebuild_duplicate_index
+
+    client = real_app.test_client()
+    token = client.get('/api/v1/auth/csrf').get_json()['csrf_token']
+    assert client.post('/api/v1/auth/login', json={
+        'username': 'admin', 'password': 'admin123',
+    }, headers={'X-CSRFToken': token}).status_code == 200
+    token = client.get('/api/v1/auth/csrf').get_json()['csrf_token']
+    headers = {'X-CSRFToken': token}
+    preview_url = '/duplicates/preview-resolution'
+    execute_url = '/duplicates/execute-resolution'
+    assert client.post(execute_url, json={'strategy': 'newest'}).status_code == 400
+    import kobo_fixture
+    kobo_fixture.create_reader()
+    reader = kobo_fixture.login(real_app.test_client())
+    reader_token = reader.get('/api/v1/auth/csrf').get_json()['csrf_token']
+    for url in (preview_url, execute_url):
+        response = reader.post(url, json={'strategy': 'newest'},
+                               headers={'X-CSRFToken': reader_token})
+        assert response.status_code == 403, response.get_data(as_text=True)
+    for url in (preview_url, execute_url):
+        for payload in ([], {'strategy': 'invalid'}, {'expected_preview': None}):
+            # A null preview is invalid only on execute; preview ignores it.
+            if url == preview_url and isinstance(payload, dict) and 'expected_preview' in payload:
+                continue
+            response = client.post(url, json=payload, headers=headers)
+            assert response.status_code == 400, response.get_data(as_text=True)
+
+    def add_copy(day, publisher):
+        with real_app.app_context():
+            calibre_db.ensure_session()
+            date = datetime(2024, 1, day)
+            book = db.Books('Preview fixture', 'Preview fixture', 'Fixture Author',
+                            date, date, '1.0', date, f'Fixture/Copy {day}', None, [], [])
+            author = calibre_db.session.query(db.Authors).filter_by(name='Fixture Author').first()
+            book.authors = [author or db.Authors('Fixture Author', 'Fixture Author', '')]
+            book.publishers = [db.Publishers(publisher, '')]
+            calibre_db.session.add(book)
+            calibre_db.session.commit()
+            book_id = book.id
+            rebuild_duplicate_index(CWA_DB().cwa_settings)
+            path = Path(real_app.config['CWA_TEST_ROOT']) / 'library' / book.path
+            path.mkdir(parents=True)
+            (path / 'original.txt').write_text(f'edition {day}')
+            return book_id
+
+    first = add_copy(1, 'OUP')
+    second = add_copy(2, 'Penguin Classics')
+    response = client.post(preview_url, json={'strategy': 'newest'}, headers=headers)
+    assert response.status_code == 200
+    plan = response.get_json()
+    assert plan['success'], plan
+    assert plan['preview'][0]['kept_book_edition'] == {'publisher': 'Penguin Classics', 'year': 2024}
+    assert plan['preview'][0]['deleted_books_info'][0]['publisher'] == 'OUP'
+    third = add_copy(3, 'A later edition')
+    response = client.post(execute_url, json={
+        'strategy': 'newest', 'expected_preview': plan['preview'],
+    }, headers=headers)
+    assert response.status_code == 200
+    assert response.get_json()['success'] is False, response.get_json()
+    with real_app.app_context():
+        assert calibre_db.session.query(db.Books).count() == 3
+
+    plan = client.post(preview_url, json={'strategy': 'newest'}, headers=headers).get_json()
+    assert plan['deleted_count'] == 2, plan
+    result = client.post(execute_url, json={
+        'strategy': 'newest', 'expected_preview': plan['preview'],
+    }, headers=headers).get_json()
+    assert result['success'], result
+    assert result['deleted_count'] == 2
+    with real_app.app_context():
+        assert [book.id for book in calibre_db.session.query(db.Books).all()] == [third]
+        backup = Path(duplicate_resolution_root())
+        for book_id in (first, second):
+            assert list(backup.glob(f'*/book_{book_id}/original.txt')), list(backup.rglob('*'))

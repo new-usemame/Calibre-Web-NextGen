@@ -103,7 +103,7 @@
     opacity: 1 !important;
   }
   
-  .metadata-provider-item * {
+  .metadata-provider-item > :not(label) {
     pointer-events: none;
   }
 
@@ -168,6 +168,16 @@
         will then apply those changes the ebook files themselves. Normally in Stock CW or when this setting is disabled, the changes made 
         are only applied to what you see in the Web UI, not the ebook files themselves. This feature currently only supports files in EPUB 
         or AZW3 format.')}}
+      </p>
+
+      {% if cwa_settings.get('cover_keep_aspect_ratio') %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% else %}
+      <input type="checkbox" id="cover_keep_aspect_ratio" name="cover_keep_aspect_ratio" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% endif %}
+      <label for="cover_keep_aspect_ratio" style="padding-left: 10px;">{{_('Preserve cover aspect ratio in EPUBs')}}</label><br>
+      <p class="cwa-settings-tooltip">
+        {{_("When the enforcement service writes a new cover into an EPUB, its cover page keeps the image's proportions instead of stretching it to fill the screen. This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to covers written from now on; KEPUB files are not changed.")}}
       </p>
 
       {% if cwa_settings['kindle_epub_fixer'] %}
@@ -326,13 +336,13 @@
       </p>
 
       {% if cwa_settings['auto_metadata_smart_application'] %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% else %}
-      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Apply intelligent criteria when replacing existing metadata">
+      <input type="checkbox" id="auto_metadata_smart_application" name="auto_metadata_smart_application" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Only fill metadata the book is missing">
       {% endif %}
       <label for="auto_metadata_smart_application" style="padding-left: 10px;">{{_('Enable Smart Metadata Application')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When enabled, fetched metadata will only replace existing data if it appears to be better quality (e.g., longer descriptions, higher resolution covers). When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
+        {{_('When enabled, fetched metadata only fills in what a book is missing (for example an empty description, a missing series or cover) and adds new tags, but never replaces data the book already has. When disabled, fetched metadata will replace existing data as-is from the preferred provider.')}}
       </p>
 
       <!-- Metadata Field Selection -->
@@ -1393,7 +1403,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // First add providers in the current hierarchy order (this is the saved user preference)
     hierarchy.forEach(providerId => {
       if (providerMap[providerId]) {
-        addProviderItem(container, providerMap[providerId]);
+        addProviderItem(container, providerMap[providerId], true);
         delete providerMap[providerId]; // Remove so we don't add twice
       }
     });
@@ -1407,19 +1417,25 @@ document.addEventListener('DOMContentLoaded', function() {
     updateHiddenInput();
   }
   
-  function addProviderItem(container, provider) {
+  function addProviderItem(container, provider, inOrder = false) {
     const item = document.createElement('div');
     item.className = 'metadata-provider-item';
     item.draggable = false; // Disable native drag
     item.dataset.providerId = provider.id;
     
-    // For admin settings, show all providers as enabled/available
     item.innerHTML = `
       <span class="metadata-provider-drag-handle">⋮⋮</span>
-      <span class="metadata-provider-name">
-        ${provider.name}
-      </span>
     `;
+    const label = document.createElement(provider.requires_ingest_opt_in ? 'label' : 'span');
+    label.className = 'metadata-provider-name';
+    if (provider.requires_ingest_opt_in) {
+      const include = document.createElement('input');
+      include.type = 'checkbox';
+      include.checked = inOrder;
+      label.append(include, ' ');
+    }
+    label.append(provider.name);
+    item.appendChild(label);
     
     container.appendChild(item);
   }
@@ -1433,9 +1449,9 @@ document.addEventListener('DOMContentLoaded', function() {
       wrapper.classList.add('provider_enable_item');
 
       const id = `global-provider-${p.id}`;
-      // Global omission means available. Best-effort scraper opt-in happens
-      // per user and in ingest; admins may still disable either server-wide.
-      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : true);
+      // Use backend defaults so saving settings cannot silently opt into a
+      // newly installed service. An explicit administrator choice wins.
+      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : p.default_ingest_enabled !== false);
       wrapper.innerHTML = `
         <input type="checkbox" id="${id}" data-provider-id="${p.id}" ${checked ? 'checked' : ''}>
         <label for="${id}" style="margin-left: 8px;">${p.name}</label>
@@ -1469,7 +1485,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let startY = 0;
     let startX = 0;
     
+    container.addEventListener('change', updateHiddenInput);
     container.addEventListener('mousedown', function(e) {
+      if (e.target.closest('label')) return;
       const item = e.target.closest('.metadata-provider-item');
       if (!item) return;
       
@@ -1530,7 +1548,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const hiddenInput = document.getElementById('metadata_provider_hierarchy_hidden');
     const items = container.querySelectorAll('.metadata-provider-item');
     
-    const hierarchy = Array.from(items).map(item => item.dataset.providerId);
+    const hierarchy = Array.from(items)
+      .filter(item => item.querySelector('input[type="checkbox"]')?.checked !== false)
+      .map(item => item.dataset.providerId);
     hiddenInput.value = JSON.stringify(hierarchy);
   }
   

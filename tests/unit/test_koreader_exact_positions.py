@@ -330,13 +330,17 @@ def test_only_the_cfi_that_made_the_shared_position_is_converted(world):
     assert body["percentage"] == pytest.approx(0.217)
 
 
-def test_an_older_plugin_still_never_receives_a_web_reader_row(world):
-    _xpointer, cfi = _web_cfi(25)
+def test_an_older_plugin_receives_a_web_reader_row_only_as_an_exact_locator(world):
+    """#2783: a client that names no position kinds (an older plugin,
+    JustRead) gets the web reader's place when it converts exactly into the
+    file it holds, as a real XPointer; never the percentage-only sentinel."""
+    xpointer, cfi = _web_cfi(25)
     world.web_save(cfi, 21.7)
 
     body = world.koreader_pull(world.digest, advertise=False)
 
-    assert "progress" not in body and "percentage" not in body
+    assert (body["progress"], body["position_kind"]) == (xpointer, "locator")
+    assert body["percentage"] == pytest.approx(0.217)
 
 
 def test_furthest_position_still_wins_both_ways(world):

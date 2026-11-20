@@ -254,6 +254,13 @@ def _setup(log_file, log_level=None):
         # avoid spamming the log with debug messages from libraries
         r.setLevel(log_level)
 
+    # APScheduler logs "Running job" / "executed successfully" at INFO on every
+    # run, and the acquisition queue runs every 5 seconds (#2673). Failed and
+    # missed runs log at ERROR/WARNING. At DEBUG the per-run lines come back,
+    # set on this logger itself because the root level is left alone below INFO.
+    logging.getLogger('apscheduler.executors.default').setLevel(
+        max(logging.WARNING, log_level) if log_level >= logging.INFO else log_level)
+
     # Decide whether to also attach a file handler. The legacy
     # stream-only tokens disable file logging; anything else resolves
     # to a real path (default: DEFAULT_LOG_FILE).

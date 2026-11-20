@@ -46,6 +46,7 @@ export const SPA_ROUTES = {
   admin: '/admin',
   adminDevices: '/admin/devices',
   adminAcquisition: '/admin/acquisition',
+  adminValueMaps: '/admin/metadata-cleanup',
   findBooks: '/find-books',
   whatsNew: '/whats-new',
   about: '/about',

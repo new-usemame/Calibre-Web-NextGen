@@ -4,16 +4,20 @@ import { useEffect } from 'react';
 import {
   useAdminUsers, useUpdateAdminUser, useDeleteAdminUser, useCreateAdminUser, useMe,
   useResetAdminUserPassword,
-  useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
+  useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig, useSendTestMail,
   useSecurityConfig, useUpdateSecurityConfig,
-  useAdminAddBookToLibrary,
+  useAdminAddBookToLibrary, useAccount,
 } from '../lib/queries';
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { IngestFolderLabels } from '../components/IngestFolderLabels';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
+import { PasswordInput } from '../components/PasswordInput';
+import { PasswordPolicyHint } from '../components/PasswordPolicyHint';
+import { passwordRequirementsText } from '../lib/passwordPolicy';
 import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
+import { CoverFlagRepairAdmin } from '../components/CoverFlagRepairAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -56,6 +60,7 @@ export function Admin() {
   const resetPassword = useResetAdminUserPassword();
   const addBookToLibrary = useAdminAddBookToLibrary();
   const me = useMe().data;
+  const passwordPolicy = useAccount().data?.password_policy;
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ name: '', password: '', email: '', upload: false });
@@ -66,6 +71,7 @@ export function Admin() {
   // scrolled to a user's form it is off-screen and the add looked silent (#1939).
   const [libraryBookAdded, setLibraryBookAdded] = useState<Record<number, string>>({});
   const [modeHelpOpen, setModeHelpOpen] = useState<Record<number, boolean>>({});
+  const [startEmpty, setStartEmpty] = useState<Record<number, boolean>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !data) {
@@ -133,14 +139,18 @@ export function Admin() {
 
   const setLibraryMode = (user: AdminUser, mode: 'monolibrary' | 'personal_library') => {
     if (mode === user.library_mode || updateUser.isPending) return;
+    const emptyStart = mode === 'personal_library' && !user.my_library_seeded
+      && !!startEmpty[user.id] && user.roles.browse_global;
     const message = mode === 'monolibrary'
       ? t('Show {name} the global library again? Their selection is kept but no longer used, and their e-reader syncs the global library at the next update.', { name: user.name })
       : user.my_library_seeded
         ? t('Switch {name} back to My Library? Their chosen books are restored.', { name: user.name })
-        : t('Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
+        : emptyStart
+          ? t('Give {name} an empty My Library? They start with no books and add what they want from the global library.', { name: user.name })
+          : t('Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
     if (!window.confirm(message)) return;
     setBanner(null);
-    updateUser.mutate({ id: user.id, library_mode: mode }, {
+    updateUser.mutate({ id: user.id, library_mode: mode, ...(emptyStart ? { start_empty: true } : {}) }, {
       onSuccess: () => setBanner({ ok: true, text: mode === 'monolibrary'
         ? t('{name} sees the global library again.', { name: user.name })
         : t('{name} now uses My Library.', { name: user.name }) }),
@@ -208,13 +218,16 @@ export function Admin() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </label>
-            <label className={styles.field}>
-              <span>{t('Password')}</span>
-              <input
-                type="password" value={form.password} required
+            <div className={styles.field}>
+              <label htmlFor="new-user-password">{t('Password')}</label>
+              <PasswordInput
+                id="new-user-password"
+                value={form.password} required autoComplete="new-password"
+                aria-describedby={passwordRequirementsText(passwordPolicy, t) ? 'new-user-password-rules' : undefined}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
-            </label>
+              <PasswordPolicyHint policy={passwordPolicy} id="new-user-password-rules" />
+            </div>
             <label className={styles.field}>
               <span>{t('Email (optional)')}</span>
               <input
@@ -316,6 +329,23 @@ export function Admin() {
                       <span className={styles.modeText}><strong>{t('My Library')}</strong><small>{t('Only the books chosen for this account.')}</small></span>
                     </label>
                   </div>
+                  {user.library_mode === 'monolibrary' && !user.my_library_seeded && (
+                    <label className={styles.modeOption}>
+                      <input type="checkbox"
+                        checked={!!startEmpty[user.id] && user.roles.browse_global}
+                        disabled={updateUser.isPending || !user.roles.browse_global}
+                        aria-describedby={`library-start-empty-help-${user.id}`}
+                        onChange={(e) => setStartEmpty((prev) => ({ ...prev, [user.id]: e.target.checked }))} />
+                      <span className={styles.modeText}>
+                        <strong>{t('Start My Library empty')}</strong>
+                        <small id={`library-start-empty-help-${user.id}`}>
+                          {user.roles.browse_global
+                            ? t('Applies when you choose My Library. The user adds books from the global library themselves. Not available once an account already syncs books to a Kobo.')
+                            : t('Needs the global-browse role: without it the user could not add any books.')}
+                        </small>
+                      </span>
+                    </label>
+                  )}
                   <p id={`library-mode-howto-${user.id}`} className={styles.settingsHint}
                     hidden={!modeHelpOpen[user.id]}>{t('Switching a user to My Library first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
                   {user.library_mode === 'personal_library' && !user.roles.browse_global &&
@@ -369,6 +399,7 @@ export function Admin() {
       <IngestFolderLabels />
       <AdminConfigForm />
       <ReaderFontsAdmin />
+      <CoverFlagRepairAdmin />
       <MailConfigForm />
       <SecurityConfigForm />
     </div>
@@ -542,6 +573,7 @@ function MailConfigForm() {
   const t = useT();
   const { data: cfg } = useMailConfig();
   const update = useUpdateMailConfig();
+  const sendTest = useSendTestMail();
   const [form, setForm] = useState<Record<string, string | number>>({});
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -552,20 +584,33 @@ function MailConfigForm() {
       mail_server: cfg.mail_server, mail_port: cfg.mail_port, mail_use_ssl: cfg.mail_use_ssl,
       mail_login: cfg.mail_login, mail_from: cfg.mail_from, mail_size_mb: cfg.mail_size_mb,
       mail_filename_template: cfg.mail_filename_template,
+      mail_server_type: cfg.mail_server_type,
     });
   }, [cfg]);
 
   if (!cfg) return null;
   const set = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
+  // Gmail OAuth is authorised on the classic page only. While it is the server
+  // type the SMTP fields are ignored, so say so and offer the way out (#2771).
+  const usesGmail = Number(form.mail_server_type ?? 0) !== 0;
+  const busy = update.isPending || sendTest.isPending;
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (after?: () => void) => {
     setMsg(null);
     update.mutate({ ...form, ...(pw ? { mail_password: pw } : {}) }, {
-      onSuccess: () => { setMsg({ ok: true, text: t('Email settings saved.') }); setPw(''); },
+      onSuccess: () => {
+        setPw('');
+        if (after) after(); else setMsg({ ok: true, text: t('Email settings saved.') });
+      },
       onError: (err: unknown) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
     });
   };
+  const onSubmit = (e: React.FormEvent) => { e.preventDefault(); save(); };
+  // Same as the classic page's "Save and Send Test Email": test what was just saved.
+  const saveAndTest = () => save(() => sendTest.mutate(undefined, {
+    onSuccess: (r) => setMsg({ ok: true, text: t('Test email queued for {email}. Check Tasks for the result.', { email: r.email }) }),
+    onError: (err: unknown) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not send the test email.') }),
+  }));
 
   return (
     <form id="email-settings" className={`${styles.newForm} ${styles.anchorSection}`} onSubmit={onSubmit}>
@@ -573,6 +618,23 @@ function MailConfigForm() {
         <Mail size={18} className={styles.headerIcon} />
         <h2 className={styles.settingsTitle}>{t('Email (SMTP) server')}</h2>
       </div>
+      <p className={cfg.mail_configured ? styles.msgOk : styles.msgErr} role="status" data-testid="mail-status">
+        {cfg.mail_configured
+          ? t('Mail is configured and ready to send.')
+          : cfg.mail_server_type !== 0 && !cfg.gmail_authorised
+            ? t('Gmail (OAuth) is selected but not authorised, so mail is switched off. Use standard SMTP below, or authorise Gmail in the classic settings.')
+            : t('Mail is not configured yet. Enter an SMTP server and save.')}
+      </p>
+      {usesGmail ? (
+        <div className={styles.fieldHint} data-testid="mail-gmail-notice">
+          <p>{t('Mail currently sends through Gmail (OAuth), which is set up in the classic settings. The SMTP settings below are not used.')}</p>
+          <button type="button" className={styles.submitBtn} onClick={() => set('mail_server_type', 0)}>
+            {t('Use standard SMTP instead')}
+          </button>
+        </div>
+      ) : Number(cfg.mail_server_type) !== 0 && (
+        <p className={styles.fieldHint} data-testid="mail-smtp-pending">{t('Standard SMTP will be used once you save.')}</p>
+      )}
       <div className={styles.newRow}>
         <label className={styles.field}>
           <span>{t('SMTP server')}</span>
@@ -596,10 +658,10 @@ function MailConfigForm() {
           <span>{t('Login')}</span>
           <input value={String(form.mail_login ?? '')} onChange={(e) => set('mail_login', e.target.value)} />
         </label>
-        <label className={styles.field}>
-          <span>{cfg.has_password ? t('Password (leave blank to keep)') : t('Password')}</span>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
-        </label>
+        <div className={styles.field}>
+          <label htmlFor="smtp-password">{cfg.has_password ? t('Password (leave blank to keep)') : t('Password')}</label>
+          <PasswordInput id="smtp-password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+        </div>
         <label className={styles.field}>
           <span>{t('From address')}</span>
           <input value={String(form.mail_from ?? '')} onChange={(e) => set('mail_from', e.target.value)} />
@@ -616,8 +678,12 @@ function MailConfigForm() {
         </div>
       </div>
       <div className={styles.newActions}>
-        <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
+        <button type="submit" className={styles.submitBtn} disabled={busy}>
           {update.isPending ? t('Saving…') : t('Save email settings')}
+        </button>
+        <button type="button" className={styles.submitBtn} disabled={busy} onClick={saveAndTest}
+          data-testid="mail-save-and-test">
+          {sendTest.isPending ? t('Sending…') : t('Save and send test email')}
         </button>
         <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
@@ -742,9 +808,9 @@ function SecurityConfigForm() {
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Service account (DN)')}</span>
               <input value={f.ldap.serv_username} onChange={(e) => setLdap('serv_username', e.target.value)} /></label>
-            <label className={styles.field}>
-              <span>{f.ldap.has_password ? t('Service password (leave blank to keep)') : t('Service password')}</span>
-              <input type="password" value={ldapPw} autoComplete="new-password" onChange={(e) => setLdapPw(e.target.value)} /></label>
+            <div className={styles.field}>
+              <label htmlFor="ldap-password">{f.ldap.has_password ? t('Service password (leave blank to keep)') : t('Service password')}</label>
+              <PasswordInput id="ldap-password" value={ldapPw} autoComplete="new-password" onChange={(e) => setLdapPw(e.target.value)} /></div>
             <label className={styles.field}><span>{t('Base DN')}</span>
               <input value={f.ldap.dn} onChange={(e) => setLdap('dn', e.target.value)} /></label>
           </div>
@@ -791,9 +857,9 @@ function SecurityConfigForm() {
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Client ID')}</span>
               <input value={f.oauth.generic.client_id} onChange={(e) => setGen('client_id', e.target.value)} /></label>
-            <label className={styles.field}>
-              <span>{f.oauth.generic.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</span>
-              <input type="password" value={oauthSecret} autoComplete="new-password" onChange={(e) => setOauthSecret(e.target.value)} /></label>
+            <div className={styles.field}>
+              <label htmlFor="oauth-secret">{f.oauth.generic.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</label>
+              <PasswordInput id="oauth-secret" value={oauthSecret} autoComplete="new-password" onChange={(e) => setOauthSecret(e.target.value)} /></div>
           </div>
           <div className={styles.newRow}>
             <label className={styles.field}><span>{t('Metadata URL (OIDC auto-discovery)')}</span>
@@ -861,10 +927,10 @@ function SecurityConfigForm() {
                 <div className={styles.newRow} key={p.name}>
                   <label className={styles.field}><span>{p.name[0].toUpperCase() + p.name.slice(1)} {t('Client ID')}</span>
                     <input value={p.client_id} onChange={(e) => setProviderClientId(p.name, e.target.value)} /></label>
-                  <label className={styles.field}>
-                    <span>{p.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</span>
-                    <input type="password" autoComplete="new-password" value={providerSecrets[p.name] || ''}
-                      onChange={(e) => setProviderSecrets((s) => ({ ...s, [p.name]: e.target.value }))} /></label>
+                  <div className={styles.field}>
+                    <label htmlFor={`oauth-${p.name}-secret`}>{p.has_secret ? t('Client secret (leave blank to keep)') : t('Client secret')}</label>
+                    <PasswordInput id={`oauth-${p.name}-secret`} autoComplete="new-password" value={providerSecrets[p.name] || ''}
+                      onChange={(e) => setProviderSecrets((s) => ({ ...s, [p.name]: e.target.value }))} /></div>
                 </div>
               ))}
             </>

@@ -14,6 +14,7 @@ receipt is ``KoboBookmark.server_modified_at``. The stored device clock is
 never treated as a receipt.
 """
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -23,13 +24,15 @@ from types import SimpleNamespace
 from sqlalchemy import and_, case, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from .. import ub
+from .. import logger, ub
 from .place_arbiter import Report, report_wins
 from .share_place import gates_enforced
 from .place_journal import (
     _journal_place_report, _journal_status_report, _status_receipt, _same,
     write_report,
 )
+
+log = logger.create()
 
 CHECKED = "checked"
 UNCHECKED = "unchecked"
@@ -480,6 +483,55 @@ def refresh_share_place_nudges(device, *, session):
     return len(armed)
 
 
+def arm_download_place_nudge(device_id, book_id, *, session):
+    """Re-send a book's shared place once to a Kobo that proved it downloaded it.
+
+    Nickel treats every (re-)download as "forget the position I had", so it
+    opens the book at the cover. A shared place sent before the download is
+    gone from the device, but the device's reading-state cursor is already
+    past it, so nothing would send it again until the account's place changed
+    (#2688). Called once the download is proven complete: the same proof that
+    makes the delivered span exact.
+
+    Armed only where the turn-on nudge would be: the box is on and the shared
+    place beats this Kobo's own report. For a Kobo with an older report of
+    its own, the own-place restore armed at download time sends the same
+    place, and the sync drops the nudge's copy as a duplicate; the nudge is
+    what covers a Kobo with no report, or one past that restore's window.
+    Returns whether a nudge was armed.
+    """
+    device = session.execute(
+        select(ub.Device.user_id, ub.Device.kind, ub.Device.share_place)
+        .where(ub.Device.id == int(device_id))
+    ).first()
+    if (device is None or device.kind != "kobo" or not device.share_place
+            or not gates_enforced(device.user_id)):
+        return False
+    state, mark = ub.KoboReadingState, ub.KoboBookmark
+    shared = session.execute(
+        select(mark.progress_percent, mark.location_value, mark.last_modified,
+               mark.server_modified_at)
+        .join(state, mark.kobo_reading_state_id == state.id)
+        .where(state.user_id == device.user_id, state.book_id == int(book_id))
+    ).first()
+    shared_report = None if shared is None else shared_bookmark_report(
+        shared.progress_percent, shared.location_value, shared.last_modified,
+        shared.server_modified_at)
+    if shared_report is None:
+        return False
+    journal = ub.DeviceReadingPosition.__table__
+    own = session.execute(select(journal).where(
+        journal.c.device_id == int(device_id),
+        journal.c.book_id == int(book_id),
+    )).first()
+    if not report_wins(shared_report, _journal_place_report(own)):
+        return False
+    session.execute(sqlite_insert(ub.KoboSharePlaceNudge.__table__).values(
+        device_id=int(device_id), book_id=int(book_id), armed_at=_now(),
+    ).on_conflict_do_nothing(index_elements=["device_id", "book_id"]))
+    return True
+
+
 def clear_share_place_nudges(device_id, *, session):
     nudge = ub.KoboSharePlaceNudge.__table__
     return session.execute(nudge.delete().where(
@@ -630,11 +682,23 @@ def delivery_bookmark(book, bookmark, response, device_id):
     """
     own = ub.session.query(ub.DeviceReadingPosition).filter_by(
         device_id=int(device_id), book_id=int(book.id)).one_or_none()
+    if own is not None and bookmark.server_modified_at is not None:
+        # #2783: this Kobo has now been sent this shared place, exactly or
+        # held; a later return to its old place is its own reading.
+        # The first serve of this place is when the Kobo could first see it;
+        # a re-serve must not make a move it clocked in between look queued.
+        if (own.served_shared_at is None or own.served_shared_received_at is None
+                or _naive_utc(own.served_shared_received_at)
+                != _naive_utc(bookmark.server_modified_at)):
+            own.served_shared_at = _naive_utc(_now())
+        own.served_shared_received_at = bookmark.server_modified_at
     receiver_identity = completed_kepub_identity(device_id, book)
     if (receiver_identity is not None and bookmark.location_value
             and bookmark.location_source and bookmark.location_type == "KoboSpan"
             and bookmark.span_kepub_identity == receiver_identity):
         clear_echo_guard(device_id, book.id)
+        response = _with_kobo_percentage(book, bookmark, response)
+        _log_delivery(book, device_id, "exact shared place", response)
         return response
     if own is not None and own.location_value:
         held = own
@@ -650,6 +714,8 @@ def delivery_bookmark(book, bookmark, response, device_id):
     # No shared place has ever been written, so no inexact delivery to arm.
     if bookmark.progress_percent is None and not bookmark.location_value:
         return None
+    held_reason = (_held_reason(device_id, book, bookmark, receiver_identity)
+                   if log.isEnabledFor(logging.DEBUG) else None)
     table = ub.KoboPlaceEchoGuard.__table__
     values = dict(device_id=int(device_id), book_id=int(book.id),
                   location_value=held.location_value, location_source=held.location_source,
@@ -664,12 +730,110 @@ def delivery_bookmark(book, bookmark, response, device_id):
         where=~_same(table.c.shared_received_at, bookmark.server_modified_at),
     ))
     if not held.location_value:
+        if held_reason is not None:
+            _log_delivery(book, device_id, held_reason + "; no own place to hold, so no bookmark", None)
         return None
     response = dict(response)
     response["Location"] = {"Value": held.location_value,
                             "Source": held.location_source,
                             "Type": held.location_type}
+    if held_reason is not None:
+        _log_delivery(book, device_id, held_reason + "; sent this Kobo's own place", response)
     return response
+
+
+def _with_kobo_percentage(book, bookmark, response):
+    """``response`` with the percentage a Kobo itself reports at the exact place.
+
+    The web reader weights the book by text and a Kobo by the size of each
+    KEPUB document, so the same place is 26% in one and 16% in the other, and
+    the shelf showed the web's figure until the book was opened (#2821).
+    """
+    from .kepub_alignment import kobo_progress_percent
+    from ..kobo import _clean_progress
+    if not bookmark.shared_from_koreader:
+        return response  # a Kobo's own report is already in its own terms
+    try:
+        _epub, kepub = _book_paths(book)
+        percent = (kobo_progress_percent(kepub, bookmark.location_source,
+                                         bookmark.location_value) if kepub else None)
+    except Exception:  # the shared figure is still a fair answer
+        log.debug("Could not work out the Kobo's percentage", exc_info=True)
+        return response
+    if percent is None:
+        return response
+    response = dict(response)
+    response["ProgressPercent"] = _clean_progress(round(percent, 2))
+    return response
+
+
+def _held_reason(device_id, book, bookmark, receiver_identity):
+    """Why a Kobo was not sent the shared span (#2804). DEBUG only."""
+    try:
+        return "held: " + _held_cause(device_id, book, bookmark, receiver_identity)
+    except Exception:  # a diagnostic must never fail a sync
+        log.debug("Could not explain the held Kobo place", exc_info=True)
+        return "held: reason unavailable"
+
+
+def _held_cause(device_id, book, bookmark, receiver_identity):
+    if receiver_identity is None:
+        _epub, path = _book_paths(book)
+        if _readable_kepub_identity(path) is None:
+            return "the library has no readable KEPUB for this book, so no place can be exact"
+        row = ub.session.query(ub.KoboDeviceBookDownload).filter_by(
+            device_id=int(device_id), book_id=int(book.id)).one_or_none()
+        if row is None or (row.book_format or "").lower() != "kepub":
+            return "this Kobo has no recorded KEPUB download of this book from this server"
+        return ("this Kobo has not finished downloading the library's current KEPUB: "
+                + _unproven_download(row, path))
+    if not (bookmark.location_value and bookmark.location_source
+            and bookmark.location_type == "KoboSpan"):
+        return "the shared place has no KoboSpan (it could only be shared as a percentage)"
+    return "the shared span was converted against a different KEPUB than this Kobo holds"
+
+
+def _unproven_download(row, path):
+    """Which part of completed_kepub_identity's proof this download row lacks."""
+    from .kobo_post_download_restore import RESTORE_ARMED, RESTORE_PENDING, RESTORE_SERVED
+
+    def utc(value):
+        return "%s UTC" % _naive_utc(value).isoformat(" ", "seconds") if value else "an unknown time"
+
+    if row.restore_state == RESTORE_ARMED:
+        return ("the book was sent to this Kobo again at %s and it has not downloaded it since"
+                % utc(row.downloaded_at))
+    if row.completed_at is None and row.kepub_file_identity is not None:
+        return ("this Kobo's download at %s never finished (no completed transfer was "
+                "recorded; the download's own DEBUG line says why)" % utc(row.downloaded_at))
+    if row.completed_at is not None and row.kepub_file_identity != _readable_kepub_identity(path):
+        return "the library KEPUB was replaced after this Kobo's download at %s" % utc(row.completed_at)
+    if (row.completed_at is None and row.kepub_file_identity is None
+            and row.restore_state not in (RESTORE_PENDING, RESTORE_SERVED)):
+        # completed_kepub_identity accepts an untracked row only in these two
+        # historical states; any other one can never prove the download.
+        return ("this Kobo's download at %s is from before CWNG recorded finished downloads, "
+                "so it cannot be proven; remove the download on the Kobo and download the "
+                "book again" % utc(row.downloaded_at))
+    written = datetime.fromtimestamp(os.stat(path).st_mtime, timezone.utc)
+    downloaded = row.completed_at or row.downloaded_at
+    if downloaded is None or _naive_utc(written) > _naive_utc(downloaded):
+        return ("the library KEPUB was written at %s, after this Kobo's download at %s"
+                % (utc(written), utc(downloaded)))
+    return ("the library KEPUB (written at %s) changed while this sync checked this "
+            "Kobo's download at %s" % (utc(written), utc(downloaded)))
+
+
+def _log_delivery(book, device_id, reason, response):
+    response = response or {}
+    location = response.get("Location") or {}
+    log.debug(
+        "Kobo place for book %s device %s: %s; CurrentBookmark ProgressPercent=%s "
+        "ContentSourceProgressPercent=%s Location=%s %s",
+        book.id, device_id, reason, response.get("ProgressPercent"),
+        response.get("ContentSourceProgressPercent"),
+        location.get("Type"), location.get("Value"),
+    )
 
 
 def _span_ordinal(value):
@@ -684,6 +848,65 @@ def _first_spine_source(book):
         return None
     kepub = _kepub(path)
     return kepub.documents[0].member if kepub and kepub.documents else None
+
+
+def _same_place(place, location_value, location_source, progress_percent):
+    """Whether a CurrentBookmark names the place given by these columns: the
+    same Location when it carries one, else the same percentage with none."""
+    location = place.get("Location") or {}
+    value = location.get("Value")
+    if value:
+        return value == location_value and location.get("Source") == location_source
+    return not location_value and place.get("ProgressPercent") == progress_percent
+
+
+def is_unmoved_report(device_id, book_id, place, bookmark_id, client_at=None):
+    """#2783: a checked Kobo's report at the place it last reported, when
+    another reader has since put a different place on the shared bookmark.
+
+    Nickel clocks each PUT /state when it sends it, so a Kobo that slept with
+    a book open reports its old place with a fresh clock before it syncs.
+    That clock says when the Kobo spoke, not when it read, so it must not
+    beat the other reader's newer place. Once the Kobo has been sent that
+    place (``delivery_bookmark``), a return to its old place that the Kobo
+    clocked (``client_at``) after the serve is a deliberate move and wins as
+    before. One clocked before the serve was queued before the Kobo could
+    have seen that place, so it has not moved. Judge before journaling.
+    """
+    journal = ub.DeviceReadingPosition.__table__
+    own = ub.session.execute(select(
+        journal.c.location_value, journal.c.location_source,
+        journal.c.progress_percent, journal.c.server_modified_at,
+        journal.c.served_shared_received_at, journal.c.served_shared_at,
+    ).where(journal.c.device_id == int(device_id),
+            journal.c.book_id == int(book_id))).first()
+    if (own is None or own.server_modified_at is None
+            or not _same_place(place, own.location_value, own.location_source,
+                               own.progress_percent)):
+        return False
+    mark = ub.KoboBookmark
+    shared = ub.session.execute(select(
+        mark.location_value, mark.location_source, mark.progress_percent,
+        mark.server_modified_at,
+    ).where(mark.id == bookmark_id)).first()
+    if shared is None or shared.server_modified_at is None:
+        return False
+    if (_same_place(place, shared.location_value, shared.location_source,
+                    shared.progress_percent)
+            and place.get("ProgressPercent") == shared.progress_percent):
+        # Nothing newer to protect. A percentage-only write from another
+        # reader keeps the old Location, so the percentage must match too.
+        return False
+    if (own.served_shared_received_at is not None
+            and _naive_utc(own.served_shared_received_at)
+            == _naive_utc(shared.server_modified_at)
+            and (client_at is None or own.served_shared_at is None
+                 or _naive_utc(client_at) > _naive_utc(own.served_shared_at))):
+        # The Kobo was sent this place before it clocked this report, so a
+        # return to its old one is a move. A place served before this release
+        # (no serve time) or a report with no clock is judged as before.
+        return False
+    return _naive_utc(shared.server_modified_at) > _naive_utc(own.server_modified_at)
 
 
 def is_inexact_echo(device_id, book, place):

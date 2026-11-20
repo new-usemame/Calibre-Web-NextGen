@@ -7,7 +7,7 @@ ghcr.io/new-usemame/calibre-web-nextgen:latest
 ```
 
 It's a drop-in for the standard Calibre-Web-Automated (CWA) image. **Switching keeps
-everything** — your books, users, settings, shelves and the Read checkmarks you've set all
+everything**: your books, users, settings, shelves and the Read checkmarks you've set all
 live in the folders you mount into the container (`/config` and `/calibre-library`), not
 inside the image. Nothing is converted or deleted, and you can go back to your old image
 with the same one-line change in reverse.
@@ -23,11 +23,11 @@ Pick the guide that matches how you run Docker:
 | **QNAP** (Container Station) | [qnap.md](qnap.md) |
 | **Dockge** (compose stacks) | [dockge.md](dockge.md) |
 | **A terminal / `docker compose`** | [compose.md](compose.md) |
-| Something else | not listed yet — see the help links below, we'll walk you through it |
+| Something else | not listed yet; see the help links below, we'll walk you through it |
 
 Every guide covers both a **fresh install** and **switching from stock CWA**, and tells you
 how to **update** later on that platform (on most NAS GUIs a "restart" does **not** pull a new
-image — you have to re-pull, and each guide shows exactly how).
+image; you have to re-pull, and each guide shows exactly how).
 
 ---
 

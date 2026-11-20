@@ -206,6 +206,7 @@ def get_library():
     # File facts are read fresh for every page; the kept manifest stays as built.
     books = [dict(book) for book in books]
     koreader_library.fill_file_facts(books, manifest.paths, _library_root())
+    _register_filename_digests(books)
     response = jsonify({
         "revision": revision,
         "scope": manifest.scope,
@@ -272,6 +273,7 @@ def get_library_placeholder(book_id):
         authors=entry["authors"],
         series=entry["series"],
         series_index=entry["series_index"],
+        tags=koreader_library.tag_order(tag.name for tag in book.tags),
         cover_path=_cover_path(book),
         language=language,
         modified=koreader_library.iso_z(book.last_modified) or "2000-01-01T00:00:00Z",
@@ -352,6 +354,22 @@ def _register_checksum(book_id, book_format, path, filename):
     except Exception:
         log.warning("Could not register the KOReader checksum of book %s",
                     book_id, exc_info=True)
+
+
+def _register_filename_digests(books):
+    """Let progress from a device in filename matching find each listed book.
+
+    A device renames a book it already holds when its listed name changes,
+    without downloading it again (#2565), so the download route alone would
+    never learn the new name's digest."""
+    try:
+        from ..checksums.manager import store_filename_checksums
+        store_filename_checksums(
+            (book["book_id"], book.get("format"), book.get("filename"))
+            for book in books)
+    except Exception:
+        log.warning("Could not register the KOReader file name digests",
+                    exc_info=True)
 
 
 def _record_download(user, book_id):

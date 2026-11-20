@@ -47,7 +47,7 @@ from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
     get_book_cover, get_series_cover_thumbnail, get_download_link, send_mail, generate_random_password, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
-    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book
+    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book, set_inline_filename
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, DEFAULT_SORT, book_sort_order, viewer_id
 from .unicode_collation import locale_sort_key, locale_initial, unicode_sort_key
@@ -175,6 +175,12 @@ def add_security_headers(resp):
         csp += " *"
     if reader_like:
         csp += " blob: ; style-src-elem 'self' blob: 'unsafe-inline'"
+        # #2710: pdf.js saves a PDF by clicking a link to a blob: URL, and
+        # Firefox checks that download against frame-src, which otherwise
+        # falls back to default-src (no blob:). Keep default-src's hosts so
+        # the SPA can still frame /read/<id>/pdf.
+        csp += "; frame-src " + ' '.join(
+            [src for src in default_src if not src.startswith("'unsafe-")] + ["blob:"])
     # #60: the switched-back-to-Classic feedback popup (layout.html) POSTs to our
     # first-party feedback endpoint (a Cloudflare Worker on a different origin).
     # Without an explicit connect-src, fetch()/XHR fall back to default-src 'self'
@@ -2874,6 +2880,10 @@ def render_cc_category(page, col_id, path, order):
     if not is_cc_visible(current_user, col_id, fail_on_error=True):
         abort(404)
 
+    # The value editor is offered on the ROOT view only: it acts on the whole
+    # vocabulary, and a node's book list has no use for it.
+    may_edit_values = _may_edit_column_values()
+
     is_hierarchical = not calibre_db.is_flat_cc_column(col_id, fail_on_error=True)
 
     if is_hierarchical:
@@ -2948,7 +2958,64 @@ def render_cc_category(page, col_id, path, order):
                else calibre_db.get_cc_flat_list(col_id, fail_on_error=True))
     return render_title_template(
         'cc_list.html', entries=entries,
-        title=col.name, page="cclist", col_id=col_id, hierarchical=is_hierarchical)
+        title=col.name, page="cclist", col_id=col_id, hierarchical=is_hierarchical,
+        may_edit_values=may_edit_values, edit_rows=(
+            cc_value_edit_rows(entries, is_hierarchical) if may_edit_values else []))
+
+
+def cc_value_edit_rows(entries, is_hierarchical):
+    """Flatten a browse tree into the rows the classic value editor renders.
+
+    One flat list of ``(node, depth)``, in the order the tree is shown, so the
+    editor is a plain table rather than a second nested renderer. Each node
+    carries its ``available`` flags, computed by the SAME
+    ``hierarchy.node_availability`` the JSON tree publishes, so the classic
+    editor and the new interface cannot disagree about which values may be
+    deleted, merged or moved.
+
+    Rendered server-side rather than fetched on toggle: the tree is already in
+    hand here, and an edit mode that has to round-trip before it can draw
+    itself is the "button does nothing" failure this feature already had once.
+    """
+    rows, stack = [], [(node, 0, entries) for node in reversed(entries)]
+    while stack:
+        node, depth, siblings = stack.pop()
+        # `siblings` is the node's own level, in display order. Needed because
+        # sibling position is not a property of a node: "can this move up" is a
+        # question about its place in a list, not about the node.
+        available = hierarchy.node_availability(
+            node, [sibling['path'] for sibling in (siblings or [])])
+        rows.append({
+            'path': node['path'],
+            'name': node['name'],
+            'total_count': node['total_count'],
+            # A flat column has no children, so its values are all leaves and
+            # the depth is always 0 — the same one-level contract the JSON tree
+            # keeps for it.
+            'depth': depth if is_hierarchical else 0,
+            'can_delete': available['can_delete'],
+            'can_merge_source': available['can_merge_source'],
+            'can_move_up': available['can_move_up'],
+            'can_move_down': available['can_move_down'],
+            'has_children': bool(node['children']),
+        })
+        stack.extend((child, depth + 1, node['children'])
+                     for child in reversed(node['children']))
+    return rows
+
+
+def _may_edit_column_values():
+    """Whether the current account may be offered the value editor.
+
+    Same gate every value-write endpoint enforces through
+    ``_require_metadata_editor``. Hiding the button without this is what caused
+    the original silent failure in the new interface: a working-looking panel
+    whose every action was refused, with the refusal rendered off-screen.
+    """
+    try:
+        return (not current_user.is_anonymous) and current_user.role_edit()
+    except Exception:
+        return False
 
 
 # ################################### Download/Send ##################################################################
@@ -3062,20 +3129,10 @@ def _repair_epub_container_if_needed(book_id, original_path):
             return fixed_path
 
         temp_path = fixed_path + ".tmp"
-        with zipfile.ZipFile(original_path, "r") as zin, zipfile.ZipFile(temp_path, "w") as zout:
-            for item in zin.infolist():
-                data = zin.read(item.filename)
-                if item.filename == "META-INF/container.xml":
-                    data = _sanitize_container_xml(data)
-
-                zi = zipfile.ZipInfo(item.filename)
-                zi.date_time = item.date_time
-                zi.compress_type = item.compress_type
-                zi.external_attr = item.external_attr
-                zi.internal_attr = item.internal_attr
-                zi.extra = item.extra
-                zi.comment = item.comment
-                zout.writestr(zi, data, compress_type=item.compress_type)
+        from .epub_helper import rewrite_zip_members
+        rewrite_zip_members(original_path, temp_path, {
+            "META-INF/container.xml": _sanitize_container_xml(container_bytes),
+        })
 
         os.replace(temp_path, fixed_path)
         return fixed_path
@@ -3123,6 +3180,8 @@ def serve_book(book_id, book_format, anyname):
             if not range_header:
                 log.info('Serving book: %s', data.name)
                 headers['Accept-Ranges'] = 'bytes'
+            if book_format.upper() == 'PDF':
+                set_inline_filename(headers, book, book_format)  # #2729
             df = getFileFromEbooksFolder(book.path, data.name + "." + book_format)
             return do_gdrive_download(df, headers, (book_format.upper() == 'TXT'))
         except AttributeError as ex:
@@ -3160,6 +3219,8 @@ def serve_book(book_id, book_format, anyname):
         response = make_response(
             send_from_directory(os.path.join(config.get_book_path(), book.path), data.name + "." + book_format))
         response.headers['Content-Disposition'] = 'inline'
+        if book_format.upper() == 'PDF':
+            set_inline_filename(response.headers, book, book_format)  # #2729
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Content-Security-Policy'] = "script-src 'none'; object-src 'none'"
         if not range_header:
@@ -4271,57 +4332,12 @@ def read_book(book_id, book_format):
         except Exception as e:
             log.debug(f"Failed to log read activity: {e}")
 
-    # CWA #1364 fix: bump `book_read_link.last_time_started_reading` and
-    # `times_started_reading` when an authenticated user opens the web
-    # reader. The Kobo + KOSync code paths already do this; the web
-    # reader was the only book-opening surface that never wrote to
-    # those fields, so a user who only reads through the browser had
-    # no "read history" recorded at all (`/read`, `/unread` filters
-    # never reflected web-reader activity).
-    #
-    # Debounce: only bump the counter when the transition is into
-    # IN_PROGRESS from a NON-in-progress state. A user refreshing the
-    # reader tab or hitting Back/Forward doesn't count as a new
-    # reading session. Always touch `last_time_started_reading` so
-    # "recently read" sorting reflects every open.
+    # CWA #1364: record the open (Currently Reading, session count, last-open
+    # time). Shared with the new UI reader's reader-open call (#2750).
     if current_user.is_authenticated and not lookup_mode:
         try:
-            from .services.share_place import gates_enforced
-            if gates_enforced(int(current_user.id)):
-                reading_position.record_gated_reader_open(current_user, book_id)
-            else:
-                read_row = ub.session.query(ub.ReadBook).filter(
-                    ub.ReadBook.user_id == int(current_user.id),
-                    ub.ReadBook.book_id == book_id,
-                ).first()
-                now = datetime.now(timezone.utc)
-                if read_row is None:
-                    read_row = ub.ReadBook(
-                        user_id=int(current_user.id),
-                        book_id=book_id,
-                        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
-                        times_started_reading=1,
-                        last_time_started_reading=now,
-                        read_status_choice_at=now,
-                    )
-                    ub.session.add(read_row)
-                else:
-                    prev_status = read_row.read_status or 0
-                    can_resume = True
-                    if (prev_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
-                                        ub.ReadBook.STATUS_ON_HOLD)
-                            and config.config_read_column):
-                        # Opening the ordinary reader is an explicit resume. A
-                        # prior shared finished marker must not mask that resume.
-                        can_resume = helper.set_custom_read_column_value(
-                            book_id, False, source="web reader resume")
-                    if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
-                            and prev_status != ub.ReadBook.STATUS_FINISHED and can_resume:
-                        read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
-                        read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
-                    if can_resume and prev_status != ub.ReadBook.STATUS_FINISHED:
-                        read_row.read_status_choice_at = now
-                    read_row.last_time_started_reading = now
+            from .services.read_status import record_reader_open
+            record_reader_open(current_user, book_id)
             ub.session_commit()
         except Exception as e:
             log.debug(f"Failed to record web reader open in book_read_link: {e}")

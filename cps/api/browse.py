@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Entity-list browse endpoints for /api/v1."""
+import re
+
 from ..unicode_collation import locale_sort_key
 from flask import abort, jsonify, request
 from flask_babel import gettext as _
@@ -17,29 +19,74 @@ from ..usermanagement import login_required_if_no_ano
 @api_v1.route("/authors")
 @login_required_if_no_ano
 def list_authors():
-    rows = (calibre_db.session.query(db.Authors, func.count('books_authors_link.book').label('count'))
-            .join(db.books_authors_link)
-            .join(db.Books)
-            .filter(calibre_db.common_filters())
-            .group_by(text('books_authors_link.author'))
-            .order_by(locale_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
-            .all())
-    items = [{"id": a.id, "name": a.name.replace("|", ","), "count": cnt} for a, cnt in rows]
-    return {"items": items}
+    return _list_browse_entities(db.Authors, db.books_authors_link, 'author', authors=True)
 
 
 @api_v1.route("/series")
 @login_required_if_no_ano
 def list_series():
-    rows = (calibre_db.session.query(db.Series, func.count('books_series_link.book').label('count'))
-            .join(db.books_series_link)
+    return _list_browse_entities(db.Series, db.books_series_link, 'series')
+
+
+def _list_browse_entities(entity, link, foreign_key, authors=False, order_column=None):
+    """Filter grouped book counts before paging; legacy callers omit limit."""
+    try:
+        values = {}
+        for key, minimum, maximum in (('limit', 1, 500), ('offset', 0, None), ('min_count', 1, None)):
+            raw = request.args.get(key)
+            if raw is not None:
+                if not raw.isascii() or not raw.isdecimal():
+                    raise ValueError(key)
+                value = int(raw)
+                if value < minimum or (maximum is not None and value > maximum):
+                    raise ValueError(key)
+                values[key] = value
+        # Reject ambiguous repeated parameters, including q on the legacy path.
+        if any(len(request.args.getlist(key)) > 1 for key in ('limit', 'offset', 'q', 'min_count')):
+            raise ValueError('Repeated browse parameter')
+        needle = request.args.get('q', '')
+        if '\x00' in needle:
+            raise ValueError('Invalid name filter')
+    except ValueError:
+        return jsonify({"error": {"code": "bad_request", "message": "Invalid browse parameters"}}), 400
+
+    count = func.count(link.c.book)
+    base = (calibre_db.session.query(entity, count.label('count'))
+            .join(link)
             .join(db.Books)
             .filter(calibre_db.common_filters())
-            .group_by(text('books_series_link.series'))
-            .order_by(locale_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
-            .all())
-    items = [{"id": s.id, "name": s.name, "count": cnt} for s, cnt in rows]
-    return {"items": items}
+            .group_by(link.c[foreign_key]))
+    query = base
+    if needle:
+        displayed_name = func.replace(entity.name, '|', ',') if authors else entity.name
+        # SQLAlchemy's SQLite REGEXP handles Unicode case, without the accent
+        # transliteration of this database's custom lower(). Escape the input
+        # so punctuation (including SQL LIKE wildcards) stays literal.
+        query = query.filter(displayed_name.regexp_match('(?i)' + re.escape(needle)))
+    if 'min_count' in values:
+        # SQLite counts are signed 64-bit integers, even for a larger input.
+        query = query.having(count >= min(values['min_count'], 2**63 - 1))
+
+    def total_rows(grouped):
+        return calibre_db.session.query(func.count()).select_from(
+            grouped.with_entities(entity.id).subquery()).scalar()
+
+    order = entity.sort if order_column is None else order_column
+    response = {}
+    if 'limit' in values:
+        total = total_rows(query)
+        unfiltered_total = total_rows(base) if needle or 'min_count' in values else total
+        offset = values.get('offset', 0)
+        next_offset = offset + values['limit']
+        response.update(total=total, unfiltered_total=unfiltered_total,
+                        next_offset=next_offset if next_offset < total else None)
+        query = query.order_by(locale_sort_key(order), order, entity.id)
+        rows = query.limit(values['limit']).offset(offset).all() if offset < total else []
+    else:
+        rows = query.order_by(locale_sort_key(order), order, entity.id).all()
+    response['items'] = [{"id": row.id, "name": row.name.replace('|', ',') if authors else row.name,
+                          "count": books} for row, books in rows]
+    return response
 
 
 @api_v1.route("/tags")
@@ -78,44 +125,31 @@ def _require_metadata_editor():
     return None
 
 
-@api_v1.route("/tags/<int:tag_id>", methods=["POST"])
-@login_required_if_no_ano
-def rename_tag(tag_id):
-    """Rename one existing Calibre tag for every linked book.
+def _rename_or_merge(model, link_attr, obj_id, name, merge, messages):
+    """Rename one calibre list value (a tag) for every linked book.
 
-    A name collision is the de-duplication case (#973), not merely an error:
-    renaming a tag onto its near-duplicate is how you consolidate the two. So
-    the 409 carries the conflicting tag (id, name, how many books it holds) and
-    the caller can repeat the request with ``merge: true`` to fold this tag into
-    it. The merge stays opt-in and must be boolean ``true`` — folding two tags
-    together destroys the distinction between them and there is no undo, so a
-    typo that happens to match an existing tag must not silently consume it.
+    ``model`` is the calibre table, ``link_attr`` the ``Books`` relationship
+    that holds it, ``messages`` the translated texts for this kind of value
+    (``not_found``, ``exists``). A name collision is the de-duplication case
+    (#973), not merely an error: renaming a value onto its near-duplicate is
+    how you consolidate the two. So the 409 carries the conflicting value (id,
+    name, how many books it holds) and the caller can repeat the request with
+    ``merge: true`` to fold this value into it. The merge stays opt-in and must
+    be boolean ``true``: folding two values together destroys the distinction
+    between them and there is no undo, so a typo that happens to match an
+    existing value must not silently consume it.
     """
-    guard = _require_metadata_editor()
-    if guard is not None:
-        return guard
-
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name must be text")}}), 400
-    name = payload["name"].strip()
-    if not name:
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name cannot be empty")}}), 400
-    if "," in name:
-        return jsonify({"error": {"code": "invalid_request", "message": _("Tag name cannot contain commas")}}), 400
-    merge = payload.get("merge") is True
-
     with metadata_db_write_lock():
-        tag = calibre_db.session.get(db.Tags, tag_id)
-        if tag is None:
-            return jsonify({"error": {"code": "not_found", "message": _("Tag not found")}}), 404
-        if tag.name == name:
-            return jsonify({"id": tag.id, "name": tag.name})
+        obj = calibre_db.session.get(model, obj_id)
+        if obj is None:
+            return jsonify({"error": {"code": "not_found", "message": messages["not_found"]}}), 404
+        if obj.name == name:
+            return jsonify({"id": obj.id, "name": obj.name})
 
         # Recheck under the process-shared writer lock so two Flask workers
         # cannot both pass the uniqueness check before either commits.
-        duplicate = (calibre_db.session.query(db.Tags)
-                     .filter(func.lower(db.Tags.name) == name.lower(), db.Tags.id != tag_id)
+        duplicate = (calibre_db.session.query(model)
+                     .filter(func.lower(model.name) == name.lower(), model.id != obj_id)
                      .first())
         if duplicate is not None and not merge:
             # The count is the raw link count, i.e. the true blast radius of the
@@ -123,45 +157,82 @@ def rename_tag(tag_id):
             # common_filters(), which would under-report what actually moves.
             return jsonify({"error": {
                 "code": "conflict",
-                "message": _("A tag with that name already exists"),
+                "message": messages["exists"],
                 "conflict": {"id": duplicate.id, "name": duplicate.name, "count": len(duplicate.books)},
             }}), 409
 
         # Materialize the exact linked-book set while association writers are
         # excluded, then mutate and dirty that same set in one transaction.
-        affected_books = list(tag.books)
+        affected_books = list(obj.books)
         try:
             if duplicate is not None:
-                # Merge: move every book off this tag onto the survivor, whose
-                # own spelling wins, then drop the now-empty tag. A book already
+                # Merge: move every book off this value onto the survivor, whose
+                # own spelling wins, then drop the now-empty value. A book already
                 # carrying both must end up with one link, not two.
                 for book in affected_books:
-                    if duplicate not in book.tags:
-                        book.tags.append(duplicate)
-                    book.tags.remove(tag)
+                    linked = getattr(book, link_attr)
+                    if duplicate not in linked:
+                        linked.append(duplicate)
+                    linked.remove(obj)
                     helper.mark_book_modified(book, set_dirty=True)
-                calibre_db.session.delete(tag)
+                calibre_db.session.delete(obj)
                 result = {"id": duplicate.id, "name": duplicate.name,
                           "merged": True, "books": len(affected_books)}
             else:
-                tag.name = name
+                obj.name = name
+                if hasattr(obj, "sort"):
+                    obj.sort = name
                 for book in affected_books:
                     helper.mark_book_modified(book, set_dirty=True)
-                result = {"id": tag.id, "name": tag.name}
+                result = {"id": obj.id, "name": obj.name}
             calibre_db.session.commit()
         except IntegrityError:
             calibre_db.session.rollback()
-            return jsonify({"error": {"code": "conflict", "message": _("A tag with that name already exists")}}), 409
+            return jsonify({"error": {"code": "conflict", "message": messages["exists"]}}), 409
         except Exception:
             calibre_db.session.rollback()
             raise
 
     # File-level enforcement is best-effort and must only be queued after the
     # database transaction succeeds. Every linked book now carries the surviving
-    # tag name (or, after a merge, no longer carries the one that was folded in).
+    # name (or, after a merge, no longer carries the one that was folded in).
     for book in affected_books:
-        helper.log_metadata_change(book, {"tags": ", ".join(item.name for item in book.tags)})
+        helper.log_metadata_change(
+            book, {link_attr: ", ".join(item.name for item in getattr(book, link_attr))})
     return jsonify(result)
+
+
+def _read_new_name(empty_message, type_message, comma_message=None):
+    """``(name, merge, None)`` from the request body, or ``(None, None, error)``."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": type_message}}), 400)
+    name = payload["name"].strip()
+    if not name:
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": empty_message}}), 400)
+    if comma_message and "," in name:
+        return None, None, (jsonify({"error": {"code": "invalid_request", "message": comma_message}}), 400)
+    return name, payload.get("merge") is True, None
+
+
+@api_v1.route("/tags/<int:tag_id>", methods=["POST"])
+@login_required_if_no_ano
+def rename_tag(tag_id):
+    """Rename one existing Calibre tag for every linked book (#973).
+
+    See ``_rename_or_merge`` for the merge semantics.
+    """
+    guard = _require_metadata_editor()
+    if guard is not None:
+        return guard
+    name, merge, error = _read_new_name(
+        _("Tag name cannot be empty"), _("Tag name must be text"), _("Tag name cannot contain commas"))
+    if error is not None:
+        return error
+    return _rename_or_merge(db.Tags, "tags", tag_id, name, merge, {
+        "not_found": _("Tag not found"),
+        "exists": _("A tag with that name already exists"),
+    })
 
 
 @api_v1.route("/tags/<int:tag_id>", methods=["DELETE"])
@@ -204,15 +275,9 @@ def delete_tag(tag_id):
 @api_v1.route("/publishers")
 @login_required_if_no_ano
 def list_publishers():
-    rows = (calibre_db.session.query(db.Publishers, func.count(db.books_publishers_link.c.book).label('count'))
-            .join(db.books_publishers_link, db.Publishers.id == db.books_publishers_link.c.publisher)
-            .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
-            .filter(calibre_db.common_filters())
-            .group_by(db.Publishers.id)
-            .order_by(locale_sort_key(db.Publishers.name), db.Publishers.name, db.Publishers.id)
-            .all())
-    items = [{"id": p.id, "name": p.name, "count": cnt} for p, cnt in rows]
-    return {"items": items}
+    # Calibre leaves publishers.sort empty, so publishers order by name.
+    return _list_browse_entities(db.Publishers, db.books_publishers_link, 'publisher',
+                                 order_column=db.Publishers.name)
 
 
 @api_v1.route("/languages")

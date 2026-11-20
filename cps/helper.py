@@ -40,6 +40,8 @@ from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
 
+from .utils.filename_sanitizer import build_content_disposition
+
 try:
     from . import cw_advocate
     from .cw_advocate.exceptions import UnacceptableAddressException
@@ -57,7 +59,7 @@ from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
-from .services.file_move import copy_with_metadata_fallback
+from .services.file_move import copy_with_metadata_fallback, move_path
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
 from .services.conversion_capabilities import get_conversion_capabilities
@@ -111,7 +113,7 @@ def validate_cover_dimensions(width, height):
     return width, height
 
 
-def mark_book_modified(book, *, set_dirty=True, unsync=False):
+def mark_book_modified(book, *, set_dirty=True, unsync=False, metadata_only=False):
     """Single source of truth for "this book changed".
 
     Stamps ``book.last_modified`` — the value that drives BOTH the web
@@ -124,6 +126,7 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
       * ``set_dirty``  → queue CWA metadata write-back (``set_metadata_dirty``).
       * ``unsync``     → drop Kobo synced-book records for all users so every
                          device re-pulls (``remove_synced_book(all=True)``).
+      * ``metadata_only`` → record a metadata edit in the same library transaction.
 
     The caller still owns the ``calibre_db.session.commit()``. ``kobo_sync_status``
     is imported lazily to keep this module's import graph unchanged.
@@ -147,6 +150,8 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         if now <= previous < now + timedelta(seconds=1):
             now = previous + timedelta(microseconds=1)
     book.last_modified = now
+    if metadata_only and previous is not None and getattr(calibre_db, "book_metadata_edits_available", False):
+        db.record_book_metadata_edit(calibre_db.session, book, previous)
     if set_dirty:
         calibre_db.set_metadata_dirty(book.id)
     if unsync:
@@ -616,6 +621,9 @@ def get_send_filename(book, book_format):
             template, book, calibre_db.session,
             unicode_filename=bool(config.config_unicode_filename),
             ordered_authors=calibre_db.order_authors([book]), sort_names=False,
+            # An emailed attachment name never lands on our disk, so a colon
+            # in the title can arrive intact (#2650).
+            keep_colon=True,
         )
         return basename + "." + book_format.lower()
     except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
@@ -1040,11 +1048,11 @@ def set_explicit_book_read_status(book_id, status_name, sync_hardcover=True):
     return ""
 
 
-def reset_reading_position(session, user_id, book_id):
+def reset_reading_position(session, user_id, book_id, *, keep_read_status=False):
     """Clear a user's stored reading position for one book so marking it
     'unread' is a genuine reset (#683).
 
-    Three independent stores surface as the "% read" the user sees:
+    Four independent stores surface as the "% read" the user sees:
       * ``ub.KoboReadingState.current_bookmark`` — the KOReader/Kobo synced
         progress percentage shown on the classic detail page and the new-UI book
         page (fork #587);
@@ -1053,6 +1061,16 @@ def reset_reading_position(session, user_id, book_id):
         scroll, so the ghost would return.
       * ``KOSyncProgress`` — KOReader's server-side resume point, stored under
         either the Calibre book ID or any registered file checksum.
+      * ``ub.DeviceReadingPosition`` — each of the user's devices' own last
+        reported place (#2831). ``GET /kosync/syncs/progress`` serves an
+        identified device its own row when there is no shared row, so leaving
+        these behind handed a "reset" book straight back to the KOReader that
+        had reported it.
+
+    ``keep_read_status=True`` is the position-only clear (#2831): the
+    "Currently reading" marker is left as it is, so a finished book can be
+    reset for a re-read and stay marked read. "Mark as unread" keeps the
+    default and folds the marker back to unread.
 
     Kobo/KOReader propagation is automatic: zeroing the KoboBookmark bumps its
     ``last_modified`` (onupdate) and the before_flush listener in ``ub.py`` lifts
@@ -1061,8 +1079,10 @@ def reset_reading_position(session, user_id, book_id):
     legitimately re-establishes it on its next push — the device owns its own
     position, and device sync never routes through this function.
 
-    Returns the number of position records cleared (bookmarks deleted + a
-    progress row zeroed) so callers/tests can tell it acted.
+    Returns the number of position records cleared (web bookmarks, the Kobo
+    bookmark, device journal rows, KOSync rows and, unless
+    ``keep_read_status``, the folded "Currently reading" marker) so callers and
+    tests can tell it acted.
     """
     uid = int(user_id)
     cleared = session.query(ub.Bookmark).filter(
@@ -1123,13 +1143,30 @@ def reset_reading_position(session, user_id, book_id):
     # after via ``mirror_read_status_to_readbook`` (#1343). Filtering FINISHED
     # here too would make a position reset silently un-read a book for any
     # future caller that only wanted the percentage cleared.
-    read_row = session.query(ub.ReadBook).filter(
-        ub.ReadBook.user_id == uid,
-        ub.ReadBook.book_id == book_id,
-        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
-    if read_row is not None:
-        read_row.read_status = ub.ReadBook.STATUS_UNREAD
-        cleared += 1
+    if not keep_read_status:
+        read_row = session.query(ub.ReadBook).filter(
+            ub.ReadBook.user_id == uid,
+            ub.ReadBook.book_id == book_id,
+            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+        if read_row is not None:
+            read_row.read_status = ub.ReadBook.STATUS_UNREAD
+            cleared += 1
+    # #2831: every device's own observation for this book (KOReader and Kobo),
+    # scoped to this user's devices only. The journal's delivery bookkeeping
+    # (rehydrate latch) lives on these rows, so a cleared book is not
+    # re-delivered from a stale observation either. The echo guard holds an
+    # earlier inexact delivery's place for the same device and book; left
+    # behind, a report matching that old place would still be read as an echo
+    # rather than a real move. ``purge_user_book_data`` clears the same pair.
+    user_devices = session.query(ub.Device.id).filter(ub.Device.user_id == uid)
+    cleared += session.query(ub.DeviceReadingPosition).filter(
+        ub.DeviceReadingPosition.book_id == book_id,
+        ub.DeviceReadingPosition.device_id.in_(user_devices),
+    ).delete(synchronize_session=False)
+    session.query(ub.KoboPlaceEchoGuard).filter(
+        ub.KoboPlaceEchoGuard.book_id == book_id,
+        ub.KoboPlaceEchoGuard.device_id.in_(user_devices),
+    ).delete(synchronize_session=False)
     # KOSync may have accumulated a canonical book-id row plus legacy rows for
     # any checksum ever registered to this book. Delete every equivalent key;
     # otherwise the next GET can resurrect a finished 100% position. This uses
@@ -1178,12 +1215,42 @@ def get_kosync_progress_display(session, user_id, book_id):
         if kobo_state is None or kobo_state.current_bookmark is None:
             return None, None, None
         bookmark = kobo_state.current_bookmark
-        if bookmark.progress_percent is None:
+        percent = bookmark.progress_percent
+        if percent is None:
             return None, None, None
-        return bookmark.progress_percent, bookmark.last_modified, bookmark.created_at
+        shared = _kobo_shared_percent(session, user_id, book_id, bookmark)
+        if shared is not None:
+            percent = shared
+        return percent, bookmark.last_modified, bookmark.created_at
     except Exception:  # pragma: no cover - defensive around DB/session errors
         log.debug("Could not load KOReader progress for book %s", book_id, exc_info=True)
         return None, None, None
+
+
+def _kobo_shared_percent(session, user_id, book_id, bookmark):
+    """Return the KOSync percentage that the same Kobo report wrote, or None.
+
+    A Kobo bookmark keeps the device's whole-number percentage. The share to
+    KOSync can store the finer CrossPoint value of the same place
+    (``kobo.share_kobo_progress_with_koreader``). That row has the device
+    ``Kobo`` and the bookmark's receipt as its timestamp. Any other row is
+    from another report, so the bookmark value applies.
+    """
+    try:
+        from .progress_syncing.models import KOSyncProgress
+        from .services.koreader_position import KOBO_DEVICE
+        if bookmark.server_modified_at is None:
+            return None
+        row = (session.query(KOSyncProgress.percentage)
+               .filter(KOSyncProgress.user_id == int(user_id),
+                       KOSyncProgress.document == str(book_id),
+                       KOSyncProgress.device == KOBO_DEVICE,
+                       KOSyncProgress.timestamp == bookmark.server_modified_at)
+               .first())
+    except Exception:
+        log.debug("Could not load the shared Kobo percentage for book %s", book_id, exc_info=True)
+        return None
+    return row[0] if row else None
 
 
 def _get_kosync_checksums_for_book(book_id):
@@ -1700,17 +1767,10 @@ def move_files_on_change(calibre_path, new_author_dir, new_titledir, localbook, 
             if not os.path.exists(new_path):
                 # move original path to new path
                 log.debug("Moving title: %s to %s", path, new_path)
-                try:
-                    shutil.move(path, new_path)
-                except OSError as ex:
-                    log.error("Failed to move directory %s to %s: %s, trying copy tree approach", path, new_path, ex)
-                    # Fallback: try to copy tree and then remove original
-                    try:
-                        shutil.copytree(path, new_path, dirs_exist_ok=True)
-                        shutil.rmtree(path)
-                    except (OSError, IOError) as fallback_ex:
-                        log.error("Copy tree fallback also failed: %s", fallback_ex)
-                        raise
+                # move_path renames (creating a new author folder first) and only
+                # copies across filesystems, skipping metadata the destination
+                # refuses, such as an NFSv4 ACL (#2921).
+                move_path(path, new_path)
             elif _same_filesystem_entry(path, new_path):
                 # Case-only rename on a case-insensitive filesystem: the "existing"
                 # folder is this book's own folder, so rename it in place (#2559).
@@ -2037,7 +2097,8 @@ def check_email(email, user_id=None):
 
     Pass ``user_id`` when changing an existing account's address."""
     email = valid_email(email)
-    if _taken_by_another_user(ub.User.email, email, user_id):
+    # A blank address is "no email", not a value to collide on (#2153).
+    if email and _taken_by_another_user(ub.User.email, email, user_id):
         log.error("Found an existing account for this Email address")
         raise Exception(_("Found an existing account for this Email address"))
     return email
@@ -2359,12 +2420,16 @@ def get_book_cover_internal(book, resolution=None):
             # Determine which thumbnail format to serve based on request context
             try:
                 from flask import has_request_context, request
-                is_kobo_request = (has_request_context() and
-                                 request.path and
-                                 '/kobo/' in request.path)
+                # Kobo devices and OPDS clients get JPEG: the OPDS feed
+                # declares image/jpeg, and e-reader OPDS clients cannot all
+                # decode WebP (#2845).
+                wants_jpeg = (has_request_context() and
+                              request.path and
+                              ('/kobo/' in request.path
+                               or request.path.startswith('/opds/')))
 
-                # Prefer jpg for Kobo requests, webp for web requests
-                if is_kobo_request:
+                # Prefer jpg for Kobo and OPDS requests, webp for web requests
+                if wants_jpeg:
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
@@ -3589,6 +3654,43 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
+def get_download_file_name(book, filename_template=None):
+    """The name (without extension) a downloaded copy of ``book`` is given:
+    "Title - First author" or the OPDS filename template, made filesystem-safe."""
+    file_name = book.title
+    first_author = next((author for author in book.authors if author is not None), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + (first_author.name or '')
+    if isinstance(filename_template, str):
+        filename_template = strip_whitespaces(filename_template)
+    if filename_template:
+        try:
+            file_name = render_opds_filename(
+                filename_template, book, calibre_db.session,
+                title_regex=config.config_title_regex,
+                unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
+            )
+        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
+            # A corrupt or manually changed setting must not prevent downloads.
+            log.warning("Invalid OPDS filename template; using the default filename")
+    return get_valid_filename(file_name, replace_whitespace=False)
+
+
+def set_inline_filename(headers, book, book_format):
+    """Serve a book inline (in-browser reader) but still name it after the book.
+
+    pdf.js names its Save button's file from the response's Content-Disposition,
+    else from the URL, which for /show/<id>/pdf ends in no ".pdf" and so became
+    "document.pdf" (#2729). Leaves the plain "inline" header if naming fails.
+    """
+    try:
+        headers['Content-Disposition'] = build_content_disposition(
+            'inline', "%s.%s" % (get_download_file_name(book), book_format.lower()))
+    except Exception as ex:
+        log.warning("Could not name inline %s for book %s: %s", book_format, getattr(book, 'id', '?'), ex)
+
+
 def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False,
                       filename_template=None):
     book_format = book_format.split(".")[0]
@@ -3642,15 +3744,28 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
         try:
-            from flask import g
-            from .services.kobo_post_download_restore import record_download, completed_download_body
+            from flask import g, request
+            from .services.kobo_post_download_restore import (
+                DOWNLOAD_DEVICE_PARAM, record_download, completed_download_body,
+                tagged_download_device,
+            )
+            device_id = getattr(g, "annotation_origin_device_id", None)
+            if device_id is None:
+                # No device header (Nickel never sends one on a file GET): the
+                # Kobo named in the URL its own sync handed it is the fetcher.
+                device_id = tagged_download_device(
+                    getattr(current_user, "id", None),
+                    request.args.get(DOWNLOAD_DEVICE_PARAM))
             download = record_download(
-                device_id=getattr(g, "annotation_origin_device_id", None),
+                device_id=device_id,
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
                 completed=False,
             )
-            if isinstance(download, ub.KoboDeviceBookDownload):
+            # A row already completed is proof kept from an earlier download,
+            # not an attempt this response can confirm.
+            if (isinstance(download, ub.KoboDeviceBookDownload)
+                    and download.completed_at is None):
                 download_proof = (download.id, download.downloaded_at,
                                   download.kepub_file_identity)
         except Exception:
@@ -3694,24 +3809,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         except Exception as e:
             log.error(f"Failed to log download stats: {e}")
 
-    file_name = book.title
-    first_author = next((author for author in book.authors if author is not None), None)
-    if first_author is not None:
-        file_name = file_name + ' - ' + (first_author.name or '')
-    if isinstance(filename_template, str):
-        filename_template = strip_whitespaces(filename_template)
-    if filename_template:
-        try:
-            file_name = render_opds_filename(
-                filename_template, book, calibre_db.session,
-                title_regex=config.config_title_regex,
-                unicode_filename=config.config_unicode_filename,
-                ordered_authors=calibre_db.order_authors([book]),
-            )
-        except (ValueError, TypeError, AttributeError, SQLAlchemyError, OverflowError, RecursionError):
-            # A corrupt or manually changed setting must not prevent downloads.
-            log.warning("Invalid OPDS filename template; using the default filename")
-    file_name = get_valid_filename(file_name, replace_whitespace=False)
+    file_name = get_download_file_name(book, filename_template)
     headers = Headers()
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
     headers["Content-Disposition"] = "attachment; filename=%s.%s; filename*=UTF-8''%s.%s" % (
@@ -3742,10 +3840,24 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 bind=ub.session.get_bind(), download_id=download_proof[0],
                 downloaded_at=download_proof[1], file_identity=download_proof[2],
                 kepub_path=kepub_path, headers=response.headers, log=log,
+                book_id=book.id,
             )
         except Exception:
             log.warning("Could not track Kobo download completion for book %s",
                         book.id, exc_info=True)
+    elif download_proof:
+        # #2804: a download that cannot count as proof says why, so a held
+        # place in a later sync can be traced back to this request.
+        if request.method != "GET":
+            why = "a %s request carries no file" % request.method
+        elif "Range" in request.headers:
+            why = "a Range request (%s) is only part of the file" % request.headers["Range"]
+        elif response.status_code != 200:
+            why = "the response status was %s" % response.status_code
+        else:
+            why = ("the server is %s; only the gevent server can tell that a transfer finished"
+                   % (request.environ.get("SERVER_SOFTWARE") or "unknown"))
+        log.debug("Kobo download of book %s: completion not recorded: %s", book.id, why)
     return response
 
 

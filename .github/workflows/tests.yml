@@ -1004,13 +1004,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
-      # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
-      # 193s (>3m) with both caches warm. Ten minutes per step gives >17x/28x
-      # median headroom and >3x that observed stall floor, while still failing
-      # a real setup hang far before the job's 180m guard.
+      # Run 33848680049 twice saw npm ci stall for 193s with warm caches.
+      # The five-minute limit covers that case and bounds a longer stall.
       - name: Install frontend dependencies (npm ci)
-        timeout-minutes: 10
+        # ci-time-budget 2026-11-20: shorten 10 -> 5 min; p50 0.1, p95 0.1, max 0.1 min over 24 main runs; p95 0.1 min is 1% of the 10-min limit.
+        timeout-minutes: 5
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 

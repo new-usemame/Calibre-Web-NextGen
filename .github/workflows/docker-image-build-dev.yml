@@ -172,7 +172,8 @@ jobs:
   # --------------------------------------------------------------------------------
   build-amd64:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # ci-time-budget 2026-11-20: shorten 60 -> 30 min; p50 1.7, p95 8.0, max 19.6 min over 40 main runs; p95 8.0 min is 13% of the 60-min limit.
+    timeout-minutes: 30
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
@@ -325,7 +326,8 @@ jobs:
     # repo is also a meaningful attack surface (any PR can execute on
     # operator hardware), so GitHub-hosted is the safer default.
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+    # ci-time-budget 2026-11-20: shorten 60 -> 30 min; p50 3.6, p95 5.2, max 5.5 min over 40 main runs; p95 5.2 min is 9% of the 60-min limit.
+    timeout-minutes: 30
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
@@ -489,7 +491,8 @@ jobs:
   # --------------------------------------------------------------------------------
   merge:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # ci-time-budget 2026-11-20: shorten 15 -> 10 min; p50 0.3, p95 0.6, max 0.7 min over 40 main runs; p95 0.6 min is 4% of the 15-min limit.
+    timeout-minutes: 10
     needs: [classify, alias-image-neutral-commit, build-amd64, build-arm]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:

@@ -5002,7 +5002,7 @@ msgstr "阅读位置已清除"
 
 #: cps/spa_strings.py
 msgid "Could not clear the reading position."
-msgstr "无法清楚阅读位置"
+msgstr "无法清除阅读位置"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"

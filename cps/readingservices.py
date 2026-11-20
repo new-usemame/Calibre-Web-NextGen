@@ -1640,6 +1640,7 @@ def _handle_check_for_changes():
         log.warning("Not proxying an unrecognized Kobo checkforchanges request")
         return jsonify([])
 
+    proxy_enabled = config.config_kobo_proxy
     filtered_ids = set()
     for index, entry in enumerate(entries):
         content_id = entry["ContentId"]
@@ -1654,10 +1655,21 @@ def _handle_check_for_changes():
                 content_id=content_id,
                 ownership=_capture_ownership_label(ownership),
                 authority_status=_capture_authority_status(ownership),
-                action="suppressed" if is_filtered else "proxied",
+                action="suppressed" if is_filtered or not proxy_enabled else "proxied",
             )
     outbound_entries = _filter_check_for_changes_entries(entries, filtered_ids)
     if not outbound_entries:
+        return jsonify([])
+    if not proxy_enabled:
+        # With the store proxy off the device's bearer token is one CWNG issued
+        # on /oauth/token, which readingservices.kobo.com always rejects with
+        # 401 (#2958), and a 401 surfaces on the device as a sync error. "[]"
+        # is the answer measured safe on hardware: Nickel then sends no
+        # annotations GET and keeps its local highlights for these books.
+        log.debug(
+            "Kobo store proxy is off; answering checkforchanges locally for "
+            "%d non-library content id(s)", len(outbound_entries),
+        )
         return jsonify([])
 
     outbound_body = json.dumps(

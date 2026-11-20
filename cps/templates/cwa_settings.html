@@ -1443,9 +1443,9 @@ document.addEventListener('DOMContentLoaded', function() {
       wrapper.classList.add('provider_enable_item');
 
       const id = `global-provider-${p.id}`;
-      // Global omission means available. Best-effort scraper opt-in happens
-      // per user and in ingest; admins may still disable either server-wide.
-      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : true);
+      // Use backend defaults so saving settings cannot silently opt into a
+      // newly installed service. An explicit administrator choice wins.
+      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : p.default_ingest_enabled !== false);
       wrapper.innerHTML = `
         <input type="checkbox" id="${id}" data-provider-id="${p.id}" ${checked ? 'checked' : ''}>
         <label for="${id}" style="margin-left: 8px;">${p.name}</label>

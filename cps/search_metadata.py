@@ -24,7 +24,7 @@ from cps.services.cover_picker import format_provider_summary
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
 from .usermanagement import user_login_required
-from .metadata_constants import metadata_provider_enabled
+from .metadata_constants import metadata_provider_enabled, ORDER_OPT_IN_METADATA_PROVIDERS
 
 
 meta = Blueprint("metadata", __name__)
@@ -265,6 +265,7 @@ def metadata_keys_save(prov_id):
 def metadata_provider():
     active = current_user.view_settings.get("metadata", {})
     global_enabled = _get_global_provider_enabled_map()
+    hierarchy = _get_provider_hierarchy()
     provider = list()
     for c in cl:
         ac = metadata_provider_enabled(c.__id__, active)
@@ -277,6 +278,10 @@ def metadata_provider():
                 # Global omission means available; best-effort defaults are a
                 # per-user/ingest opt-in, not hidden from the SPA toggle list.
                 "globally_enabled": bool(global_enabled.get(c.__id__, True)),
+                # The settings page lists new providers in its reorder control.
+                # Saving that page must not opt into a new service implicitly.
+                "default_ingest_enabled": (c.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS or
+                                           c.__id__ in hierarchy),
             }
         )
     return make_response(jsonify(provider))

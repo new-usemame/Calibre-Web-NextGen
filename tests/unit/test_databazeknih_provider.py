@@ -206,7 +206,8 @@ def _provider(dk, routes, head_ok=False):
     return provider
 
 
-def test_isbn_query_follows_redirect_to_edition(dk):
+@pytest.mark.parametrize("query", ["978-80-8182-096-0", "isbn:9788081820960"])
+def test_isbn_query_follows_redirect_to_edition(dk, query):
     base = _FakeSession.BASE
     book_url = f"{base}/prehled-knihy/henry-chinaski-postovy-urad-499580"
     provider = _provider(dk, {
@@ -216,30 +217,13 @@ def test_isbn_query_follows_redirect_to_edition(dk):
         book_url: _FakeResponse(book_url, _fixture("book_499580.html")),
         f"{base}/book-detail-more-info/499580": _FakeResponse("", _fixture("more_info_499580.html")),
     })
-    records = provider.search("978-80-8182-096-0")
+    records = provider.search(query)
     assert len(records) == 1
     record = records[0]
     assert record.title == "Poštový úrad"
     assert record.source.id == "databazeknih"
     assert record.url == book_url
     assert record.languages == ["slk"]
-
-
-def test_auto_fetch_isbn_query_form_follows_redirect(dk):
-    """The auto-fetch fallback sends "isbn:<isbn>" (SUPPORTS_ISBN_QUERY)."""
-    assert dk.DatabazeKnih.SUPPORTS_ISBN_QUERY is True
-    base = _FakeSession.BASE
-    book_url = f"{base}/prehled-knihy/henry-chinaski-postovy-urad-499580"
-    provider = _provider(dk, {
-        f"{base}/search?q=9788081820960": _FakeResponse(
-            f"{base}/search?q=9788081820960", status=302, location=book_url.removeprefix(base)
-        ),
-        book_url: _FakeResponse(book_url, _fixture("book_499580.html")),
-        f"{base}/book-detail-more-info/499580": _FakeResponse("", _fixture("more_info_499580.html")),
-    })
-    records = provider.search("isbn:9788081820960")
-    assert [r.url for r in records] == [book_url]
-    assert provider.session.calls[0] == f"{base}/search?q=9788081820960"
 
 
 def test_title_author_query_retries_without_author(dk):

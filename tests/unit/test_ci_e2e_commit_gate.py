@@ -190,8 +190,9 @@ def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
     paired_attempt = re.search(
         r"paired with.*?attempts=(\d+)", script, flags=re.DOTALL
     )
-    assert paired_attempt
-    wait_seconds = (int(paired_attempt.group(1)) - 1) * 30
+    resolver_interval = re.search(r'"\$attempts"\s+(\d+)\b', script)
+    assert paired_attempt and resolver_interval
+    wait_seconds = (int(paired_attempt.group(1)) - 1) * int(resolver_interval.group(1))
 
     jobs = dev["jobs"]
     producer_minutes = (

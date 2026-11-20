@@ -3035,8 +3035,8 @@ msgid "Page not found"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/email_edit.html cps/templates/shelf.html
-#: cps/templates/user_table.html
+#: cps/templates/custom_column_modal.html cps/templates/email_edit.html
+#: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Add"
 msgstr "Přidat"
 
@@ -5803,6 +5803,7 @@ msgstr ""
 #: cps/templates/book_review.html cps/templates/book_table.html
 #: cps/templates/config_db.html cps/templates/config_edit.html
 #: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/custom_column_modal.html
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
 #: cps/templates/duplicates.html cps/templates/layout.html
@@ -8496,7 +8497,7 @@ msgstr ""
 msgid "New user"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
 msgid "New value"
 msgstr ""
 
@@ -11269,7 +11270,8 @@ msgstr ""
 msgid "Try My Library"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+#: cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr ""
 
@@ -12307,6 +12309,54 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Apply selection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose from stored values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing hierarchy"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Could not load the values for this column."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Enter one value without commas."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Loading values..."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values match the filter."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values stored for this column yet. Add one below."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values..."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "e.g. Category.SubCategory.Item"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -15705,6 +15755,14 @@ msgstr ""
 
 #: cps/templates/cover_picker.html
 msgid "Rendering e-reader previews:"
+msgstr ""
+
+#: cps/templates/custom_column_modal.html
+msgid "Select values"
+msgstr ""
+
+#: cps/templates/custom_column_modal.html
+msgid "Add a new value"
 msgstr ""
 
 #: cps/templates/cwa_api_stats.html

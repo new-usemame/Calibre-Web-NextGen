@@ -3295,8 +3295,8 @@ msgid "Page not found"
 msgstr "Page introuvable"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/email_edit.html cps/templates/shelf.html
-#: cps/templates/user_table.html
+#: cps/templates/custom_column_modal.html cps/templates/email_edit.html
+#: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Add"
 msgstr "Ajouter"
 
@@ -6270,6 +6270,7 @@ msgstr "Peut téléverser des livres"
 #: cps/templates/book_review.html cps/templates/book_table.html
 #: cps/templates/config_db.html cps/templates/config_edit.html
 #: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/custom_column_modal.html
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
 #: cps/templates/duplicates.html cps/templates/layout.html
@@ -9111,7 +9112,7 @@ msgstr "Nouvelle étagère intelligente"
 msgid "New user"
 msgstr "Nouvel utilisateur"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
 msgid "New value"
 msgstr "Nouvelle valeur"
 
@@ -12135,7 +12136,8 @@ msgstr "Faire confiance à l’en-tête d’authentification"
 msgid "Try My Library"
 msgstr "Essayer Ma bibliothèque"
 
-#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+#: cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr "Réessayer"
 
@@ -13269,6 +13271,56 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
 msgstr "Démarrer Ma bibliothèque vide"
+
+# Book-edit custom-column value picker (#2434).
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Apply selection"
+msgstr "Appliquer la sélection"
+
+#: cps/spa_strings.py
+msgid "Choose from stored values"
+msgstr "Choisir parmi les valeurs enregistrées"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing hierarchy"
+msgstr "Choisir dans la hiérarchie existante"
+
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing values"
+msgstr "Choisir parmi les valeurs existantes"
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Could not load the values for this column."
+msgstr "Impossible de charger les valeurs de cette colonne."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Enter one value without commas."
+msgstr "Saisissez une seule valeur sans virgule."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Loading values..."
+msgstr "Chargement des valeurs..."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values match the filter."
+msgstr "Aucune valeur ne correspond au filtre."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values stored for this column yet. Add one below."
+msgstr ""
+"Cette colonne ne contient pas encore de valeurs. Ajoutez-en une ci-dessous."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values"
+msgstr "Rechercher ou filtrer les valeurs"
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values..."
+msgstr "Rechercher ou filtrer les valeurs..."
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "e.g. Category.SubCategory.Item"
+msgstr "p. ex. Catégorie.SousCatégorie.Élément"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -16922,6 +16974,14 @@ msgstr "Remplacer la couverture par cette proposition ?"
 #: cps/templates/cover_picker.html
 msgid "Rendering e-reader previews:"
 msgstr "Génération des aperçus pour liseuse :"
+
+#: cps/templates/custom_column_modal.html
+msgid "Select values"
+msgstr "Sélectionner des valeurs"
+
+#: cps/templates/custom_column_modal.html
+msgid "Add a new value"
+msgstr "Ajouter une nouvelle valeur"
 
 #: cps/templates/cwa_api_stats.html
 msgid "API Usage Analytics"
@@ -22902,48 +22962,3 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
-
-
-# Book-edit custom-column value picker (#2434).
-
-msgid "Apply selection"
-msgstr "Appliquer la sélection"
-
-msgid "Choose from stored values"
-msgstr "Choisir parmi les valeurs enregistrées"
-
-msgid "Choose from the existing hierarchy"
-msgstr "Choisir dans la hiérarchie existante"
-
-msgid "Choose from the existing values"
-msgstr "Choisir parmi les valeurs existantes"
-
-msgid "Could not load the values for this column."
-msgstr "Impossible de charger les valeurs de cette colonne."
-
-msgid "Enter one value without commas."
-msgstr "Saisissez une seule valeur sans virgule."
-
-msgid "Loading values..."
-msgstr "Chargement des valeurs..."
-
-msgid "No values match the filter."
-msgstr "Aucune valeur ne correspond au filtre."
-
-msgid "No values stored for this column yet. Add one below."
-msgstr "Cette colonne ne contient pas encore de valeurs. Ajoutez-en une ci-dessous."
-
-msgid "Search or filter values"
-msgstr "Rechercher ou filtrer les valeurs"
-
-msgid "Search or filter values..."
-msgstr "Rechercher ou filtrer les valeurs..."
-
-msgid "e.g. Category.SubCategory.Item"
-msgstr "p. ex. Catégorie.SousCatégorie.Élément"
-
-msgid "Select values"
-msgstr "Sélectionner des valeurs"
-
-msgid "Add a new value"
-msgstr "Ajouter une nouvelle valeur"

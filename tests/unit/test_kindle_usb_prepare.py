@@ -16,9 +16,9 @@ def _ctx(path="/api/v1/books/5/kindle-usb"):
     return app.test_request_context(path, method="POST")
 
 
-def _user(download=True, anon=False):
+def _user(download=True, anon=False, edit=True):
     return SimpleNamespace(is_authenticated=True, is_anonymous=anon, id=1, name="alice",
-                           role_download=lambda: download)
+                           role_download=lambda: download, role_edit=lambda: edit)
 
 
 def _body(resp):
@@ -128,4 +128,12 @@ def test_prepare_is_unavailable_when_admin_disables_kindle_usb():
     resp, convert = _call(_book(["EPUB"]), enabled=False)
     assert (resp[1] if isinstance(resp, tuple) else resp.status_code) == 404
     assert _body(resp)["error"]["code"] == "kindle_usb_disabled"
+    convert.assert_not_called()
+
+
+
+@pytest.mark.unit
+def test_download_only_account_cannot_add_a_converted_format():
+    resp, convert = _call(_book(["EPUB", "PDF"]), user=_user(edit=False))
+    assert _body(resp)["format"] == "PDF"
     convert.assert_not_called()

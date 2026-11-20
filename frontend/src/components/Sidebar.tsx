@@ -394,8 +394,12 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                             </Link>
                             <button type="button" className={styles.sectionControl}
                               aria-label={eject} title={eject} data-testid={`sidebar-device-${device.id}-eject`}
+                              disabled={device.busy !== null}
                               onClick={() => {
-                                void device.eject().then(() => announce(t('{name} ejected. It is safe to unplug.', { name: device.name })));
+                                void device.eject().then(
+                                  () => announce(t('{name} ejected. It is safe to unplug.', { name: device.name })),
+                                  () => announce(t('Could not confirm safe eject. Keep the Kindle connected and try again.')),
+                                );
                               }}>
                               <Unplug size={16} aria-hidden="true" focusable={false} />
                             </button>

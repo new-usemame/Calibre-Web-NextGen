@@ -5,14 +5,13 @@
  * Add a kind by writing a driver (see ./kindle.tsx) and listing it in DRIVERS.
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import type { Me } from '../api';
 import { useKindleDevices } from './kindle';
 import type { ConnectedDevice, DeviceSource } from './types';
 
 export * from './types';
 
-/** A driver is a hook: `enabled` is false when the account may not use devices at all. */
-type DeviceDriver = (enabled: boolean) => { devices: ConnectedDevice[]; source: DeviceSource };
+/** A driver is a hook. An account ID is present only while devices are allowed. */
+type DeviceDriver = (ownerId: number | undefined) => { devices: ConnectedDevice[]; source: DeviceSource };
 
 const DRIVERS: readonly DeviceDriver[] = [useKindleDevices];
 
@@ -23,13 +22,9 @@ interface DevicesValue {
 const NONE: DevicesValue = { devices: [], sources: [] };
 const DevicesContext = createContext<DevicesValue>(NONE);
 
-export function canUseKindleUsb(me: Me | null | undefined): boolean {
-  return !!me?.id && !me.role?.anonymous && !!me.role?.download && me.features?.kindle_usb === true;
-}
-
-export function DevicesProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+export function DevicesProvider({ ownerId, children }: { ownerId: number | undefined; children: ReactNode }) {
   // DRIVERS is a module constant, so these hook calls happen in the same order on every render.
-  const results = DRIVERS.map((driver) => driver(enabled));
+  const results = DRIVERS.map((driver) => driver(ownerId));
   // Each driver memoises what it returns, so key on those and not on the fresh array.
   const value = useMemo<DevicesValue>(() => ({
     devices: results.flatMap((r) => r.devices),

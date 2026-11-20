@@ -50,7 +50,7 @@ export function ConnectedDevice({ id }: { id: string }) {
     if (!device) return;
     setImport(entry.handle, { state: 'busy' });
     try {
-      const bytes = await device.read(entry.handle);
+      const bytes = await device.read(entry);
       const res = await upload.mutateAsync([new File([new Uint8Array(bytes)], entry.name)]);
       const failed = res.errors[0];
       if (failed) setImport(entry.handle, { state: 'error', text: failed.error });
@@ -77,7 +77,7 @@ export function ConnectedDevice({ id }: { id: string }) {
       : t('This file is not in your library, so it will be gone.');
     if (!window.confirm(`${t('Remove "{title}" from {name}?', { title: what, name: device.name || device.label })} ${tail}`)) return;
     setRemoveError(null);
-    device.remove(entry.handle).then(
+    device.remove(entry).then(
       () => announce(t('Removed from {name}.', { name: device.name || device.label })),
       (err) => {
         const message = device.describeError(err);
@@ -148,6 +148,7 @@ export function ConnectedDevice({ id }: { id: string }) {
             data-testid="device-connect">
             {ejected ? t('Reconnect') : t('Connect {name}', { name: device.label })}
           </button>
+          {ejectError && <p role="alert">{t('Could not confirm safe eject. Keep the Kindle connected and try again.')}</p>}
         </EmptyState>
       </div>
     );
@@ -194,7 +195,7 @@ export function ConnectedDevice({ id }: { id: string }) {
           </button>
         </div>
       </header>
-      {ejectError && <p role="alert">{t('Could not eject the Kindle. Keep it connected and try again.')}</p>}
+      {ejectError && <p role="alert">{t('Could not confirm safe eject. Keep the Kindle connected and try again.')}</p>}
 
       {(removeError ?? connectError ?? device.error) && (
         <p className={styles.error} role="alert">{removeError ?? connectError ?? device.error}</p>

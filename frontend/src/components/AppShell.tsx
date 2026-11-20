@@ -11,7 +11,8 @@ import { UploadImportWatcher } from './UploadImportWatcher';
 import { contextSidebarForLocation } from '../lib/contextSidebars';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useMe } from '../lib/queries';
-import { canUseKindleUsb, DevicesProvider } from '../lib/device';
+import { DevicesProvider } from '../lib/device';
+import { canUseKindleUsb } from '../lib/permissions';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -23,9 +24,9 @@ interface AppShellProps {
 
 export function AppShell(props: AppShellProps) {
   const me = useMe().data;
-  const devicesEnabled = canUseKindleUsb(me);
+  const deviceOwner = canUseKindleUsb(me) ? me?.id : undefined;
   return (
-    <DevicesProvider enabled={devicesEnabled}>
+    <DevicesProvider ownerId={deviceOwner}>
       <ShelfDragProvider><ShellContents {...props} /></ShelfDragProvider>
     </DevicesProvider>
   );

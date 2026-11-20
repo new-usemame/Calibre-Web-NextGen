@@ -703,11 +703,12 @@ export function BookDetail() {
     });
   }
   for (const device of devices) {
-    const entry = device.onDevice(book.id);
-    if (!entry) continue;
+    const matches = device.entries.filter((entry) => entry.book?.id === book.id);
+    if (matches.length !== 1) continue;
+    const [entry] = matches;
     const name = device.name || device.label;
     menuItems.push({
-      id: `remove-from-${device.kind}`,
+      id: `remove-from-${device.id}`,
       label: t('Remove from {name}', { name }),
       icon: <Usb size={15} />,
       danger: true,
@@ -715,7 +716,7 @@ export function BookDetail() {
       onSelect: () => {
         if (!window.confirm(t('Remove "{title}" from {name}? The book stays in your library.', { title: book.title, name }))) return;
         setUsbBanner(null);
-        device.remove(entry.handle).then(
+        device.remove(entry).then(
           () => announce(t('Removed from {name}.', { name })),
           (err) => {
             const message = device.describeError(err);

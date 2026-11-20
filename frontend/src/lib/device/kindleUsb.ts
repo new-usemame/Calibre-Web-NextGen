@@ -39,6 +39,37 @@ interface UsbApi {
   requestDevice(options: { filters: Array<{ vendorId: number }> }): Promise<UsbDeviceLike>;
 }
 
+export function createKindleDeviceKeys(
+  storage: () => Pick<Storage, 'getItem' | 'setItem'> = () => sessionStorage,
+): (device: UsbDeviceLike) => string {
+  // Keep serials inside the tab. Only the generated key goes into app URLs.
+  const keyed = new Map<string, string>();
+  const anonymous = new WeakMap<UsbDeviceLike, string>();
+  return (device) => {
+    const serial = device.serialNumber;
+    if (!serial) {
+      const known = anonymous.get(device);
+      if (known) return known;
+      const generated = crypto.randomUUID();
+      anonymous.set(device, generated);
+      return generated;
+    }
+    const known = keyed.get(serial);
+    if (known) return known;
+
+    const storageKey = `cwng:kindle-route-key:${serial}`;
+    let key: string = crypto.randomUUID();
+    try {
+      const saved = storage().getItem(storageKey);
+      const isUuid = saved && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(saved);
+      if (isUuid) key = saved;
+      else storage().setItem(storageKey, key);
+    } catch { /* the in-memory key still works for this page */ }
+    keyed.set(serial, key);
+    return key;
+  };
+}
+
 export const AMAZON_VENDOR_ID = 0x1949;
 
 const OP = {
@@ -174,13 +205,16 @@ export class MtpSession {
     }
   }
 
-  private async readContainer(): Promise<{ type: number; code: number; payload: Uint8Array }> {
+  private async readContainer(): Promise<{ type: number; code: number; tid: number; payload: Uint8Array }> {
     await this.fill(12);
     const dv = new DataView(this.buffer.buffer, this.buffer.byteOffset, 12);
     const length = dv.getUint32(0, true);
-    if (length === 0xffffffff) throw new MtpError('Unsupported unknown-length MTP data container', 0);
+    if (length < 12 || length === 0xffffffff) throw new MtpError('Unsupported MTP data container length', 0);
     await this.fill(length);
-    const container = { type: dv.getUint16(4, true), code: dv.getUint16(6, true), payload: this.buffer.slice(12, length) };
+    const container = {
+      type: dv.getUint16(4, true), code: dv.getUint16(6, true),
+      tid: dv.getUint32(8, true), payload: this.buffer.slice(12, length),
+    };
     this.buffer = this.buffer.slice(length);
     return container;
   }
@@ -192,6 +226,9 @@ export class MtpSession {
     let received: Uint8Array | null = null;
     for (;;) {
       const c = await this.readContainer();
+      if ((c.type === 2 || c.type === 3) && c.tid !== tid) {
+        throw new MtpError('MTP response did not match the current transaction', 0);
+      }
       if (c.type === 2) {
         received = c.payload;
       } else if (c.type === 3) {
@@ -218,8 +255,11 @@ export class MtpSession {
 
   async close(): Promise<void> {
     if (!this.sessionOpen) return;
-    try { await this.transact(OP.CloseSession); } catch { /* the device may already be gone */ }
-    this.sessionOpen = false;
+    try {
+      await this.transact(OP.CloseSession);
+    } finally {
+      this.sessionOpen = false;
+    }
   }
 
   async storageId(): Promise<number> {
@@ -319,6 +359,7 @@ const MAX_FOLDER_DEPTH = 3;
 
 export interface DeviceFile {
   handle: number;
+  parent: number;
   name: string;
   size: number;
   /** Folder path below documents/ ('' for the top level). Calibre files books into author folders. */
@@ -344,6 +385,7 @@ export class KindleConnection {
   private chain: Promise<unknown> = Promise.resolve();
   private closed = false;
   private closing: Promise<void> | null = null;
+  private closeSessionError: unknown = null;
 
   private constructor(device: UsbDeviceLike, session: MtpSession, claimed: number, storage: number, docs: number) {
     this.device = device;
@@ -388,7 +430,10 @@ export class KindleConnection {
     if (this.closed || this.closing) {
       return Promise.reject(new MtpError('The Kindle is no longer connected.', 0));
     }
-    const next = this.chain.then(task);
+    const next = this.chain.then(() => {
+      if (this.closed || this.closing) throw new MtpError('The Kindle is no longer connected.', 0);
+      return task();
+    });
     this.chain = next.catch(() => undefined);
     return next;
   }
@@ -410,7 +455,7 @@ export class KindleConnection {
             continue;
           }
           const ext = fileExtension(o.name);
-          if (DEVICE_BOOK_EXTENSIONS.has(ext)) out.push({ handle: o.handle, name: o.name, size: o.size, folder, ext });
+          if (DEVICE_BOOK_EXTENSIONS.has(ext)) out.push({ handle: o.handle, parent: o.parent, name: o.name, size: o.size, folder, ext });
         }
       };
       await walk(this.docs, '', 0);
@@ -418,38 +463,67 @@ export class KindleConnection {
     });
   }
 
+  private async validateFile(file: DeviceFile): Promise<void> {
+    const current = await this.session.objectInfo(file.handle);
+    if (current.isFolder || current.name !== file.name || current.size !== file.size || current.parent !== file.parent) {
+      throw new MtpError('The file changed on the Kindle. Refresh the list and try again.', 0);
+    }
+  }
+
   /** The bytes of a file found by listBooks(). */
-  read(handle: number): Promise<Uint8Array> {
-    return this.run(() => this.session.download(handle));
+  read(file: DeviceFile): Promise<Uint8Array> {
+    return this.run(async () => {
+      await this.validateFile(file);
+      return this.session.download(file.handle);
+    });
   }
 
   /** Delete a file found by listBooks(). Its .sdr sidecar folder (reading position, notes) is left to the Kindle. */
-  delete(handle: number): Promise<void> {
-    return this.run(() => this.session.remove(handle));
+  delete(file: DeviceFile): Promise<void> {
+    return this.run(async () => {
+      await this.validateFile(file);
+      await this.session.remove(file.handle);
+    });
   }
 
-  /** Write a book into documents/, replacing an earlier copy of the same name. */
+  /** Write a book into documents/ without replacing any existing file or folder. */
   send(filename: string, bytes: Uint8Array, onPhase?: (phase: SendPhase) => void): Promise<void> {
     return this.run(async () => {
       onPhase?.('sending');
-      const existing = (await this.session.list(this.storage, this.docs)).find((o) => o.name === filename);
-      if (existing) await this.session.remove(existing.handle);
-      await this.session.upload(this.storage, this.docs, filename, bytes);
+      const files = await this.session.list(this.storage, this.docs);
+      const filenameKey = (name: string) => name.normalize('NFC').toLowerCase();
+      const taken = new Set(files.map((file) => filenameKey(file.name)));
+      const extensionIndex = filename.lastIndexOf('.');
+      const stem = extensionIndex > 0 ? filename.slice(0, extensionIndex) : filename;
+      const extension = extensionIndex > 0 ? filename.slice(extensionIndex) : '';
+      let target = filename;
+      for (let suffix = 2; taken.has(filenameKey(target)); suffix += 1) {
+        target = `${stem} (${suffix})${extension}`;
+      }
+      await this.session.upload(this.storage, this.docs, target, bytes);
     });
+  }
+
+  get isOpen(): boolean {
+    return this.device.opened;
   }
 
   /** End the session and hand the interface back, so Calibre and similar tools can use the Kindle again. */
   async close(): Promise<void> {
     if (this.closing) return this.closing;
-    if (this.closed && !this.device.opened) return;
+    if (this.closed && !this.device.opened) {
+      if (this.closeSessionError) throw this.closeSessionError;
+      return;
+    }
     this.closing = (async () => {
       // Finish transfers already in the queue before closing the device.
       await this.chain;
       this.closed = true;
-      await this.session.close();
+      try { await this.session.close(); } catch (error) { this.closeSessionError = error; }
       // An interface may already be released when a previous close failed.
       try { await this.device.releaseInterface(this.claimed); } catch { /* close still runs */ }
       await this.device.close();
+      if (this.closeSessionError) throw this.closeSessionError;
     })();
     try {
       await this.closing;

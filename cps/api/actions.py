@@ -661,7 +661,9 @@ def prepare_kindle_usb(book_id):
         return _err("not_found", "Book not found", 404)
 
     available = [d.format.upper() for d in book.data]
-    chosen, source = kindle_usb_plan(available, bool(getattr(config, "config_converterpath", None)))
+    # Conversion persists another format in the shared library.
+    can_convert = current_user.role_edit() and bool(getattr(config, "config_converterpath", None))
+    chosen, source = kindle_usb_plan(available, can_convert)
     converted = False
     if source:
         err = convert_book_format(book.id, config.get_book_path(), source, chosen,

@@ -120,3 +120,10 @@ def test_resolve_is_unavailable_when_admin_disables_kindle_usb():
     resp = _call({"files": ["Dune.azw3"]}, enabled=False)
     assert (resp[1] if isinstance(resp, tuple) else resp.status_code) == 404
     assert resp[0].get_json()["error"]["code"] == "kindle_usb_disabled"
+
+
+
+@pytest.mark.unit
+def test_same_title_and_author_with_multiple_editions_is_ambiguous():
+    index, authors = _index((1, "Dune", ["Frank Herbert"]), (2, "Dune", ["Frank Herbert"]))
+    assert ku.match_book("Dune - Frank Herbert.azw3", index, authors) is None

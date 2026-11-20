@@ -14,7 +14,7 @@ import { TagsBrowse, TagGroup } from './pages/TagsBrowse';
 import { NotFound } from './pages/NotFound';
 import { Shelves } from './pages/Shelves';
 import { ConnectedDevice } from './pages/ConnectedDevice';
-import { canUseKindleUsb } from './lib/device';
+import { canUseKindleUsb } from './lib/permissions';
 import { ShelfEditor } from './pages/ShelfEditor';
 import { MagicShelves } from './pages/MagicShelves';
 import { Shelf } from './pages/Shelf';

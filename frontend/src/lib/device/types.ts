@@ -19,6 +19,7 @@ export interface DeviceBook {
 export interface DeviceEntry {
   /** Unique within the device. */
   handle: number;
+  parent: number;
   name: string;
   /** Lower-case extension without the dot. */
   ext: string;
@@ -56,9 +57,9 @@ export interface ConnectedDevice {
   /** Prepare (convert if needed), download and push one book. Connects first when needed. */
   send: (bookId: number, onPhase?: (phase: string) => void) => Promise<DeviceSendResult>;
   /** The content of one of `entries`, to bring a book that is only on the device into the library. */
-  read: (handle: number) => Promise<Uint8Array>;
+  read: (entry: DeviceEntry) => Promise<Uint8Array>;
   /** Delete one of `entries` from the device. */
-  remove: (handle: number) => Promise<void>;
+  remove: (entry: DeviceEntry) => Promise<void>;
   /** The device's copy of a library book, or undefined. */
   onDevice: (bookId: number) => DeviceEntry | undefined;
   /** Text for a failure from this device, or null for something that is not a failure

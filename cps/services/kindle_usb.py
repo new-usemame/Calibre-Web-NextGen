@@ -46,9 +46,9 @@ def match_book(filename, title_index, author_keys_for):
         if not ids:
             continue
         if author_key:
-            for book_id in ids:
-                if author_key in author_keys_for(book_id):
-                    return book_id
+            matches = [book_id for book_id in ids if author_key in author_keys_for(book_id)]
+            if matches:
+                return matches[0] if len(matches) == 1 else None
         elif len(ids) == 1:
             return ids[0]
     return None

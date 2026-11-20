@@ -278,6 +278,35 @@ def test_real_checkforchanges_route_captures_actual_filtered_upstream_and_device
 
 
 @pytest.mark.unit
+def test_checkforchanges_capture_records_local_suppression_with_store_proxy_off(
+    monkeypatch, tmp_path,
+):
+    _, root = _enable(monkeypatch, tmp_path)
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", False)
+    monkeypatch.setattr(rs, "_capture_authority_status", lambda _ownership: None)
+
+    def unexpected_proxy(**_kwargs):
+        pytest.fail("store proxy is off")
+
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", unexpected_proxy)
+    response = _check_app(monkeypatch).test_client().post(
+        "/api/v3/content/checkforchanges",
+        json=[{"ContentId": OWNED}, {"ContentId": FOREIGN}],
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == []
+    [record] = _records(root)
+    assert record["upstream_request"] is None
+    assert record["upstream_response"] is None
+    assert record["device_response"]["body"]["data"].encode() == response.get_data()
+    assert [(item["content_id"], item["action"]) for item in record["decisions"]] == [
+        (OWNED, "suppressed"),
+        (FOREIGN, "suppressed"),
+    ]
+
+
+@pytest.mark.unit
 def test_capture_enabled_and_capture_failure_leave_response_byte_identical(monkeypatch, tmp_path):
     capture, _root = _enable(monkeypatch, tmp_path)
 

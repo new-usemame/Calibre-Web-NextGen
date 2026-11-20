@@ -338,10 +338,10 @@ def test_reconcile_never_overwrites_a_declared_verdict(sidecar, tmp_path):
 def test_admin_form_saves_hierarchy_modes_without_a_sentinel(sidecar, monkeypatch):
     """Submit the fields the rendered form actually contains through its handler."""
     import inspect
-    from flask import Flask
-    from flask_babel import Babel
     from cps import admin
     from cps.config_sql import ConfigSQL
+    from tests.unit.api_basic_auth_world import build_api_app
+
     config = ConfigSQL.__new__(ConfigSQL)
     config.__dict__['dirty'] = []
     config.config_restricted_column = config.config_read_column = config.config_default_role = 0
@@ -351,9 +351,7 @@ def test_admin_form_saves_hierarchy_modes_without_a_sentinel(sidecar, monkeypatc
     monkeypatch.setattr(admin, 'view_configuration', lambda: 'saved')
     monkeypatch.setattr(admin, 'load_eligible_columns', lambda: [])
     monkeypatch.setattr(admin, 'flash', lambda *a, **kw: None)
-    app = Flask(__name__)
-    app.secret_key = 'test'
-    Babel(app)
+    app = build_api_app(sidecar.session)
     for mode, expected in [('hierarchical', True), ('flat', False), ('auto', None)]:
         with app.test_request_context('/admin/viewconfig', method='POST', data={'cc_hierarchy_mode_3': mode}):
             assert inspect.unwrap(admin.update_view_configuration)() == 'saved'

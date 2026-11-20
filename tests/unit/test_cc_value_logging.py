@@ -151,10 +151,8 @@ def test_a_refused_operation_writes_no_success_line(captured):
     """The rule that matters most. A 409 asked about a merge, or a 409 for a
     reorder that is already at the end, must not leave a line saying it
     happened."""
-    from werkzeug.exceptions import Conflict
-    from flask import Flask
+    from cps import app
 
-    app = Flask(__name__)
     with app.test_request_context("/"):
         response, status = cc_values._conflict("Already at the top", [])
 

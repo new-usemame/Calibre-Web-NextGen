@@ -29,7 +29,6 @@ import logging
 import sqlite3
 from types import SimpleNamespace
 
-import flask
 import pytest
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, event, text
 from sqlalchemy.orm import declarative_base, relationship
@@ -210,15 +209,10 @@ def library(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def client(library):
-    from flask_babel import Babel
+    from tests.unit.api_basic_auth_world import build_api_app
 
-    from cps.api import api_v1
-    app = flask.Flask(__name__)
-    app.testing = True
+    app = build_api_app(library.session)
     app.config["WTF_CSRF_ENABLED"] = False
-    app.config["SECRET_KEY"] = "test"
-    Babel(app)
-    app.register_blueprint(api_v1)
     return app.test_client()
 
 

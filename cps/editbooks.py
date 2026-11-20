@@ -374,7 +374,7 @@ def edit_selected_books():
                     })
                     continue
 
-            helper.mark_book_modified(book, set_dirty=metadata_changed)
+            helper.mark_book_modified(book, set_dirty=metadata_changed, metadata_only=True)
             try:
                 calibre_db.session.commit()
             except (OperationalError, IntegrityError, StaleDataError) as e:
@@ -815,7 +815,7 @@ def edit_book_param(param, vals):
             log_value = vals.get('value', '')
         else:
             return _("Parameter not found"), 400
-        helper.mark_book_modified(book, set_dirty=metadata_changed)
+        helper.mark_book_modified(book, set_dirty=metadata_changed, metadata_only=True)
 
         calibre_db.session.commit()
         # revert change for sort if automatic fields link is deactivated
@@ -1155,7 +1155,8 @@ def do_edit_book(book_id, upload_formats=None):
                 modify_date = True
             modify_date |= edit_book_ratings(to_save, book)
         else:
-            to_save, edit_error = upload_book_formats(upload_formats, book, book_id, book.has_cover)
+            to_save, edit_error, format_written = upload_book_formats(upload_formats, book, book_id, book.has_cover)
+            modify_date |= format_written
 
         cover_upload_success = upload_cover(request, book)
         if cover_upload_success or to_save.get("format_cover"):
@@ -1233,6 +1234,7 @@ def do_edit_book(book_id, upload_formats=None):
         if config.config_kobo_sync and config.hardcover_sync_enabled():
             modify_date |= edit_hardcover_blacklist(book_id, to_save)
 
+        previous_pubdate = book.pubdate
         if to_save.get("pubdate"):
             try:
                 # Accept year-only ("2020") and year-month ("2020-05") in
@@ -1245,10 +1247,14 @@ def do_edit_book(book_id, upload_formats=None):
                 edit_error = True
         else:
             book.pubdate = db.Books.DEFAULT_PUBDATE
+        modify_date |= book.pubdate != previous_pubdate
 
         # Stage 3: Commit all changes to the database.
         if modify_date:
-            helper.mark_book_modified(book)
+            if not upload_formats and cover_stage is None and book.has_cover == previous_cover_metadata[0]:
+                helper.mark_book_modified(book, metadata_only=True)
+            else:
+                helper.mark_book_modified(book)
 
         # Hold the process-shared metadata.db write lock for the
         # duration of the commit. Coordinates with the ingest_processor
@@ -2376,6 +2382,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
     # Check and handle Uploaded file
     to_save = dict()
     error = False
+    format_written = False
     allowed_extensions = config.config_upload_formats.split(',')
     for requested_file in requested_files:
         current_filename = requested_file.filename
@@ -2426,6 +2433,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                 flash(_("Failed to store file %(file)s.", file=saved_filename), category="error")
                 error = True
                 continue
+            format_written = True
 
             if file_ext == "kepub":
                 # An uploaded KEPUB never passes through conversion, and the
@@ -2490,7 +2498,7 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
     #    for lang_code in to_save['languages'].split(','):
     #        langs.append(isoLanguages.get_language_name(get_locale(), lang_code))
     #    to_save['languages'] = ",".join(langs)
-    return to_save, error
+    return to_save, error, format_written
 
 
 def upload_cover(cover_request, book):

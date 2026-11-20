@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import { UploadCloud, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useUploadBooks, useMe } from '../lib/queries';
+import { useImportWatch } from '../lib/uploadImportStore';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { canUploadBooks } from '../lib/permissions';
@@ -14,6 +15,7 @@ export function Upload() {
   const t = useT();
   const me = useMe().data;
   const upload = useUploadBooks();
+  const watch = useImportWatch();
   const [dragover, setDragover] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +120,16 @@ export function Upload() {
               </p>
               <ul>{result.errors.map((e) => <li key={e.filename}>{e.filename} — {e.error}</li>)}</ul>
             </div>
+          )}
+          {result.queued.length > 0 && watch && (
+            // Quiet while the count climbs, so a large batch does not have a
+            // screen reader announcing every update; the end is announced.
+            <p className={styles.importProgress} aria-live={watch.status === 'watching' ? 'off' : 'polite'}>
+              {t('{done} of {total} imported', { done: watch.imported, total: watch.expected })}
+              {watch.status === 'stalled' && (
+                <>{' '}{t('No new books have appeared for a while; {count} not imported yet.', { count: watch.expected - watch.imported })}</>
+              )}
+            </p>
           )}
           {result.queued.length > 0 && (
             <div className={styles.afterActions}>

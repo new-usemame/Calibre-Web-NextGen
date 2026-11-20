@@ -1489,9 +1489,18 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "重複スキャンが完了しました（フォールバック）"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 #, fuzzy
 msgid "Invalid resolution strategy"
 msgstr "無効なロール"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -4960,6 +4969,23 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr ""
 
@@ -6041,6 +6067,10 @@ msgid "Could not open the synced position."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr ""
 
@@ -6074,6 +6104,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not reset password."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6213,6 +6247,10 @@ msgstr ""
 msgid "Crop to fill — no border, trims the edges"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr ""
@@ -6298,6 +6336,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6693,6 +6735,47 @@ msgstr ""
 msgid "Email settings saved."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "空"
@@ -7059,7 +7142,7 @@ msgstr ""
 msgid "Hide fields"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr ""
 
@@ -7236,6 +7319,26 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Keep connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7550,6 +7653,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Member user filter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7943,6 +8050,10 @@ msgid "Nothing requested yet."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr ""
 
@@ -8266,6 +8377,10 @@ msgstr ""
 msgid "Previewing {source}. Its saved position will not change."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "前"
@@ -8372,6 +8487,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Recipient(s)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8588,6 +8707,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reset to defaults"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9102,7 +9230,7 @@ msgstr ""
 msgid "Show more"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr ""
 
@@ -9293,6 +9421,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Storyteller is configured but could not be reached."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Strategy"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
@@ -9876,6 +10008,12 @@ msgstr ""
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10529,6 +10667,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr ""
 
@@ -10697,6 +10840,44 @@ msgstr ""
 msgid "{failed} of {total} books could not be added. They remain selected."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -10805,6 +10986,10 @@ msgid "KaiTi"
 msgstr "楷体"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr ""
 
@@ -10822,6 +11007,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
@@ -10846,6 +11037,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_review.html
@@ -11441,6 +11637,29 @@ msgid "Could not change image fit. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Applies when you choose My Library. The user adds books from the global "
+"library themselves. Not available once an account already syncs books to a "
+"Kobo."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} an empty My Library? They start with no books and add what they "
+"want from the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Needs the global-browse role: without it the user could not add any books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Start My Library empty"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Keep this copy"
 msgstr ""
 
@@ -11473,6 +11692,16 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not merge these books."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
 msgstr ""
 
 #: cps/tag_hierarchy.py
@@ -18449,6 +18678,16 @@ msgid "Reset user Password"
 msgstr "パスワードをリセット"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] ""
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr ""
+
+#: cps/templates/user_edit.html
 #, fuzzy
 msgid "eReader Configuration"
 msgstr "サーバー設定"
@@ -18597,6 +18836,13 @@ msgid ""
 "Defaults off. Stage 0 only captures recovery evidence and does not change "
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
+"Only applies when choosing My Library above. The user starts with no books "
+"and adds what they want from the global library, so they need the global-"
+"browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
 
 #: cps/templates/user_edit.html

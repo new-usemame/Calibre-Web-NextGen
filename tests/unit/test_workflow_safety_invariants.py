@@ -668,7 +668,10 @@ def test_e2e_playwright_install_is_version_cached_and_bounded():
         assert isinstance(step_timeout, int), (
             "each E2E dependency/browser install needs an explicit hang guard"
         )
-        assert 5 <= step_timeout <= 15, (
+        # Upper bound 25: a slow apt mirror needs about 14m for the browser
+        # step's 186 packages (run 44582337839), and a real hang must still
+        # fail long before the 180-minute job guard.
+        assert 5 <= step_timeout <= 25, (
             "each install cap must reject the former three-minute false-red "
             "budget but still fail fast instead of consuming the 180-minute job"
         )

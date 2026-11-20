@@ -84,6 +84,8 @@ def _annotation_children():
         (ub.DeviceRetiredAssignment, ub.DeviceRetiredAssignment.annotation_id),
         (ub.AnnotationContentIdMigration,
          ub.AnnotationContentIdMigration.annotation_row_id),
+        # Holds the verbatim clipping text of a CrossPoint reader.
+        (ub.CrossPointClipping, ub.CrossPointClipping.annotation_id),
     )
 
 
@@ -104,7 +106,8 @@ def _delete_annotation(session, annotation):
 # still handled below.
 PER_USER_BOOK_MODELS = (
     "Annotation",            # + sync-target, device-state, retired-assignment,
-                             #   content-id journal and materialization children
+                             #   content-id journal, materialization and
+                             #   CrossPoint clipping children
     "Bookmark",
     "ReadBook",
     "KoboReadingState",      # + KoboBookmark/KoboStatistics children

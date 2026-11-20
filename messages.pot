@@ -18655,96 +18655,96 @@ msgid "Show Read/Unread Section"
 msgstr ""
 
 
-#: cps/admin.py:614 cps/templates/admin.html:229
-#: cps/templates/hardcover_missing_ids.html:4
-#: cps/templates/hardcover_review_matches.html:53
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
 msgid "Books without a Hardcover ID"
 msgstr ""
 
-#: cps/admin.py:628
+#: cps/admin.py
 #, python-format
 msgid "Error listing books without a Hardcover ID: %(error)s"
 msgstr ""
 
-#: cps/admin.py:652
+#: cps/admin.py
 msgid ""
 "Hardcover matching started for every book without a Hardcover ID. Check "
 "Tasks for progress."
 msgstr ""
 
-#: cps/admin.py:677
+#: cps/admin.py
 msgid "The next Hardcover auto-fetch will search this book again."
 msgstr ""
 
-#: cps/admin.py:681
+#: cps/admin.py
 #, python-format
 msgid "Error: %(error)s"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:7
+#: cps/templates/hardcover_missing_ids.html
 #, python-format
 msgid ""
 "Reading progress, read status and annotations only reach Hardcover for books"
 " that carry a Hardcover identifier. These %(total)s book(s) have none."
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:13
+#: cps/templates/hardcover_missing_ids.html
 msgid "Waiting for review"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:14
+#: cps/templates/hardcover_missing_ids.html
 msgid "Rejected"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:15
+#: cps/templates/hardcover_missing_ids.html
 msgid "Skipped"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:16
+#: cps/templates/hardcover_missing_ids.html
 msgid "Not matched yet"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:31
+#: cps/templates/hardcover_missing_ids.html
 msgid ""
 "Searches Hardcover again for every book listed here, including those waiting"
 " for review. Rejected books are skipped."
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:32
+#: cps/templates/hardcover_missing_ids.html
 msgid "Match again now"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:39
+#: cps/templates/hardcover_missing_ids.html
 msgid ""
 "Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:41
+#: cps/templates/hardcover_missing_ids.html
 msgid ""
 "No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
 "configure in Basic Configuration."
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:50
+#: cps/templates/hardcover_missing_ids.html
 #, python-format
 msgid "Page %(page)s of %(pages)s"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:73
+#: cps/templates/hardcover_missing_ids.html
 msgid ""
 "Fetch metadata from Hardcover on the edit page to add the identifier by "
 "hand."
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:78
+#: cps/templates/hardcover_missing_ids.html
 msgid "Allow retry"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:88
+#: cps/templates/hardcover_missing_ids.html
 msgid "Nothing to show"
 msgstr ""
 
-#: cps/templates/hardcover_missing_ids.html:89
+#: cps/templates/hardcover_missing_ids.html
 msgid "No book without a Hardcover ID matches this filter."
 msgstr ""

@@ -14,12 +14,11 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask
-from flask_babel import Babel
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from cps import admin, db, ub
+from tests.unit.hardcover_admin_world import hardcover_admin_app  # noqa: F401
 
 pytestmark = pytest.mark.unit
 
@@ -31,7 +30,7 @@ def _unwrap(fn):
 
 
 @pytest.fixture
-def env(monkeypatch):
+def env(monkeypatch, hardcover_admin_app):
     cal_engine = create_engine("sqlite://")
 
     @event.listens_for(cal_engine, "connect")
@@ -73,14 +72,7 @@ def env(monkeypatch):
         hardcover_sync_enabled=lambda: True, resolved_hardcover_token=lambda: "token"))
     monkeypatch.setattr(admin, "render_title_template",
                         lambda template, **kwargs: rendered.update(template=template, **kwargs) or "ok")
-    app = Flask(__name__)
-    app.secret_key = "test"
-    Babel(app)
-    for rule, endpoint in [("/admin/hardcover/missing", "admin.hardcover_missing_ids"),
-                           ("/admin/hardcover/review-matches", "admin.hardcover_review_matches"),
-                           ("/admin", "admin.admin")]:
-        app.add_url_rule(rule, endpoint=endpoint, view_func=lambda: "")
-    yield SimpleNamespace(app=app, cal=cal, us=us, rendered=rendered)
+    yield SimpleNamespace(app=hardcover_admin_app, cal=cal, us=us, rendered=rendered)
     cal.close()
     us.close()
     cal_engine.dispose()
@@ -174,31 +166,10 @@ def test_pagination_reaches_every_missing_book_and_keeps_status_filter(env, monk
 def test_new_routes_enforce_login_admin_and_csrf(env, monkeypatch, actor, expected):
     """Drive the decorated handlers: denied requests cannot enqueue or lift a rejection."""
     from cps import cw_login, usermanagement
-    from flask_wtf.csrf import CSRFProtect, generate_csrf
 
-    manager = cw_login.LoginManager(env.app)
-
-    class User(cw_login.UserMixin):
-        def __init__(self, name):
-            self.id = self.name = name
-            self.locale = "fr"
-
-        def role_admin(self):
-            return self.name == "admin"
-
-    manager.user_loader(lambda user_id, user_random, session_key: User(user_id))
-    from pathlib import Path
-    env.app.config["BABEL_TRANSLATION_DIRECTORIES"] = str(Path(admin.__file__).parent / "translations")
-    Babel(env.app, locale_selector=lambda: cw_login.current_user.locale if cw_login.current_user.is_authenticated else "en")
     monkeypatch.setattr(admin, "current_user", cw_login.current_user)
     monkeypatch.setattr(admin, "render_title_template", lambda template, **kwargs: kwargs["title"])
     monkeypatch.setattr(usermanagement.config, "config_allow_reverse_proxy_header_login", False, raising=False)
-    CSRFProtect(env.app)
-    env.app.add_url_rule("/csrf", view_func=lambda: generate_csrf())
-    env.app.view_functions["admin.hardcover_missing_ids"] = admin.hardcover_missing_ids
-    env.app.add_url_rule("/admin/hardcover/rematch", view_func=admin.hardcover_rematch, methods=["POST"])
-    env.app.add_url_rule("/admin/hardcover/allow-retry/<int:book_id>",
-                         view_func=admin.hardcover_allow_retry, methods=["POST"])
     queued = []
     monkeypatch.setattr(admin, "_enqueue_hardcover_auto_fetch", lambda include_pending: queued.append(include_pending))
     client = env.app.test_client()
@@ -229,15 +200,10 @@ def test_rendered_page_keeps_filter_in_pagination_and_escapes_book_titles(env, m
     monkeypatch.setattr(admin, "HARDCOVER_MISSING_PAGE_LIMIT", 1)
     env.cal.query(db.Books).filter_by(id=1).update({"title": "<script>alert(1)</script>"})
     env.cal.commit()
-    env.app.jinja_loader = ChoiceLoader([
+    monkeypatch.setattr(env.app, "jinja_loader", ChoiceLoader([
         DictLoader({"layout.html": "{% block body %}{% endblock %}"}),
         FileSystemLoader(Path(admin.__file__).parent / "templates"),
-    ])
-    env.app.jinja_env.globals["csrf_token"] = lambda: "token"
-    for endpoint in ["admin.hardcover_rematch", "admin.hardcover_allow_retry",
-                     "web.show_book", "edit-book.show_edit_book"]:
-        env.app.add_url_rule("/" + endpoint + "/<int:book_id>" if endpoint != "admin.hardcover_rematch"
-                             else "/rematch", endpoint=endpoint, view_func=lambda **kw: "")
+    ]))
     with env.app.test_request_context("/admin/hardcover/missing?status=all&page=3"):
         _unwrap(admin.hardcover_missing_ids)()
         context = {key: value for key, value in env.rendered.items() if key != "template"}

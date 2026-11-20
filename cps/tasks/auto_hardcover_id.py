@@ -399,7 +399,7 @@ class TaskAutoHardcoverID(CalibreTask):
             return
         
         self.log.debug(f"Found {len(pool)} Hardcover results for book {book_id}")
-        
+
         # Get best match
         best_match = scored_results[0]
         best_score = best_match['score']

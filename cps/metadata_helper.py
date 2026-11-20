@@ -18,7 +18,7 @@ from cps.metadata_constants import (
 )
 from cps.search_metadata import cl as metadata_providers
 from cps.cwa_db_loader import load_cwa_db
-from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid
+from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid, normalize as normalize_isbn
 CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
@@ -104,16 +104,32 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 
                 # Search for metadata
                 results = provider.search(search_query, "", "en")
-                if not results or len(results) == 0:
-                    continue
-                    
+
                 # Prefer the candidate whose ISBN matches the book's existing ISBN
                 # over a blind first result (fork #402), and refuse a candidate
                 # that isn't plausibly this book at all (fork #1164).
                 metadata = _select_metadata_result(
                     results, book_isbn,
                     book_title=book.title, book_authors=book.authors,
-                )
+                ) if results else None
+
+                # A title search can miss when the library spells the title
+                # differently from the catalog (e.g. without diacritics). A
+                # provider that understands "isbn:<isbn>" gets a second try by
+                # the book's own ISBN, under the same confidence gate.
+                if (metadata is None and getattr(provider, "SUPPORTS_ISBN_QUERY", False) is True
+                        and (isbn_query := normalize_isbn(book_isbn))):
+                    log.debug(f"Retrying {provider.__name__} by ISBN {isbn_query}")
+                    isbn_results = provider.search(f"isbn:{isbn_query}", "", "en")
+                    if isbn_results:
+                        results = isbn_results
+                        metadata = _select_metadata_result(
+                            isbn_results, book_isbn,
+                            book_title=book.title, book_authors=book.authors,
+                        )
+
+                if not results:
+                    continue
                 if metadata is None:
                     log.info(
                         f"No confident match from {provider.__name__} for book: "

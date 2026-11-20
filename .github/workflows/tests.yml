@@ -546,11 +546,11 @@ jobs:
         needs.changed_paths.outputs.concurrency == 'true'
       ))
       )
-    # Main/PR dev-image producers may consume their full 5m classify + 15m
-    # mirror + 60m architecture + 15m manifest budgets. Their resolver is
-    # bounded to those 95m and exits as soon as the exact run/job fails. Release
-    # tags retain their independent 120m artifact wait. Leave at least 60m for
-    # setup and Playwright's two retries of a roughly 15m suite.
+    # The direct dev-image build budgets total 60m: 5m classify, 15m mirror,
+    # 30m for the parallel architecture builds, and 10m to merge the manifest.
+    # Image-neutral main commits can also wait 95m for the source image alias.
+    # Keep the paired resolver's 95m cap for that path. Release tags retain
+    # their independent 120m wait and at least 60m for setup and test retries.
     #
     # Fork PRs stay advisory while the local-build path awaits verification on
     # a real fork after merge. They run in pull_request with a read-only token,
@@ -663,7 +663,7 @@ jobs:
           else
             # Main pushes and concurrency-shaped same-repo PRs are paired with
             # docker-image-build-dev.yml. Wait only while that exact run is
-            # live, and no longer than its 95-minute job budget. No :dev
+            # live, up to the 95-minute alias polling window. No :dev
             # fallback is allowed: an absent subject cannot earn a verdict.
             tag="sha-$SUBJECT_SHA"
             attempts=191
@@ -1004,12 +1004,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
-      # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
-      # 193s (>3m) with both caches warm. Ten minutes per step gives >17x/28x
-      # median headroom and >3x that observed stall floor, while still failing
-      # a real setup hang far before the job's 180m guard.
+      # Run 33848680049 twice saw npm ci stall for 193s with warm caches.
       - name: Install frontend dependencies (npm ci)
+        # ci-time-budget: keep a margin of at least 3x the observed warm-cache stall.
         timeout-minutes: 10
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error

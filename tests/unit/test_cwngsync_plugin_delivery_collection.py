@@ -36,7 +36,7 @@ def _lua():
 def test_reader_ready_sync_cycle_claims_device_deliveries():
     ready = _function("onReaderReady")
 
-    assert "self:collectDeliveries(false, false)" in ready
+    assert "self:checkDeliveriesIfDue()" in ready
 
 
 def test_collection_uses_atomic_installer_then_acknowledges():

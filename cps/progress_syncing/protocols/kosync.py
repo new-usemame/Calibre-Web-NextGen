@@ -57,6 +57,7 @@ from flask import Blueprint, g, has_request_context, request, jsonify, send_from
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, select, String
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -92,6 +93,7 @@ MAX_DEVICE_LENGTH = 100    # Maximum device name length
 MAX_DEVICE_ID_LENGTH = 100 # Maximum device ID length
 MAX_INVENTORY_BYTES = 2 * 1024 * 1024
 MAX_INVENTORY_ITEMS = 5000
+INVENTORY_CHECKSUM_BATCH = 500  # Below SQLite's legacy 999 bind parameter limit.
 MAX_INVENTORY_PATH_LENGTH = 1024
 MAX_DELIVERY_BYTES = 64 * 1024
 _CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{32}$")
@@ -1561,6 +1563,33 @@ def _validate_inventory_entry(entry):
     }
 
 
+def _inventory_book_ids(entries):
+    """Resolve distinct checksums using the same history order as progress sync."""
+    from ... import calibre_db
+    from ...db import BookFormatChecksum, Books
+
+    checksums = list(dict.fromkeys(entry["checksum"] for entry in entries))
+    matches = {}
+    session = getattr(calibre_db, "session", None)
+    if not checksums or session is None:
+        return matches
+    for start in range(0, len(checksums), INVENTORY_CHECKSUM_BATCH):
+        batch = checksums[start:start + INVENTORY_CHECKSUM_BATCH]
+        rows = session.query(
+            BookFormatChecksum.checksum, BookFormatChecksum.book
+        ).join(Books, Books.id == BookFormatChecksum.book).filter(
+            BookFormatChecksum.checksum.in_(batch)
+        ).order_by(BookFormatChecksum.created.desc(), BookFormatChecksum.version.desc())
+        try:
+            for checksum, book_id in rows:
+                matches.setdefault(checksum, book_id)
+        except SQLAlchemyError:
+            # Inventory also tracks sideloads. As in the single-file lookup,
+            # an unavailable metadata DB must not discard the device report.
+            log.warning("KOReader inventory checksum lookup failed", exc_info=True)
+    return matches
+
+
 @csrf.exempt
 @kosync.route("/kosync/syncs/inventory", methods=["PUT"])
 def update_inventory():
@@ -1663,48 +1692,36 @@ def update_inventory():
             )
 
         now = datetime.now(timezone.utc)
-        resolved = []
-        matched_count = 0
-        for entry in normalized:
-            book_id, _fmt, _title, _path, _version = get_book_by_checksum(entry["checksum"])
-            if book_id is not None:
-                matched_count += 1
-            resolved.append((entry, book_id))
+        book_ids = _inventory_book_ids(normalized)
+        matched_count = sum(entry["checksum"] in book_ids for entry in normalized)
 
         report = ub.DeviceInventoryReport(
             device_id=device.id,
             observed_at=now,
-            item_count=len(resolved),
+            item_count=len(normalized),
             matched_count=matched_count,
         )
         ub.session.add(report)
         ub.session.flush()
 
-        for entry, book_id in resolved:
-            item = ub.session.query(ub.DeviceInventoryItem).filter_by(
-                device_id=device.id,
-                lpath=entry["lpath"],
-                checksum=entry["checksum"],
-            ).one_or_none()
-            if item is None:
-                item = ub.DeviceInventoryItem(
-                    device_id=device.id,
-                    lpath=entry["lpath"],
-                    checksum=entry["checksum"],
-                    first_seen_at=now,
-                )
-                ub.session.add(item)
-            item.book_id = book_id
-            item.size = entry["size"]
-            item.mtime = entry["mtime"]
-            item.last_seen_at = now
-            item.last_report_id = report.id
+        if normalized:
+            insert = sqlite_insert(ub.DeviceInventoryItem.__table__)
+            upsert = insert.on_conflict_do_update(
+                index_elements=["device_id", "lpath", "checksum"],
+                set_={key: insert.excluded[key] for key in
+                      ("book_id", "size", "mtime", "last_seen_at", "last_report_id")},
+            )
+            ub.session.execute(upsert, [
+                dict(entry, device_id=device.id, book_id=book_ids.get(entry["checksum"]),
+                     first_seen_at=now, last_seen_at=now, last_report_id=report.id)
+                for entry in normalized
+            ])
 
         ub.session.commit()
         return create_sync_response({
-            "accepted": len(resolved),
+            "accepted": len(normalized),
             "matched": matched_count,
-            "unmatched": len(resolved) - matched_count,
+            "unmatched": len(normalized) - matched_count,
             "report_id": report.id,
             "device": device.public_id,
         })

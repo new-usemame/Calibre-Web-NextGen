@@ -312,9 +312,9 @@ function CWNGSync:onReaderReady()
             self:flushPending(function()
                 self:getProgress(false, false)
                 if self.settings.sync_annotations then self:syncAnnotations(false) end
-                -- A book sent from the website while reading arrives now.
+                -- Check for books sent from the website while reading.
                 self:syncDeviceCapabilities(false, false)
-                self:collectDeliveries(false, false)
+                self:checkDeliveriesIfDue()
             end)
         end)
     end

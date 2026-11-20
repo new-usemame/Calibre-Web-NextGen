@@ -637,9 +637,9 @@ jobs:
   alias-image-neutral-commit:
     name: Prepare immutable subject image
     runs-on: ubuntu-latest
-    # The source producer may legitimately consume its full 95-minute
-    # classify+mirror+architecture+merge budget. The script stops sooner when
-    # that exact run/job fails and never substitutes the floating :dev tag.
+    # Retain the 95-minute polling window for an image-neutral commit's
+    # source image, including a producer started under the earlier job limits.
+    # The script stops when the exact run/job fails and never substitutes :dev.
     # ci-time-budget: keep a wait budget for the producer run, not this job's own work
     timeout-minutes: 100
     needs: classify

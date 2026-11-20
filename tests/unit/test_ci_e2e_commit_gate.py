@@ -178,7 +178,7 @@ def test_pr_classification_executes_the_base_copy_in_both_consumers():
 
 
 def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
-    """The paired resolver is bounded by the producer's own job budgets."""
+    """The paired resolver covers direct builds and immutable alias publishing."""
     import re
     import yaml
 
@@ -200,15 +200,19 @@ def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
         + max(jobs["build-amd64"]["timeout-minutes"], jobs["build-arm"]["timeout-minutes"])
         + jobs["merge"]["timeout-minutes"]
     )
-    assert wait_seconds == producer_minutes * 60
-    assert e2e["timeout-minutes"] * 60 - wait_seconds >= 60 * 60
-
     alias = jobs["alias-image-neutral-commit"]
     publish = next(
         step for step in alias["steps"] if step.get("name") == "Publish immutable commit alias"
     )
-    assert alias["timeout-minutes"] >= producer_minutes + 5
-    assert "191 30" in publish["run"]
+    alias_poll = re.search(r'"\$SUBJECT_SHA"\s+(\d+)\s+(\d+)', publish["run"])
+    assert alias_poll
+    alias_attempts, alias_interval = map(int, alias_poll.groups())
+    alias_wait_seconds = (alias_attempts - 1) * alias_interval
+
+    required_wait_seconds = max(producer_minutes * 60, alias_wait_seconds)
+    assert wait_seconds == required_wait_seconds
+    assert e2e["timeout-minutes"] * 60 - wait_seconds >= 60 * 60
+    assert alias["timeout-minutes"] * 60 >= required_wait_seconds + 5 * 60
     assert (publish.get("env") or {}).get("GITHUB_TOKEN")
     assert (e2e.get("permissions") or {}).get("actions") == "read"
 

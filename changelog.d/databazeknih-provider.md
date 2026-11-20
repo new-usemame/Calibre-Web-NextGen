@@ -5,4 +5,6 @@
   the provider list. It finds editions by ISBN or title, prefers the Slovak or
   Czech edition that matches the query, and fills in the full description,
   series and index, year, publisher, language, genres and tags, rating, cover,
-  ISBN, original title, translator and page count. Contributed by @misko903.
+  ISBN, original title, translator and page count. Turn it on in manual
+  metadata search or check it in the automatic provider order in NextGen
+  settings. Contributed by @misko903.

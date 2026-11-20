@@ -1403,7 +1403,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // First add providers in the current hierarchy order (this is the saved user preference)
     hierarchy.forEach(providerId => {
       if (providerMap[providerId]) {
-        addProviderItem(container, providerMap[providerId]);
+        addProviderItem(container, providerMap[providerId], true);
         delete providerMap[providerId]; // Remove so we don't add twice
       }
     });
@@ -1417,19 +1417,25 @@ document.addEventListener('DOMContentLoaded', function() {
     updateHiddenInput();
   }
   
-  function addProviderItem(container, provider) {
+  function addProviderItem(container, provider, inOrder = false) {
     const item = document.createElement('div');
     item.className = 'metadata-provider-item';
     item.draggable = false; // Disable native drag
     item.dataset.providerId = provider.id;
     
-    // For admin settings, show all providers as enabled/available
     item.innerHTML = `
       <span class="metadata-provider-drag-handle">⋮⋮</span>
-      <span class="metadata-provider-name">
-        ${provider.name}
-      </span>
     `;
+    const label = document.createElement(provider.requires_ingest_opt_in ? 'label' : 'span');
+    label.className = 'metadata-provider-name';
+    if (provider.requires_ingest_opt_in) {
+      const include = document.createElement('input');
+      include.type = 'checkbox';
+      include.checked = inOrder;
+      label.append(include, ' ');
+    }
+    label.append(provider.name);
+    item.appendChild(label);
     
     container.appendChild(item);
   }
@@ -1479,7 +1485,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let startY = 0;
     let startX = 0;
     
+    container.addEventListener('change', updateHiddenInput);
     container.addEventListener('mousedown', function(e) {
+      if (e.target.closest('label')) return;
       const item = e.target.closest('.metadata-provider-item');
       if (!item) return;
       
@@ -1540,7 +1548,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const hiddenInput = document.getElementById('metadata_provider_hierarchy_hidden');
     const items = container.querySelectorAll('.metadata-provider-item');
     
-    const hierarchy = Array.from(items).map(item => item.dataset.providerId);
+    const hierarchy = Array.from(items)
+      .filter(item => item.querySelector('input[type="checkbox"]')?.checked !== false)
+      .map(item => item.dataset.providerId);
     hiddenInput.value = JSON.stringify(hierarchy);
   }
   

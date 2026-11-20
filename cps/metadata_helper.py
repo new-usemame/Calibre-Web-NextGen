@@ -85,7 +85,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
-            is_enabled = metadata_provider_enabled(provider_id, enabled_map)
+            is_enabled = metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)
             if not is_enabled:
                 log.debug(f"Provider {provider_id} is globally disabled")
                 continue

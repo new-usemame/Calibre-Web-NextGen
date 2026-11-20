@@ -36,26 +36,19 @@ from html import escape
 import unicodedata
 from multiprocessing.pool import ThreadPool
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit
 
 import requests
 from lxml.html import HtmlElement, fromstring
 
 from cps import logger
 from cps.isoLanguages import get_language_name
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
-
-try:
-    from cps.services.Metadata import ProviderRefused
-except ImportError:  # pragma: no cover - older base class
-    class ProviderRefused(Exception):  # type: ignore
-        def __init__(self, status: str, message: str):
-            super().__init__(message)
-            self.status = status
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 
 log = logger.create()
 
 BASE_URL = "https://www.databazeknih.cz"
+CATALOG_ORIGIN = urlsplit(BASE_URL).netloc
 
 # ISO 639-1 codes the site emits in JSON-LD ``inLanguage`` → ISO 639-2/3
 # codes Calibre stores. Czech/Slovak dominate; the rest cover the usual
@@ -77,6 +70,16 @@ SERIES_INDEX_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*\.\s*díl")
 BOOK_ID_RE = re.compile(r"/(?:prehled-knihy|knihy)/([\w-]*?-?(\d+))(?:[/?#]|$)")
 EXPLICIT_ID_RE = re.compile(r"databazeknih:\s*([\w-]*\d)", re.IGNORECASE)
 ISBN_CHARS_RE = re.compile(r"[^0-9Xx]")
+
+
+def _catalog_url(value: str, base: str = BASE_URL) -> Optional[str]:
+    """Resolve links only within the approved HTTPS catalog origin."""
+    try:
+        url = urljoin(base, value)
+        target = urlsplit(url)
+    except ValueError:
+        return None
+    return url if target.scheme == "https" and target.netloc.lower() == CATALOG_ORIGIN else None
 
 
 def normalize(text: Optional[str]) -> str:
@@ -123,7 +126,8 @@ def parse_search_results(html: str) -> List[Dict]:
         if link is None:
             continue
         href = link.get("href", "")
-        slug_id, num_id = book_id_from_url(href)
+        url = _catalog_url(href)
+        slug_id, num_id = book_id_from_url(url)
         if not num_id or num_id in seen:
             continue
         seen.add(num_id)
@@ -140,7 +144,7 @@ def parse_search_results(html: str) -> List[Dict]:
             "title": _text(link),
             "authors": authors,
             "year": year,
-            "url": urljoin(BASE_URL, href),
+            "url": url,
         })
     return results
 
@@ -171,13 +175,14 @@ def parse_other_editions(html: str) -> List[Dict]:
         if _text(_first(row, ".//dt")) != "Další název":
             continue
         for link in row.xpath(".//dd//a[contains(@href,'/prehled-knihy/')]"):
-            slug_id, num_id = book_id_from_url(link.get("href", ""))
+            url = _catalog_url(link.get("href", ""))
+            slug_id, num_id = book_id_from_url(url)
             if num_id:
                 editions.append({
                     "id": num_id,
                     "slug_id": slug_id,
                     "title": _text(link),
-                    "url": urljoin(BASE_URL, link.get("href")),
+                    "url": url,
                 })
     return editions
 
@@ -348,20 +353,24 @@ class DatabazeKnih(Metadata):
 
     # -- network -----------------------------------------------------------
 
-    def _get(self, url: str, **kwargs) -> requests.Response:
-        try:
-            response = self.session.get(url, timeout=self.TIMEOUT, **kwargs)
+    def _get(self, url: str) -> requests.Response:
+        for _ in range(6):
+            url = _catalog_url(url)
+            if url is None:
+                raise requests.exceptions.InvalidURL("Databáze knih link leaves the catalog")
+            response = self.session.get(url, timeout=self.TIMEOUT, allow_redirects=False)
+            location = response.headers.get("Location")
+            if response.status_code in (301, 302, 303, 307, 308) and location:
+                url = urljoin(url, location)
+                continue
+            if response.status_code in (403, 429, 503):
+                status = "rate_limited" if response.status_code == 429 else "blocked"
+                raise ProviderRefused(
+                    status, f"Databáze knih refused the request (HTTP {response.status_code}); try again later."
+                )
             response.raise_for_status()
             return response
-        except requests.exceptions.HTTPError as e:
-            code = getattr(getattr(e, "response", None), "status_code", None)
-            if code in (403, 429, 503):
-                status = "rate_limited" if code == 429 else "blocked"
-                raise ProviderRefused(status, (
-                    "Databáze knih refused the request (HTTP %s); "
-                    "try again later." % code
-                )) from e
-            raise
+        raise requests.exceptions.TooManyRedirects("Databáze knih redirected too many times")
 
     def _source(self) -> MetaSourceInfo:
         return MetaSourceInfo(
@@ -373,9 +382,9 @@ class DatabazeKnih(Metadata):
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
     ) -> Optional[List[MetaRecord]]:
-        if not self.active:
+        if not self.active or not isinstance(query, str):
             return []
-        query = (query or "").strip()
+        query = query.strip()
         if not query:
             return []
         try:
@@ -509,12 +518,12 @@ class DatabazeKnih(Metadata):
         if not data["title"]:
             return None, []
 
-        cover = data["cover"]
+        cover = _catalog_url(data["cover"], url) if isinstance(data["cover"], str) and data["cover"] else None
         big = big_cover_candidate(cover)
         if big:
             try:
-                head = self.session.head(big, timeout=5, allow_redirects=True)
-                if head.ok and head.headers.get("content-type", "").startswith("image/"):
+                head = self.session.head(big, timeout=5, allow_redirects=False)
+                if head.status_code == 200 and head.headers.get("content-type", "").startswith("image/"):
                     cover = big
             except Exception:
                 pass

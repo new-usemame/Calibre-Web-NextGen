@@ -432,11 +432,11 @@ msgstr ""
 
 #: cps/admin.py
 msgid "Choose a KoboReader.sqlite file."
-msgstr "Escolha um arquivo KoboReader.sqlite."
+msgstr "Escolha um ficheiro KoboReader.sqlite."
 
 #: cps/admin.py
 msgid "The uploaded file is not a SQLite database."
-msgstr "O arquivo enviado não é um banco de dados SQLite."
+msgstr "O ficheiro carregado não é uma base de dados SQLite."
 
 #: cps/admin.py
 #, python-format
@@ -2881,7 +2881,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"
-msgstr "Permitir livros no formato MOBI 6 sem DRM"
+msgstr "Permitir a transferência direta de livros em formato MOBI 6 sem DRM"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5518,7 +5518,7 @@ msgstr "Aplicar seleção"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Applying…"
-msgstr "Aplicando…"
+msgstr "A aplicar…"
 
 #: cps/spa_strings.py
 msgid "Approve"
@@ -5541,7 +5541,7 @@ msgstr "Aproximado"
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Archive"
-msgstr "Arquivo"
+msgstr "Arquivar"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
@@ -5562,7 +5562,7 @@ msgstr "Pergunte no Discord"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Asked {when} from {address}."
-msgstr "Pedido em {when} a partir de {address}."
+msgstr "Pedido efetuado {when} a partir de {address}."
 
 #: cps/spa_strings.py
 msgid "Assign selected to device"
@@ -5701,7 +5701,7 @@ msgstr "ID da categoria de livro"
 
 #: cps/spa_strings.py
 msgid "Book default"
-msgstr "Livro padrão"
+msgstr "Tipo de letra predefinido do livro"
 
 #: cps/spa_strings.py
 msgid "Book density"
@@ -5713,7 +5713,7 @@ msgstr "O download da lista de livros foi iniciado"
 
 #: cps/spa_strings.py
 msgid "Book order"
-msgstr "Pedido de livro"
+msgstr "Livro"
 
 #: cps/spa_strings.py
 msgid "Book requested. An administrator has to approve it."
@@ -5770,7 +5770,7 @@ msgstr "Disposição dos livros"
 
 #: cps/spa_strings.py
 msgid "Books seeding"
-msgstr "Livros partilhados"
+msgstr "Livros com importação inicial de anotações"
 
 #: cps/spa_strings.py
 msgid ""
@@ -8695,7 +8695,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for the selected filters."
-msgstr "Nenhum(a) {items} corresponde aos filtros selecionados."
+msgstr "Sem resultados para {items} com os filtros selecionados."
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
@@ -10219,7 +10219,7 @@ msgstr "Mostrar todas as {count} tags"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Show all {items}"
-msgstr "Mostrar todos os {items}"
+msgstr "Mostrar lista completa de {items}"
 
 #: cps/spa_strings.py
 msgid "Show annotations assigned to this device"
@@ -11326,7 +11326,7 @@ msgstr "Árvore"
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
-msgstr "Cabeçalho de autenticação confiável"
+msgstr "Confiar no cabeçalho de autenticação"
 
 #: cps/spa_strings.py
 msgid "Try My Library"
@@ -12551,12 +12551,10 @@ msgid "Language: %(name)s"
 msgstr "Idioma: %(name)s"
 
 #: cps/web.py
-#, fuzzy
 msgid "Favorite Books"
-msgstr "Livros Favoritos"
+msgstr "Livros favoritos"
 
 #: cps/templates/user_edit.html cps/web.py
-#, fuzzy
 msgid "Hidden Books"
 msgstr "Livros ocultos"
 

@@ -7980,6 +7980,22 @@ msgid "New: My Library"
 msgstr "Nytt: Mitt bibliotek"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Newest"
 msgstr "Nyast"
 

@@ -75,6 +75,7 @@ msgid "Error starting Hardcover auto-fetch task: %(error)s"
 msgstr "启动 Hardcover 自动获取任务出错：%(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "审查 Hardcover 匹配"
 
@@ -100,6 +101,53 @@ msgstr "没有待拒绝的匹配"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "已拒绝 %(count)s 个匹配"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr ""
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr ""
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr ""
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr ""
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr ""
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "全部"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr ""
 
 #: cps/admin.py
 #, python-brace-format
@@ -140,11 +188,6 @@ msgstr "自定义列号：%(column)d 在 Calibre 数据库中不存在"
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "管理用户"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "全部"
 
 #: cps/admin.py
 msgid "User not found"
@@ -2190,6 +2233,7 @@ msgstr "未读书籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "作者"
@@ -3766,7 +3810,7 @@ msgstr "简介包含"
 msgid "Deselect {title}"
 msgstr "取消选择 {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "编辑元数据"
 
@@ -4102,7 +4146,8 @@ msgstr "标签（以逗号分隔）"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
+#: cps/templates/tasks.html
 msgid "Title"
 msgstr "标题"
 
@@ -7828,7 +7873,8 @@ msgid "Newznab / Torznab indexer"
 msgstr "Newznab / Torznab 索引器"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "下一个"
 
@@ -8280,7 +8326,7 @@ msgstr "第 {number} 页"
 msgid "Page {page} of {pages}"
 msgstr "第 {page} 页，共 {pages} 页"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr "分页"
 
@@ -8414,7 +8460,8 @@ msgstr "正在预览 {source}。其保存的阅读位置不会改变。"
 msgid "Previewing…"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "上一个"
 
@@ -9454,7 +9501,8 @@ msgstr "开始阅读"
 msgid "Starting scan…"
 msgstr "开始扫描..."
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "任务状态"
 
@@ -17365,6 +17413,61 @@ msgstr "Kobo Token:"
 msgid "List"
 msgstr "列表"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "操作"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr ""
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Hardcover 匹配审核 🔖"
@@ -18535,10 +18638,6 @@ msgstr "后台任务概览"
 #: cps/templates/tasks.html
 msgid "Run Time"
 msgstr "运行时间"
-
-#: cps/templates/tasks.html
-msgid "Actions"
-msgstr "操作"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"

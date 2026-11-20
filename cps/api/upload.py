@@ -70,6 +70,15 @@ def upload_books():
     if disabled:
         return disabled
 
+    kindle_owner = request.form.get("kindle_owner_id")
+    if kindle_owner is not None:
+        if kindle_owner != str(current_user.id):
+            return _err("kindle_account_changed", "The account changed before Kindle import", 409)
+        if not current_user.role_download():
+            return _err("forbidden", "You don't have download permission", 403)
+        if not getattr(config, "config_kindle_usb_enabled", False):
+            return _err("kindle_usb_disabled", "Kindle USB is disabled", 404)
+
     files = [f for f in request.files.getlist("file") if f and f.filename]
     if not files:
         return _err("invalid_request", "No files were uploaded", 400)

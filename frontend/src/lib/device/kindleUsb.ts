@@ -479,15 +479,19 @@ export class KindleConnection {
   }
 
   /** Delete a file found by listBooks(). Its .sdr sidecar folder (reading position, notes) is left to the Kindle. */
-  delete(file: DeviceFile): Promise<void> {
+  delete(file: DeviceFile, checkAccess?: () => Promise<void>): Promise<void> {
     return this.run(async () => {
       await this.validateFile(file);
+      await checkAccess?.();
+      if (this.closed || this.closing) throw new MtpError('The Kindle is no longer connected.', 0);
       await this.session.remove(file.handle);
     });
   }
 
   /** Write a book into documents/ without replacing any existing file or folder. */
-  send(filename: string, bytes: Uint8Array, onPhase?: (phase: SendPhase) => void): Promise<void> {
+  send(
+    filename: string, bytes: Uint8Array, onPhase?: (phase: SendPhase) => void, checkAccess?: () => Promise<void>,
+  ): Promise<void> {
     return this.run(async () => {
       onPhase?.('sending');
       const files = await this.session.list(this.storage, this.docs);
@@ -500,6 +504,8 @@ export class KindleConnection {
       for (let suffix = 2; taken.has(filenameKey(target)); suffix += 1) {
         target = `${stem} (${suffix})${extension}`;
       }
+      await checkAccess?.();
+      if (this.closed || this.closing) throw new MtpError('The Kindle is no longer connected.', 0);
       await this.session.upload(this.storage, this.docs, target, bytes);
     });
   }

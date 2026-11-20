@@ -350,3 +350,33 @@ test('close finishes an active transfer and blocks queued file deletion', async 
   await rejection;
   assert.deepEqual(log.deleted, []);
 });
+
+test('closing during device inspection prevents the first mutating command', async () => {
+  for (const action of ['send', 'delete'] as const) {
+    const { device, log } = fakeKindle();
+    const conn = await KindleConnection.open(device);
+    const [file] = await conn.listBooks();
+    let signalStarted!: () => void;
+    let releaseInspection!: () => void;
+    const started = new Promise<void>(resolve => { signalStarted = resolve; });
+    const released = new Promise<void>(resolve => { releaseInspection = resolve; });
+    const transfer = device.transferOut.bind(device);
+    device.transferOut = async (endpoint, data) => {
+      if (data.length >= 12 && new DataView(data.buffer, data.byteOffset).getUint16(6, true) === OP.GetObjectInfo) {
+        signalStarted();
+        await released;
+      }
+      return transfer(endpoint, data);
+    };
+
+    const mutation = action === 'send' ? conn.send('Other.azw3', new Uint8Array(4)) : conn.delete(file);
+    const rejection = assert.rejects(mutation, /no longer connected/);
+    await started;
+    const close = conn.close();
+    releaseInspection();
+    await close;
+    await rejection;
+    assert.deepEqual(log.deleted, []);
+    assert.equal(log.uploaded, null);
+  }
+});

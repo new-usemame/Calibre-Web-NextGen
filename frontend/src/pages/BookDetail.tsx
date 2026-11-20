@@ -714,7 +714,8 @@ export function BookDetail() {
       danger: true,
       disabled: usbSending !== null || device.busy !== null,
       onSelect: () => {
-        if (!window.confirm(t('Remove "{title}" from {name}? The book stays in your library.', { title: book.title, name }))) return;
+        const file = entry.folder ? `${entry.folder}/${entry.name}` : entry.name;
+        if (!window.confirm(t('Permanently delete "{file}" from {name}?', { file, name }))) return;
         setUsbBanner(null);
         device.remove(entry).then(
           () => announce(t('Removed from {name}.', { name })),

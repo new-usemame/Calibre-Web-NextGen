@@ -1462,9 +1462,10 @@ export function useUploadBooks() {
     // The total before the files are queued is what later arrivals are counted
     // against (#1044).
     onMutate: async () => ({ watch: getImportWatch(), baseline: await readLibraryTotal() }),
-    mutationFn: (files: File[]) => {
+    mutationFn: (input: File[] | { files: File[]; kindleOwnerId: number }) => {
       const fd = new FormData();
-      for (const f of files) fd.append('file', f);
+      if (!Array.isArray(input)) fd.set('kindle_owner_id', String(input.kindleOwnerId));
+      for (const file of Array.isArray(input) ? input : input.files) fd.append('file', file);
       return apiUpload<UploadResult>('/api/v1/upload', fd);
     },
     onSuccess: (result, _files, context) => {

@@ -234,9 +234,10 @@ export function useKindleDevices(ownerId: number | undefined): { devices: Connec
         throw new Error(`Could not download the Kindle book (${response.status}).`);
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
-      await verifyAccess(access);
-      if (connections.current.get(id) !== conn) throw new Error('This Kindle has disconnected.');
-      await conn.send(plan.filename, bytes, (p: SendPhase) => onPhase?.(p));
+      await conn.send(plan.filename, bytes, (p: SendPhase) => onPhase?.(p), async () => {
+        await verifyAccess(access);
+        if (connections.current.get(id) !== conn) throw new Error('This Kindle has disconnected.');
+      });
       await load(id, conn);
       return { format: plan.format, converted: plan.converted };
     } finally {
@@ -258,11 +259,14 @@ export function useKindleDevices(ownerId: number | undefined): { devices: Connec
   const remove = useCallback(async (
     id: string, conn: KindleConnection | undefined, entry: DeviceEntry,
   ): Promise<void> => {
-    await verifyAccess();
+    const access = await verifyAccess();
     if (!conn || connections.current.get(id) !== conn) throw new Error('This Kindle has disconnected.');
     patch(id, { busy: 'Removing…' });
     try {
-      await conn.delete(entry);
+      await conn.delete(entry, async () => {
+        await verifyAccess(access);
+        if (connections.current.get(id) !== conn) throw new Error('This Kindle has disconnected.');
+      });
       await load(id, conn);
     } finally {
       if (connections.current.get(id) === conn) patch(id, { busy: null });
@@ -334,16 +338,10 @@ export function useKindleDevices(ownerId: number | undefined): { devices: Connec
       eject: () => eject(id),
       refresh: () => refresh(id),
       send: async (bookId, onPhase) => {
-        // After an eject or an error there is no connection: the chooser needs this click's gesture,
-        // so connect before any slow work. Whichever Kindle gets connected receives the book.
-        let target = id;
-        if (!connections.current.has(id)) {
-          onPhase?.('connecting');
-          const connected = await pickAndAttach();
-          if (connected === null) throw new DOMException('No device chosen', 'NotFoundError');
-          target = connected;
+        if (!connection || connections.current.get(id) !== connection) {
+          throw new Error('This Kindle disconnected. Reconnect it before sending.');
         }
-        return send(target, bookId, onPhase);
+        return send(id, bookId, onPhase);
       },
       read: (entry) => read(id, connection, entry),
       remove: (entry) => remove(id, connection, entry),

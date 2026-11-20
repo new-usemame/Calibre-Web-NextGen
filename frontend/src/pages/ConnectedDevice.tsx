@@ -47,11 +47,15 @@ export function ConnectedDevice({ id }: { id: string }) {
     setImports((cur) => ({ ...cur, [handle]: v }));
 
   const importEntry = async (entry: DeviceEntry) => {
-    if (!device) return;
+    if (!device || !me?.id) return;
+    const ownerId = me.id;
     setImport(entry.handle, { state: 'busy' });
     try {
       const bytes = await device.read(entry);
-      const res = await upload.mutateAsync([new File([new Uint8Array(bytes)], entry.name)]);
+      const res = await upload.mutateAsync({
+        files: [new File([new Uint8Array(bytes)], entry.name)],
+        kindleOwnerId: ownerId,
+      });
       const failed = res.errors[0];
       if (failed) setImport(entry.handle, { state: 'error', text: failed.error });
       else {
@@ -71,11 +75,8 @@ export function ConnectedDevice({ id }: { id: string }) {
 
   const removeEntry = (entry: DeviceEntry) => {
     if (!device) return;
-    const what = entry.book ? entry.book.title : entry.name;
-    const tail = entry.book
-      ? t('The book stays in your library.')
-      : t('This file is not in your library, so it will be gone.');
-    if (!window.confirm(`${t('Remove "{title}" from {name}?', { title: what, name: device.name || device.label })} ${tail}`)) return;
+    const file = entry.folder ? `${entry.folder}/${entry.name}` : entry.name;
+    if (!window.confirm(t('Permanently delete "{file}" from {name}?', { file, name: device.name || device.label }))) return;
     setRemoveError(null);
     device.remove(entry).then(
       () => announce(t('Removed from {name}.', { name: device.name || device.label })),

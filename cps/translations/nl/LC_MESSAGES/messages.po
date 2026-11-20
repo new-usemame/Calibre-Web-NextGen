@@ -84,6 +84,7 @@ msgstr ""
 "Fout bij het starten van de automatische ophaaltaak voor hardcover: %(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 #, fuzzy
 msgid "Review Hardcover Matches"
 msgstr "Hardcover-overeenkomsten beoordelen"
@@ -110,6 +111,57 @@ msgstr "Geen openstaande overeenkomsten om af te wijzen"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "%(count)s afgewezen overeenkomst(en)"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr "Wacht op beoordeling"
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr "Afgewezen"
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr "Overgeslagen"
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr "Nog niet gekoppeld"
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr "Boeken zonder Hardcover-ID"
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "Alles"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr "Fout bij het tonen van boeken zonder Hardcover-ID: %(error)s"
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+"Het zoeken naar Hardcover-overeenkomsten is gestart voor alle boeken zonder "
+"Hardcover-ID. Bekijk Taken voor de voortgang."
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+"Bij de volgende automatische Hardcover-zoekopdracht wordt dit boek opnieuw "
+"gezocht."
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr "Fout: %(error)s"
 
 #: cps/admin.py
 #, python-brace-format
@@ -152,11 +204,6 @@ msgstr "Aangepaste kolom Nr.%(column)d bestaat niet in de Calibre Database"
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "Bewerken Gebruikers"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "Alles"
 
 #: cps/admin.py
 msgid "User not found"
@@ -2286,6 +2333,7 @@ msgstr "Ongelezen boeken"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "Auteurs"
@@ -3918,7 +3966,7 @@ msgstr "Beschrijving bevat"
 msgid "Deselect {title}"
 msgstr "{title} deselecteren"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "Metagegevens bewerken"
 
@@ -4256,7 +4304,8 @@ msgstr "Labels (door komma's gescheiden)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
-#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/hardcover_missing_ids.html cps/templates/shelf_edit.html
+#: cps/templates/tasks.html
 msgid "Title"
 msgstr "Titel"
 
@@ -5665,6 +5714,14 @@ msgid "Basic settings"
 msgstr "Basisinstellingen"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr "Wordt"
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr "Wordt (scheid met komma’s om te splitsen)"
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "Bèta"
 
@@ -5820,6 +5877,10 @@ msgid "Bulleted list"
 msgstr "Lijst met opsommingstekens"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr "Op naam"
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "CA-certificaatpad"
 
@@ -5932,6 +5993,16 @@ msgstr "Certificaatpad"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "Wijzigen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr "Nu {n} boeken wijzigen?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
+msgstr "{n} boeken gewijzigd."
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -6251,6 +6322,10 @@ msgid "Could not load the device board."
 msgstr "Kan het apparaatoverzicht niet laden."
 
 #: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr "Kan de regels niet laden."
+
+#: cps/spa_strings.py
 msgid "Could not load this device library."
 msgstr "Kan de bibliotheek van dit apparaat niet laden."
 
@@ -6281,6 +6356,11 @@ msgstr "Kan dat zoekresultaat niet openen."
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
 msgstr "De gesynchroniseerde leespositie kon niet worden geopend."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr "Kan dat bestand niet lezen: {error}"
 
 #: cps/spa_strings.py
 msgid "Could not preview the resolution."
@@ -6428,6 +6508,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
 msgstr "Omslag bijgewerkt vanuit het geselecteerde resultaat."
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr "Valt onder een regel"
 
 #: cps/spa_strings.py
 msgid "Create account"
@@ -6747,6 +6831,10 @@ msgid "Disabled books"
 msgstr "Uitgeschakelde boeken"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr "Verwerpen"
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "Verkennen-keuzes bijgewerkt."
 
@@ -6829,6 +6917,14 @@ msgstr "De omslag wordt getekend…"
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "Sleep bestanden hierheen, of klik om te kiezen"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr "Deze waarde verwijderen"
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr "Verwijderd"
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -7065,6 +7161,14 @@ msgstr ""
 "Voer de code in die de e-reader toont, of scan de QR-code met je telefoon."
 
 #: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr "Vul de waarde in die moet overeenkomen."
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr "Vul in wat het wordt, of kies Verwijderen."
+
+#: cps/spa_strings.py
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
@@ -7074,6 +7178,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Every filled field will replace each book's existing values."
 msgstr "Elk ingevuld veld vervangt de bestaande waarden van elk boek."
+
+#: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr "Elke waarde valt onder een regel."
 
 #: cps/spa_strings.py
 msgid "Exact place"
@@ -7140,6 +7248,10 @@ msgid "Fetch metadata from web"
 msgstr "Metagegevens van het web ophalen"
 
 #: cps/spa_strings.py
+msgid "Field"
+msgstr "Veld"
+
+#: cps/spa_strings.py
 msgid "Files"
 msgstr "Bestanden"
 
@@ -7167,6 +7279,10 @@ msgstr "Filter"
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "Op apparaat filteren"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr "Waarden filteren"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7441,6 +7557,10 @@ msgid "Highlights and notes"
 msgstr "Markeringen en notities"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr "Geschiedenis"
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "Populair"
 
@@ -7549,6 +7669,10 @@ msgstr "Inactief"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Inbegrepen"
+
+#: cps/spa_strings.py
+msgid "Incoming value"
+msgstr "Binnenkomende waarde"
 
 #: cps/spa_strings.py
 msgid "Indexer preset"
@@ -7968,6 +8092,16 @@ msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "Metadata URL (OIDC automatische detectie)"
 
 #: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr "Metadata opschonen"
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
+"Het toepassen van metadata staat uit, dus de boekbestanden houden hun oude "
+"metadata."
+
+#: cps/spa_strings.py
 msgid "Min"
 msgstr "Min"
 
@@ -7995,6 +8129,10 @@ msgstr "Meer"
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Meer acties voor {name}"
+
+#: cps/spa_strings.py
+msgid "Most books first"
+msgstr "Meeste boeken eerst"
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -8097,6 +8235,22 @@ msgid "New: My Library"
 msgstr "Nieuw: Mijn bibliotheek"
 
 #: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr "Toegevoegd, nieuwste eerst"
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr "Toegevoegd, oudste eerst"
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr "Leesdatum, nieuwste eerst"
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr "Leesdatum, oudste eerst"
+
+#: cps/spa_strings.py
 msgid "Newest"
 msgstr "Nieuwste"
 
@@ -8109,7 +8263,8 @@ msgid "Newznab / Torznab indexer"
 msgstr "Newznab / Torznab-indexer"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "Volgende"
 
@@ -8128,6 +8283,10 @@ msgstr "Geen enkel toegestaan uploadformaat staat EPUB of PDF toe."
 #: cps/spa_strings.py
 msgid "No approval needed"
 msgstr "Geen goedkeuring nodig"
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr "Geen enkel boek verandert met de opgeslagen regels."
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -8229,6 +8388,12 @@ msgid "No registered devices."
 msgstr "Geen geregistreerde apparaten."
 
 #: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
+"Nog geen regels. Voeg er hierboven een toe, of importeer een JSON-bestand "
+"met regels."
+
+#: cps/spa_strings.py
 msgid "No saved reading places yet."
 msgstr "Nog geen leesposities opgeslagen."
 
@@ -8264,6 +8429,10 @@ msgstr "Geen geldig ISBN gevonden in de gescande tekst."
 #: cps/spa_strings.py
 msgid "No values in this column yet"
 msgstr "Deze kolom bevat nog geen waarden"
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr "Geen waarden gevonden."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8322,6 +8491,10 @@ msgstr "Noot {label}"
 #: cps/spa_strings.py
 msgid "Notes"
 msgstr "Notities"
+
+#: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr "Nog niets toegepast."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8436,11 +8609,28 @@ msgstr "Éé kolom"
 
 #: cps/spa_strings.py
 msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+"Eén set regels per veld. Een regel maakt van een waarde een andere "
+"(hernoemen), meerdere (splitsen) of geen (verwijderen), ongeacht "
+"hoofdletters en accenten. Waarden waarvoor geen regel geldt, blijven zoals "
+"ze zijn. Er verandert niets in de bibliotheek totdat je het voorbeeld "
+"toepast."
+
+#: cps/spa_strings.py
+msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
 "Alleen de boeken die je hieronder kiest, synchroniseren. Overschakelen "
 "begint met niets gekozen — je kiest elk boek zelf."
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr "Alleen waarden zonder regel"
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8576,7 +8766,7 @@ msgstr "Pagina {number}"
 msgid "Page {page} of {pages}"
 msgstr "Pagina {page} van {pages}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr "Paginering"
 
@@ -8712,7 +8902,8 @@ msgstr "Voorvertoning van {source}. De opgeslagen positie verandert niet."
 msgid "Previewing…"
 msgstr "Voorbeeld laden…"
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "Vorige"
 
@@ -8921,6 +9112,11 @@ msgid "Remove tag \"{tag}\""
 msgstr "Label \"{tag}\" verwijderen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr "De regel voor {value} verwijderen"
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr "Deze verwijderen"
 
@@ -8936,6 +9132,11 @@ msgstr "Verwijderde apparaten"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removed from Currently Reading."
 msgstr "Verwijderd uit Momenteel aan het lezen."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
+msgstr "{n} waarden die geen boek meer gebruikt zijn verwijderd."
 
 #: cps/spa_strings.py
 msgid "Rename"
@@ -9075,6 +9276,11 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "De vorige bibliotheekmodus is hersteld voor {accounts} accounts."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr "{n} boeken hersteld."
+
+#: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "Herstellen…"
 
@@ -9131,6 +9337,14 @@ msgstr "Rijen per keer laden"
 #: cps/spa_strings.py
 msgid "Rule group"
 msgstr "Regelgroep"
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr "Regels"
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr "Regels opgeslagen. Het voorbeeld hieronder is bijgewerkt."
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -9194,6 +9408,10 @@ msgid "Save preset"
 msgstr "Voorinstelling opslaan"
 
 #: cps/spa_strings.py
+msgid "Save rules"
+msgstr "Regels opslaan"
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "Beveiligingsinstellingen opslaan"
 
@@ -9206,6 +9424,10 @@ msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr ""
 "Sla het bestand op, werp de Kobo veilig uit en start de Kobo daarna opnieuw "
 "op."
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr "Sla de regels op om het voorbeeld bij te werken."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9752,6 +9974,10 @@ msgid "Sort order"
 msgstr "Sorteervolgorde"
 
 #: cps/spa_strings.py
+msgid "Sort values"
+msgstr "Waarden sorteren"
+
+#: cps/spa_strings.py
 msgid "Source details"
 msgstr "Brondetails"
 
@@ -9781,7 +10007,8 @@ msgstr "Begonnen met lezen"
 msgid "Starting scan…"
 msgstr "Scan starten…"
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "Status"
 
@@ -10031,6 +10258,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "The background scheduler is not running."
 msgstr "De achtergrondplanner draait niet."
+
+#: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr "De boekbestanden worden ook bijgewerkt."
 
 #: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
@@ -10289,6 +10520,10 @@ msgstr "De overdracht is niet voltooid."
 #: cps/spa_strings.py
 msgid "There are no other accounts on this server yet."
 msgstr "Er zijn nog geen andere accounts op deze server."
+
+#: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr "Er is al een regel voor deze waarde."
 
 #: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
@@ -10673,6 +10908,10 @@ msgid "Undoing…"
 msgstr "Ongedaan maken…"
 
 #: cps/spa_strings.py
+msgid "Undone"
+msgstr "Ongedaan gemaakt"
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zichtbaar maken"
 
@@ -10703,6 +10942,10 @@ msgstr "Ontgrendel de omslag om deze te wijzigen"
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
 msgstr "Zijbalk losmaken"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr "Niet-opgeslagen wijzigingen in de regels."
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -10831,6 +11074,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
 msgstr "De afbeelding achter die Google-link wordt gebruikt"
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr "Waarden in je bibliotheek"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -11278,6 +11525,16 @@ msgstr "{n} toegewezen aan {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books"
+msgstr "{n} boeken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr "{n} boeken konden niet worden gewijzigd: {list}"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "{n} boeken in de nieuwste inventaris"
 
@@ -11300,6 +11557,13 @@ msgstr "{n} gevonden"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} markeringen en notities"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
+"{n} overgeslagen, omdat ze sinds het voorbeeld zijn gewijzigd of zijn "
+"uitgesloten."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -17862,6 +18126,72 @@ msgstr "Kobo Sync Token"
 msgid "List"
 msgstr "Lijst"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+"Leesvoortgang, leesstatus en annotaties worden alleen naar Hardcover "
+"verstuurd voor boeken met een Hardcover-ID. Deze %(total)s boek(en) hebben "
+"er geen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+"Zoekt opnieuw op Hardcover voor alle hier getoonde boeken, ook boeken die op "
+"beoordeling wachten. Afgewezen boeken worden overgeslagen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr "Nu opnieuw koppelen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+"Hardcover-synchronisatie is uitgeschakeld. Schakel deze in via de "
+"basisconfiguratie of met HARDCOVER_SYNC_ENABLED."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+"Geen Hardcover-token beschikbaar. Stel de omgevingsvariabele HARDCOVER_TOKEN "
+"in of configureer het token in de basisconfiguratie."
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr "Pagina %(page)s van %(pages)s"
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "Acties"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+"Haal op de bewerkpagina metadata op van Hardcover om de ID handmatig toe te "
+"voegen."
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr "Opnieuw proberen toestaan"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr "Niets om te tonen"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr "Geen enkel boek zonder Hardcover-ID voldoet aan dit filter."
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr ""
@@ -19065,10 +19395,6 @@ msgstr ""
 #: cps/templates/tasks.html
 msgid "Run Time"
 msgstr "Looptijd"
-
-#: cps/templates/tasks.html
-msgid "Actions"
-msgstr "Acties"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"

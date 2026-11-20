@@ -67,6 +67,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 | Fork PR | Upstream | Description | SHA | Release |
 |---|---|---|---|---|
+| [#2801](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2801) | Fork issue #2800 | Sort the new UI's Read list by completion date, with explicit date-added labels; keep completion dates independent of later sync activity. Credit @sgreadly. | `TBD` | TBD |
 | [#2695](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2695) | Fork issue #2678 | Restore selected missing cover flags from existing files through an admin scan and confirmation in Classic and New UI; supports split libraries. Contributed by @sgreadly. | TBD | Unreleased |
 | #2635 | Fork issue #2632 | Password and credential reveal controls in classic account/admin forms and the new UI, with configured password requirements shown before saving. Contributed by @sgreadly with @misko903. | TBD | TBD |
 | [#2596](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2596) | — | Each Kobo keeps its selected books, own reading journal and bounded annotation-capture hold through scope removal, with archived/hidden/visibility reconciliation and download-armed own-place restore. | `cac5c00d4` | `v4.1.48` |

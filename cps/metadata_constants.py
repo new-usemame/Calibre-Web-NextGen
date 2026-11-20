@@ -26,9 +26,9 @@ DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON = '["google","openlibrary","ibdb","dnb"
 # Scraper integrations whose upstream markup/anti-bot posture makes them unsuitable
 # as surprise defaults. Users must explicitly opt in through an existing provider
 # toggle; an explicit saved True/False always wins.
-# Wikidata is a new outbound service: selecting it in the ingest order or
-# turning it on in manual search is required before contacting it.
-ORDER_OPT_IN_METADATA_PROVIDERS = frozenset({"wikidata"})
+# Databáze knih and Wikidata need an explicit opt-in: selecting the provider in the ingest
+# order or turning it on in manual search is required before contacting it.
+ORDER_OPT_IN_METADATA_PROVIDERS = frozenset({"databazeknih", "wikidata"})
 DEFAULT_OFF_METADATA_PROVIDERS = frozenset({"goodreads", "bolcom"}) | ORDER_OPT_IN_METADATA_PROVIDERS
 
 

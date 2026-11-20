@@ -1161,6 +1161,13 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6419057024",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#2329@2026-11-14T14:10:47Z": {
+  "hash": "e71fe4f00aa832d3",
+  "verdict": "fixed",
+  "quote": "Then I updated the server side as well, and sync was super-fast!",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2329#issuecomment-6899299065",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#2331@2026-10-02T13:15:25Z": {
   "hash": "3faba3435ab27b1e",
   "verdict": "content",
@@ -1537,6 +1544,34 @@
   "verdict": "fixed",
   "quote": "**Verification of #2862 — PASS on v4.1.68**",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2862#issuecomment-6859352597",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2921@2026-11-13T19:19:07Z": {
+  "hash": "95dec8d9875a0986",
+  "verdict": "fixed",
+  "quote": "I've updated to latest release and have already changed the authors of several books. Everything worked smoothly, with no errors in the logs so far.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2921#issuecomment-6975142516",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2936@2026-11-14T17:58:00Z": {
+  "hash": "677f3506fd1cc366",
+  "verdict": "fixed",
+  "quote": "Pulled the new release and can confirm that it works. The user is the correct one 😄",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2936#issuecomment-6896452190",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2952@2026-11-15T15:41:19Z": {
+  "hash": "bca1acc8177a4fd9",
+  "verdict": "fixed",
+  "quote": "I just deleted the device_id in the lua file and the Tolino shows up as a new device.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2952#issuecomment-6897523862",
+  "by": "deepseek-v4.1-flash"
+ },
+ "issue#2953@2026-11-15T20:41:40Z": {
+  "hash": "377399a51b33ebb3",
+  "verdict": "fixed",
+  "quote": "After changing the setting as directed, the sync now works as expected.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2953#issuecomment-6903910958",
   "by": "deepseek-v4.1-flash"
  },
  "issue#303@2026-07-14T02:47:33Z": {
@@ -2582,11 +2617,18 @@
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/878#issuecomment-4979997521",
   "by": "deepseek-v4.1-flash"
  },
+ "issue#915@2026-10-02T14:24:45Z": {
+  "hash": "ee1a60cb868ad4e9",
+  "verdict": "fixed",
+  "quote": "I verified this by uploading a typewriter-style font that isn't installed on the test machine and confirming the reader applied it",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/915#issuecomment-6905638484",
+  "by": "deepseek-v4.1-flash"
+ },
  "issue#917@2026-10-02T15:08:35Z": {
-  "hash": "074e01562f4e9e75",
-  "verdict": "content",
-  "quote": "I'm so sorry for my late reply, but thank you so much for this. Much much appreciated.",
-  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/917#issuecomment-6562039101",
+  "hash": "d6584a417e07bd41",
+  "verdict": "fixed",
+  "quote": "I can see it in my 4.1.70 and it works.",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/917#issuecomment-6907128271",
   "by": "deepseek-v4.1-flash"
  },
  "issue#928@2026-07-16T14:33:57Z": {
@@ -2819,6 +2861,13 @@
   "quote": "",
   "evidence": "",
   "by": "review"
+ },
+ "pr#2922@2026-11-15T23:14:06Z": {
+  "hash": "672d0f5d6554e421",
+  "verdict": "none",
+  "quote": "",
+  "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2922#issuecomment-6908073552",
+  "by": "deepseek-v4.1-flash"
  },
  "pr#350@2026-06-04T18:03:57Z": {
   "hash": "3c8842bc19569824",

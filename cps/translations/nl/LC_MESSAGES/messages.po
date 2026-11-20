@@ -1524,9 +1524,20 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "Duplicaten scan voltooid"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr "Ongeldig oplossingsverzoek"
+
+#: cps/duplicates.py
 #, fuzzy
 msgid "Invalid resolution strategy"
 msgstr "Ongeldige rol"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
+"De duplicaatgroepen zijn gewijzigd. Bekijk het voorbeeld van de oplossing "
+"opnieuw voordat je verwijdert."
 
 #: cps/editbooks.py
 msgid ""
@@ -5100,6 +5111,28 @@ msgstr ""
 "of werk deze bij om te kiezen."
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr "Percentage van deze Kobo afstemmen op CrossPoint"
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr "Kan de percentage-instelling niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+"Standaard uit. Als dit aan staat en deze Kobo de huidige KEPUB heeft, wordt "
+"zijn positie gedeeld als het percentage dat CrossPoint daar toont, niet als "
+"het hele getal dat de Kobo meldt. KOReader, CrossPoint, Hardcover en de "
+"boekpagina krijgen dat percentage, dus de pagina die Hardcover toont "
+"verandert. De Kobo houdt zijn eigen waarde."
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "Boeken op dit apparaat"
 
@@ -6250,6 +6283,10 @@ msgid "Could not open the synced position."
 msgstr "De gesynchroniseerde leespositie kon niet worden geopend."
 
 #: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr "Kan het voorbeeld van de oplossing niet laden."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Kan dit comic-archief niet lezen."
 
@@ -6284,6 +6321,10 @@ msgstr "Verwijdering van dit apparaat kon niet worden aangevraagd."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Kan wachtwoord niet herstellen."
+
+#: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr "Kan de duplicaten niet oplossen."
 
 #: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
@@ -6426,6 +6467,10 @@ msgstr "Aanmaken…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "Bijsnijden om te vullen — geen rand, snijdt de randen bij"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr "CrossPoint"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "Huidig"
@@ -6512,6 +6557,10 @@ msgstr "Standaardwaarden staan onder Beheer → Configuratie → Kobo sync."
 #: cps/spa_strings.py
 msgid "Delete books"
 msgstr "Boeken verwijderen"
+
+#: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr "Duplicaten verwijderen"
 
 #: cps/spa_strings.py
 msgid "Delete failed."
@@ -6929,6 +6978,54 @@ msgstr "E-mailserver"
 msgid "Email settings saved."
 msgstr "E-mailinstellingen opgeslagen."
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr "E-mail is ingesteld en klaar om te verzenden."
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr "E-mail is nog niet ingesteld. Voer een SMTP-server in en sla op."
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+"Gmail (OAuth) is geselecteerd maar niet geautoriseerd, dus e-mail staat uit. "
+"Gebruik hieronder standaard SMTP, of autoriseer Gmail in de klassieke "
+"instellingen."
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+"E-mail wordt nu via Gmail (OAuth) verzonden, dat in de klassieke "
+"instellingen is ingesteld. De SMTP-instellingen hieronder worden niet "
+"gebruikt."
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr "Gebruik in plaats daarvan standaard SMTP"
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr "Standaard SMTP wordt gebruikt zodra u opslaat."
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr "Opslaan en testmail verzenden"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+"Testmail in de wachtrij voor {email}. Bekijk de taken voor het resultaat."
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr "Kon de testmail niet verzenden."
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "Leeg"
@@ -7313,7 +7410,7 @@ msgstr "Apparaatbibliotheek verbergen"
 msgid "Hide fields"
 msgstr "Velden verbergen"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Hide password"
 msgstr "Wachtwoord verbergen"
 
@@ -7502,6 +7599,26 @@ msgstr "KOReader-synchronisatie is niet ingeschakeld op deze server."
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "Verbinding behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr "Beste formaat behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr "Grootste bestanden behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr "Meest complete metadata behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr "Nieuwste exemplaar behouden"
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr "Oudste exemplaar behouden"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -7831,6 +7948,10 @@ msgstr "Maximale beoordeling"
 #: cps/spa_strings.py
 msgid "Member user filter"
 msgstr "Lid gebruiker filter"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr "Formaten samenvoegen in het nieuwste exemplaar"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8237,6 +8358,10 @@ msgid "Nothing requested yet."
 msgstr "Nog niets aangevraagd."
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr "Niets te verwijderen met deze strategie."
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Nog niets om te tonen."
 
@@ -8583,6 +8708,10 @@ msgstr "Deze positie bekijken"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "Voorvertoning van {source}. De opgeslagen positie verandert niet."
 
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr "Voorbeeld laden…"
+
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
 msgstr "Vorige"
@@ -8694,6 +8823,10 @@ msgstr "Recent gelezen"
 #: cps/spa_strings.py
 msgid "Recipient(s)"
 msgstr "Ontvanger(s)"
+
+#: cps/spa_strings.py
+msgid "Saved e-reader addresses:"
+msgstr "Opgeslagen e-readeradressen:"
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
@@ -8917,6 +9050,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reset to defaults"
 msgstr "Standaardwaarden herstellen"
+
+#: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr "Automatisch oplossen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr "{groups} groepen opgelost en {deleted} boeken verwijderd."
 
 #: cps/spa_strings.py
 msgid "Restore"
@@ -9449,7 +9591,7 @@ msgstr "Minder tonen"
 msgid "Show more"
 msgstr "Meer tonen"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "Wachtwoord tonen"
 
@@ -9654,6 +9796,10 @@ msgstr "Synchronisatie-URL voor Kobo met standaardsoftware"
 #: cps/spa_strings.py
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller is ingesteld maar kon niet worden bereikt."
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr "Strategie"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -10332,6 +10478,14 @@ msgid ""
 msgstr ""
 "Deze pagina liep tegen een fout aan en kon niet worden weergegeven. Jouw "
 "bibliotheek is in orde — herladen lost het meestal op."
+
+#: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
+"Hiermee worden de extra exemplaren definitief uit je bibliotheek verwijderd. "
+"Dit kan niet ongedaan worden gemaakt."
 
 #: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
@@ -11048,6 +11202,11 @@ msgstr "{count} resultaten voor \"{query}\""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr "{deleted} boeken in {groups} groepen zouden worden verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} van {total}"
 
@@ -11223,6 +11382,44 @@ msgstr ""
 "{failed} van {total} boeken konden niet worden toegevoegd. Ze blijven "
 "geselecteerd."
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Password requirements:"
+msgstr "Wachtwoordvereisten:"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a letter"
+msgstr "een letter"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a lowercase letter"
+msgstr "een kleine letter"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a number"
+msgstr "een cijfer"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "a special character"
+msgstr "een speciaal teken"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "an uppercase letter"
+msgstr "een hoofdletter"
+
+#: cps/spa_strings.py
+msgid "at least 1 character"
+msgstr "minstens 1 teken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "at least {count} characters"
+msgstr "minstens {count} tekens"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "including {rules}"
+msgstr "waaronder {rules}"
+
 #: cps/spa_strings.py
 msgid ""
 "New accounts sync only selected shelves. If no books arrive, add books to a "
@@ -11342,6 +11539,10 @@ msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/spa_strings.py
+msgid "Keep"
+msgstr "Behouden"
+
+#: cps/spa_strings.py
 msgid "Microsoft YaHei"
 msgstr "Microsoft YaHei"
 
@@ -11361,6 +11562,14 @@ msgstr "Privé voor jouw account. Dit wijzigt de gedeelde Beschrijving niet."
 #: cps/spa_strings.py
 msgid "Keep your thoughts about this book here."
 msgstr "Bewaar hier je gedachten over dit boek."
+
+#: cps/spa_strings.py
+msgid ""
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
+msgstr ""
+"Behoudt één boek per groep en verwijdert de andere exemplaren, volgens de "
+"gekozen strategie."
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review or note"
@@ -11385,6 +11594,11 @@ msgstr "Recensie verwijderen"
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Delete your review?"
 msgstr "Jouw recensie verwijderen?"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {count} duplicate books?"
+msgstr "{count} dubbele boeken verwijderen?"
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "This removes your private review or note for this book."
@@ -12095,6 +12309,18 @@ msgstr "Samengevoegd in ‘{title}’."
 #: cps/spa_strings.py
 msgid "Could not merge these books."
 msgstr "Kan deze boeken niet samenvoegen."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{done} of {total} imported"
+msgstr "{done} van {total} geïmporteerd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No new books have appeared for a while; {count} not imported yet."
+msgstr ""
+"Er zijn al een tijdje geen nieuwe boeken verschenen; {count} nog niet "
+"geïmporteerd."
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -19018,6 +19244,17 @@ msgid "Reset user Password"
 msgstr "Gebruikerswachtwoord herstellen"
 
 #: cps/templates/user_edit.html
+#, python-format
+msgid "at least %(num)d character"
+msgid_plural "at least %(num)d characters"
+msgstr[0] "minstens %(num)d teken"
+msgstr[1] "minstens %(num)d tekens"
+
+#: cps/templates/user_edit.html
+msgid "including"
+msgstr "waaronder"
+
+#: cps/templates/user_edit.html
 #, fuzzy
 msgid "eReader Configuration"
 msgstr "Serverinstellingen"
@@ -19473,6 +19710,10 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#, python-brace-format
+#~ msgid "…and {count} more groups"
+#~ msgstr "… en nog {count} groepen"
 
 #~ msgid "Progress is not being saved."
 #~ msgstr "Voortgang wordt niet opgeslagen."

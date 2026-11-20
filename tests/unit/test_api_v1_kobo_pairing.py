@@ -277,6 +277,7 @@ def test_device_json_serializes_naive_database_timestamps_as_utc():
         last_seen_at=observed,
         active=True,
         share_place=False,
+        align_percent=False,
     )
     inventory = SimpleNamespace(item_count=2, observed_at=observed)
     storage = SimpleNamespace(free_bytes=1, total_bytes=2, observed_at=observed)

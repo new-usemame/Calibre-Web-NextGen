@@ -258,6 +258,7 @@ def test_actual_generic_cover_edit_is_preserved_by_later_enforcement(automatic_c
     monkeypatch.setattr(editbooks, "current_user", _editor())
     monkeypatch.setattr(editbooks.calibre_db, "get_filtered_book", lambda *_args, **_kwargs: book)
     monkeypatch.setattr(editbooks.calibre_db, "session", session)
+    monkeypatch.setattr(editbooks.calibre_db, "set_metadata_dirty", lambda _book_id: None)
     monkeypatch.setattr(editbooks, "metadata_db_write_lock", state.target.operation)
     monkeypatch.setattr(editbooks, "upload_cover", lambda *_args: None)
     monkeypatch.setattr(editbooks, "_book_cover_is_locked", lambda _id: False)

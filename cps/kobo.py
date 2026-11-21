@@ -6055,7 +6055,7 @@ def _kobo_oauth_base_url():
     # OAuth URLs need the same external port as the rest of the sync URLs.
     use_request_origin = config.config_kobo_proxy or current_app.wsgi_app.is_proxied
     oauth_url = url_for("kobo.HandleOauthRequest",
-                        auth_token=get_auth_token(),
+                        auth_token=kobo_auth.get_auth_token(),
                         _external=use_request_origin)
     if not use_request_origin:
         oauth_url = _kobo_direct_origin() + oauth_url

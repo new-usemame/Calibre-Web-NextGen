@@ -362,6 +362,112 @@ _LOG_TIMESTAMP_PATTERN = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 _RAW_READ_FACTOR = 4
 
 
+# --- tracebacks digest -------------------------------------------------------
+#
+# Tracebacks are already in the log files. In a long log they are a handful of
+# lines among thousands, so ``tracebacks.txt`` lifts them out: one entry per
+# place an exception was raised, with how often and when, and the most recent
+# full traceback. It is built from the text that goes into the pack (already
+# scrubbed in the sanitised one), so it cannot carry anything the logs do not.
+_TRACEBACK_HEADER = "Traceback (most recent call last):"
+_TRACEBACK_FRAME = re.compile(r'^\s*File "(?P<file>[^"]+)", line (?P<line>\d+), in (?P<func>\S+)', re.MULTILINE)
+MAX_TRACEBACK_GROUPS = 20
+_MAX_TRACEBACK_CHARS = 6000
+_MAX_TRACEBACKS_FILE_BYTES = 64 * 1024
+
+
+def _extract_tracebacks(text: str):
+    """Yield ``(timestamp, traceback text, exception line)`` for each traceback.
+
+    A traceback is the header, the indented frame lines under it, and the first
+    unindented line after them (the exception). The timestamp is the most recent
+    log record's, since the traceback follows its record's message line."""
+    if _TRACEBACK_HEADER not in text:
+        return
+    lines = text.splitlines()
+    timestamp = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stamp = _LOG_TIMESTAMP_PATTERN.match(line)
+        if stamp:
+            timestamp = stamp.group(1)
+        if line.startswith(_TRACEBACK_HEADER):
+            end = index + 1
+            while end < len(lines) and lines[end].startswith((" ", "\t")):
+                end += 1
+            last = min(end, len(lines) - 1)
+            yield timestamp, "\n".join(lines[index:last + 1]), lines[last]
+            index = last
+        index += 1
+
+
+def _traceback_site(block: str, exception_line: str) -> str:
+    """Where it was raised: ``ExceptionType @ file.py:LINE in function``."""
+    exc_type = exception_line.split(":", 1)[0].strip() or "unknown"
+    frame = None
+    for match in _TRACEBACK_FRAME.finditer(block):
+        frame = match
+    if frame is None:
+        return exc_type
+    name = os.path.basename(frame.group("file"))
+    return f"{exc_type} @ {name}:{frame.group('line')} in {frame.group('func')}"
+
+
+def _clip_traceback(block: str) -> str:
+    """Keep the top and the tail of an over-long traceback: the entry point and
+    the failing frames matter, the middle of a deep recursion does not."""
+    if len(block) <= _MAX_TRACEBACK_CHARS:
+        return block
+    head, tail = block[:1200], block[-(_MAX_TRACEBACK_CHARS - 1200):]
+    return f"{head}\n  ... [{len(block) - _MAX_TRACEBACK_CHARS:,} characters omitted] ...\n{tail}"
+
+
+class _TracebackDigest:
+    def __init__(self):
+        self._groups = {}
+        self._total = 0
+
+    def feed(self, text: str) -> None:
+        for timestamp, block, exception_line in _extract_tracebacks(text):
+            self._total += 1
+            site = _traceback_site(block, exception_line)
+            group = self._groups.setdefault(site, {
+                "count": 0, "first": None, "last": None, "exception": "", "block": "",
+            })
+            group["count"] += 1
+            if timestamp:
+                group["first"] = timestamp if group["first"] is None or timestamp < group["first"] else group["first"]
+            # The sample is the most recent occurrence; without timestamps, the latest one fed.
+            if not timestamp or group["last"] is None or timestamp >= group["last"]:
+                group["last"] = timestamp or group["last"]
+                group["exception"] = exception_line.strip()[:300]
+                group["block"] = _clip_traceback(block)
+
+    def render(self, source_label: str) -> str:
+        if not self._total:
+            return (f"No tracebacks were found in the included application logs ({source_label}).\n"
+                    "That is evidence too: if you are chasing an error, it was not logged as one.\n")
+        ordered = sorted(self._groups.items(), key=lambda item: item[1]["last"] or "", reverse=True)
+        shown = ordered[:MAX_TRACEBACK_GROUPS]
+        out = [
+            f"{self._total:,} traceback(s) in {len(self._groups):,} distinct place(s) in the included "
+            f"application logs ({source_label}).\n",
+            "One entry per place the exception was raised, most recently seen first, with the most "
+            "recent full traceback.\n",
+        ]
+        if len(ordered) > len(shown):
+            out.append(f"Showing the {len(shown)} most recent; {len(ordered) - len(shown)} older place(s) omitted.\n")
+        for number, (site, group) in enumerate(shown, 1):
+            span = f", first {group['first']}, last {group['last']}" if group["first"] and group["last"] else ""
+            out.append(f"\n== {number}. {site}\nseen {group['count']:,} time(s){span}\n\n{group['block']}\n")
+        text = "".join(out)
+        data = text.encode("utf-8")
+        if len(data) > _MAX_TRACEBACKS_FILE_BYTES:
+            text = data[:_MAX_TRACEBACKS_FILE_BYTES].decode("utf-8", errors="ignore") + "\n[digest truncated]\n"
+        return text
+
+
 def _is_routine_scheduler_line(line: str) -> bool:
     """A successful-run line from the APScheduler executor, at INFO."""
     return (_ROUTINE_SCHEDULER_MARKER in line
@@ -616,13 +722,24 @@ def _assemble_pack(prep: dict):
             zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
+        digest = _TracebackDigest()
         for fp in prep["app_logs"] + prep["access_logs"]:
+            is_app_log = fp in prep["app_logs"]
             if sanitize:
                 with open(fp, 'rb') as fd:
                     raw = fd.read()
-                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber))
+                data = _sanitize_log_bytes(raw, scrubber)
+                zf.writestr(os.path.basename(fp), data)
+                if is_app_log:
+                    digest.feed(data.decode("utf-8", errors="replace"))
             else:
                 zf.write(fp, os.path.basename(fp))
+                if is_app_log:
+                    with open(fp, 'rb') as fd:
+                        digest.feed(fd.read().decode("utf-8", errors="replace"))
+        zf.writestr('tracebacks.txt', digest.render(
+            os.path.basename(prep["app_logs"][0]).split(".log")[0] + ".log*"
+            if prep["app_logs"] else "no application log"))
     memory_zip.seek(0)
     return memory_zip
 
@@ -658,6 +775,9 @@ _SANITIZED_NOTE = (
     "What was kept:\n"
     "  * Loopback IP (127.0.0.1), timestamps, log levels, error messages,\n"
     "    book titles, request paths, application stack traces.\n"
+    "  * tracebacks.txt lifts the tracebacks out of the application logs, one\n"
+    "    entry per place an exception was raised. It is built from the already\n"
+    "    scrubbed log text, so it holds nothing the logs do not.\n"
     "\n"
     "Each log file is capped at the last 10 MiB so the zip stays small.\n"
     "\n"

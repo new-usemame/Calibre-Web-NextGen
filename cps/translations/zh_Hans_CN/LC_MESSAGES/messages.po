@@ -4949,9 +4949,8 @@ msgid ""
 "ticked here adds no books. An administrator can turn on Sync smart shelves "
 "in the settings."
 msgstr ""
-"智能书架未与此服务器上的电子阅读器同步，"
-"因此勾选此处的智能书架不会添加任何书籍。"
-"管理员可以在设置中启用‘同步智能书架’功能。"
+"此服务器未启用智能书架同步，因此在此勾选智能书架不会向设备添加任何书籍。"
+"管理员可以在设置中开启智能书架同步。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -4993,8 +4992,8 @@ msgid ""
 "Kobo and in KOReader? Your read status is not changed. A device that still "
 "holds its own position can send it back the next time it syncs."
 msgstr ""
-"清除您在网页阅读器、Kobo 阅读器和 KOReader 中保存的「{title}」阅读位置？"
-"您的阅读状态不会改变。设备中仍保留阅读位置的下次同步时可能会送回原处。"
+"要清除您在网页阅读器、Kobo 和 KOReader 中保存的「{title}」阅读位置吗？"
+"您的阅读状态不会改变。仍保留该位置的设备可能会在下次同步时将其重新上传到服务器。"
 
 #: cps/spa_strings.py
 msgid "Reading position cleared."
@@ -8398,7 +8397,7 @@ msgstr "收件人"
 
 #: cps/spa_strings.py
 msgid "Saved e-reader addresses:"
-msgstr "已保存的电子阅读器地址："
+msgstr "已保存的电子阅读器邮箱地址："
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
@@ -10298,7 +10297,7 @@ msgstr "视图设置"
 
 #: cps/spa_strings.py
 msgid "Viewer"
-msgstr "查看书籍"
+msgstr "允许在线阅读"
 
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
@@ -10814,7 +10813,7 @@ msgstr "1个特殊字符"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "an uppercase letter"
-msgstr "1个大写字符"
+msgstr "1个大写字母"
 
 #: cps/spa_strings.py
 msgid "at least 1 character"
@@ -11616,7 +11615,7 @@ msgstr ""
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
 msgstr ""
-"需要拥有「全局浏览」角色，否则用户将无法添加任何图书。"
+"需要「浏览全局书库」权限，否则用户无法自行添加书籍。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
@@ -15268,8 +15267,8 @@ msgid ""
 "This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
 "covers written from now on; KEPUB files are not changed."
 msgstr ""
-"强制处理服务向 EPUB 写入新封面时，封面页面会保留图片的原始比例，而不是将图片拉伸至铺满屏幕。"
-"此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。仅对之后写入的封面生效，不会修改 KEPUB 文件。"
+"封面与元数据写入服务将新封面写入 EPUB 时，封面页会保留图片的原始宽高比，避免拉伸图片来填满屏幕。"
+"此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。仅对之后写入的封面生效，KEPUB 文件不受影响。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -18730,9 +18729,8 @@ msgid ""
 "browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
 "仅在上方选择「我的书库」时生效。"
-"用户初始书库为空，需要自行从全局书库中添加所需图书，"
-"因此必须拥有「全局浏览」角色。"
-"已将图书同步到 Kobo 的账号无法使用此功能。"
+"用户的书库初始为空，需要自行从全局书库中添加所需书籍，因此必须拥有「浏览全局书库」权限。"
+"已向 Kobo 同步过书籍的账号无法使用此功能。"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

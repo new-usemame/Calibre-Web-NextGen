@@ -20,7 +20,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
 import cps
@@ -223,6 +223,8 @@ def damaged_index_session():
         conn.exec_driver_sql(
             "CREATE INDEX idx_checksum_version ON book_format_checksums(checksum, version)"
         )
+        conn.exec_driver_sql("CREATE INDEX idx_book_format ON book_format_checksums(book, format)")
+        conn.exec_driver_sql("CREATE INDEX idx_created ON book_format_checksums(created)")
     s = sessionmaker(bind=engine)()
     checksums = [f"{i:032x}" for i in range(40)]
     for book_id, checksum in enumerate(checksums, start=1):
@@ -416,3 +418,20 @@ def test_unindexed_orphan_is_reported_as_stale(damaged_index_session, caplog):
     assert any(f"book id {book_id}" in record.message and "stale" in record.message
                for record in caplog.records)
     assert not any("checksum index" in record.message for record in caplog.records)
+
+
+def test_diagnosis_checks_the_index_used_by_the_failing_lookup(damaged_index_session, caplog):
+    session, checksum, book_id = damaged_index_session
+    # Rebuild only the composite index so versioned lookups work but the
+    # unversioned lookup still misses. This affects the disposable test DB.
+    session.execute(text("REINDEX idx_checksum_version"))
+    session.commit()
+    k = _kosync()
+
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        assert k.get_book_by_checksum(checksum, "koreader")[0] == book_id
+        assert k.get_book_by_checksum(checksum)[0] is None
+
+    warning = next((record.message for record in caplog.records
+                    if record.levelno == logging.WARNING and "checksum index" in record.message), "")
+    assert f"book id {book_id}" in warning

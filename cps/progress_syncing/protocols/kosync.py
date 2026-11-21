@@ -57,7 +57,7 @@ from ...kobo import push_reading_state_to_hardcover
 from flask import Blueprint, g, has_request_context, request, jsonify, send_from_directory
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
-from sqlalchemy import func, desc, cast, select, String, text as sql_text
+from sqlalchemy import func, desc, cast, literal_column, select, String, text as sql_text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -522,24 +522,46 @@ _miss_diag_last: set[tuple[str, str | None]] = set()
 _miss_diag_window = {"start": None, "total": None, "scans": 0, "damage_warned": False}
 
 
+def _checksum_lookup_query(checksum, version):
+    from ...db import BookFormatChecksum, Books
+
+    checksums = BookFormatChecksum.__table__
+    books = Books.__table__
+    query = select(
+        checksums.c.book,
+        checksums.c.format,
+        checksums.c.version,
+        books.c.title,
+        books.c.path,
+    ).join(
+        books, checksums.c.book == books.c.id,
+    ).where(
+        checksums.c.checksum == checksum,
+    )
+    if version is not None:
+        query = query.where(checksums.c.version == version)
+    return query.order_by(checksums.c.created.desc(), checksums.c.version.desc()).limit(1)
+
 def _probe_checksum_index(session, checksum, version):
-    # Both reads must see the same snapshot. A concurrent registration
-    # between the original lookup and this probe can make both find a row.
-    candidate_version = "AND candidate.version = :version" if version is not None else ""
-    indexed_version = "AND indexed.version = :version" if version is not None else ""
-    return session.execute(sql_text(f"""
-        SELECT candidate.book, candidate.format, live_book.id, EXISTS (
-            SELECT 1
-            FROM book_format_checksums AS indexed
-            JOIN books AS indexed_book ON indexed_book.id = indexed.book
-            WHERE indexed.checksum = :checksum {indexed_version}
-        ) AS indexed_match
-        FROM book_format_checksums AS candidate NOT INDEXED
-        LEFT JOIN books AS live_book ON live_book.id = candidate.book
-        WHERE candidate.checksum = :checksum {candidate_version}
-        ORDER BY (live_book.id IS NOT NULL) DESC, candidate.created DESC, candidate.version DESC
-        LIMIT 1
-    """), {"checksum": checksum, "version": version}).first()
+    # Compare the same ordered lookup with an unindexed read in one SQLite
+    # snapshot. A bare EXISTS can choose a different, healthy covering index.
+    indexed_lookup = _checksum_lookup_query(checksum, version).subquery()
+    indexed_book = select(indexed_lookup.c.book).scalar_subquery()
+    scan = select(
+        literal_column("candidate.book"),
+        literal_column("candidate.format"),
+        literal_column("live_book.id"),
+        indexed_book.is_not(None),
+    ).select_from(sql_text(
+        "book_format_checksums AS candidate NOT INDEXED "
+        "LEFT JOIN books AS live_book ON live_book.id = candidate.book"
+    )).where(sql_text("candidate.checksum = :checksum"))
+    if version is not None:
+        scan = scan.where(sql_text("candidate.version = :version"))
+    scan = scan.order_by(sql_text(
+        "(live_book.id IS NOT NULL) DESC, candidate.created DESC, candidate.version DESC"
+    )).limit(1)
+    return session.execute(scan, {"checksum": checksum, "version": version}).first()
 
 
 def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
@@ -656,32 +678,9 @@ def get_book_by_checksum(document_checksum: str, version: str = None, *, diagnos
         Orders by created DESC (latest first), then version DESC.
     """
     from ... import calibre_db
-    from ...db import BookFormatChecksum, Books
 
     try:
-        query = calibre_db.session.query(
-            BookFormatChecksum.book,
-            BookFormatChecksum.format,
-            BookFormatChecksum.version,
-            Books.title,
-            Books.path
-        ).join(
-            Books, BookFormatChecksum.book == Books.id
-        ).filter(
-            BookFormatChecksum.checksum == document_checksum
-        )
-
-        # Optionally filter by version
-        if version is not None:
-            query = query.filter(BookFormatChecksum.version == version)
-
-        # Order by created DESC (latest first), then version DESC
-        query = query.order_by(
-            BookFormatChecksum.created.desc(),
-            BookFormatChecksum.version.desc()
-        )
-
-        result = query.first()
+        result = calibre_db.session.execute(_checksum_lookup_query(document_checksum, version)).first()
 
         if result:
             book_id, book_format, checksum_version, book_title, book_path = result

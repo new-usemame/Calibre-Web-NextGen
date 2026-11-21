@@ -71,6 +71,15 @@ def span_location(source, span):
     return {"Source": source, "Type": "KoboSpan", "Value": span}
 
 
+def crosspoint_percent(world, row):
+    """The percentage KOReader pulls after a Kobo holding the library KEPUB
+    reports ``row``'s span: CrossPoint's, not the Kobo's whole number."""
+    from cps.services.kepub_alignment import span_book_percent
+    percent = span_book_percent(world.epub, world.kepub, row["source"], row["span"])
+    assert percent is not None
+    return pytest.approx(percent, abs=5e-4)  # ``pull`` rounds to 3 places
+
+
 @pytest.fixture
 def sw(monkeypatch, tmp_path):
     from cps import annotations, kobo, kobo_sync_status
@@ -197,9 +206,10 @@ def sw(monkeypatch, tmp_path):
         assert response.status_code == 200, response.get_data(as_text=True)
         assert response.get_json()["RequestResult"] == "Success"
 
-    def sync(device):
+    def sync(device, *, token=None):
         """One library/sync, handing back the previous token as Nickel does."""
-        headers = {header: tokens[device.id]} if tokens.get(device.id) else {}
+        incoming = token if token is not None else tokens.get(device.id)
+        headers = {header: incoming} if incoming else {}
         # The sync handler reads ``wsgi_app.is_proxied``; the KOReader half
         # needs the real wsgi_app for HTTP, so stand it in only for this call.
         real_wsgi_app, world.app.wsgi_app = world.app.wsgi_app, SimpleNamespace(is_proxied=True)

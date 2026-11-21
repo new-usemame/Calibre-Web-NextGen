@@ -742,7 +742,7 @@ def test_execute_resolution_blocks_while_ingest_pending(monkeypatch):
     calls = []
     module = _load_duplicates_route_module(monkeypatch, calls, ingest_pending=True)
     flask_module = sys.modules["flask"]
-    flask_module.request = SimpleNamespace(json={"strategy": "newest"})
+    flask_module.request = SimpleNamespace(get_json=lambda **kwargs: {"strategy": "newest"})
     auto_resolve_calls = []
     monkeypatch.setattr(
         module,
@@ -763,7 +763,7 @@ def test_preview_resolution_uses_indexed_duplicate_groups(monkeypatch):
     calls = []
     module = _load_duplicates_route_module(monkeypatch, calls)
     flask_module = sys.modules["flask"]
-    flask_module.request = SimpleNamespace(json={"strategy": "newest"})
+    flask_module.request = SimpleNamespace(get_json=lambda **kwargs: {"strategy": "newest"})
     auto_resolve_calls = []
     expected_result = {
         "success": True,
@@ -794,7 +794,7 @@ def test_execute_resolution_uses_indexed_duplicate_groups(monkeypatch):
     calls = []
     module = _load_duplicates_route_module(monkeypatch, calls)
     flask_module = sys.modules["flask"]
-    flask_module.request = SimpleNamespace(json={"strategy": "newest"})
+    flask_module.request = SimpleNamespace(get_json=lambda **kwargs: {"strategy": "newest"})
     auto_resolve_calls = []
     monkeypatch.setattr(
         module,

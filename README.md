@@ -44,15 +44,15 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
 <!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-throughput-dark.svg">
-  <img alt="Pull request throughput: 59 open, 1,926 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
+  <img alt="Pull request throughput: 43 open, 1,958 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-outcomes-dark.svg">
-  <img alt="Fix outcomes by week: 281 happy, 83 not fixed, 474 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
+  <img alt="Fix outcomes by week: 287 happy, 83 not fixed, 500 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
 </picture>
 
-On November 15, 2026, 59 pull requests were open and 1,926 closed, 1,752 of them merged. Of 838 fixes delivered to a person, 34% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 77% of the time.
+On November 19, 2026, 43 pull requests were open and 1,958 closed, 1,780 of them merged. Of 870 fixes delivered to a person, 33% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 78% of the time.
 
 A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
 
@@ -65,8 +65,8 @@ A fix is one moment someone was told their problem was dealt with: a fix PR merg
 | Jul 2026 | 359 | 362 | 3 | 107 | 26 | 70 |
 | Aug 2026 | 578 | 573 | 11 | 35 | 14 | 71 |
 | Sep 2026 | 224 | 218 | 12 | 23 | 5 | 32 |
-| Oct 2026 | 279 | 241 | 35 | 37 | 5 | 73 |
-| Nov 2026 | 107 | 98 | 56 | 9 | 4 | 33 |
+| Oct 2026 | 279 | 241 | 35 | 38 | 5 | 72 |
+| Nov 2026 | 123 | 130 | 53 | 14 | 4 | 60 |
 
 Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge the new replies, `apply` and `render`.
 
@@ -645,6 +645,10 @@ If Repository Settings says "No custom configuration file found", the file is mi
 
 **appstore.koplugin.** Use the gear icon (⚙️) ▸ **Install plugin from URL** and enter `new-usemame` and `cwngsync.koplugin`. If the plugin is already installed, use **Match with URL** to link it to that repository so updates are tracked.
 
+A CrossPoint reader (for example an Xteink) can also back up its clippings to CWNG. **First use a firmware build containing crosspoint-reader#4323**, which sends HTTP Basic login on clipping requests. The latest tagged release, CrossPoint 2.0.0, lacks this fix: turning on Sync Clippings with that version gets a 401 and stops Sync Progress.
+
+With compatible firmware, enter `http://your-host:8083/kosync`, your user name and password in its KOSync settings. Set Custom Header 1 to `X-CWNG-Device-ID: <a name for this reader>` and Custom Header 2 to `X-CWNG-Device-Name: <its display name>`, so CWNG can tell your readers apart. Then turn on Sync Clippings. Each clipping shows as a highlight in the web reader with the reader's name, and only that reader gets it back.
+
 For matching OPDS filenames across devices, turn on **Use server filenames** in KOReader's OPDS catalog settings. By default KOReader builds `Author - Title.epub` from the feed, while the server suggests `Title - Author.epub` with only the first author. With the setting on, KOReader uses the server's name. Administrators can change that name with the OPDS download filename template preference; a blank preference keeps the current naming. Fields, examples and device limits: [OPDS download filenames](docs/opds-filename-template.md).
 
 For books emailed to a reader, the **eReader attachment filename template** in the administrator's email settings sets the attachment name, series and series number included. See [Names for emailed book attachments](docs/send-filename-template.md).
@@ -787,35 +791,35 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
-| French (`fr`) | `████████████████████` 100% | 4166/4169 | 0 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████████` 99% | 4143/4169 | 0 |
-| German (`de`) | `████████████████████` 99% | 4145/4169 | 0 |
-| ca (`ca`) | `████████████████████` 98% | 4090/4169 | 0 |
-| Slovak (`sk`) | `████████████████████` 98% | 4085/4169 | 0 |
-| Russian (`ru`) | `████████████████████` 98% | 4075/4169 | 0 |
-| Swedish (`sv`) | `████████████████░░░░` 79% | 3298/4169 | 0 |
-| Dutch (`nl`) | `███████████████░░░░░` 77% | 3197/4169 | 279 |
-| Italian (`it`) | `███████████████░░░░░` 75% | 3109/4169 | 0 |
-| Spanish (`es`) | `███████████████░░░░░` 74% | 3093/4169 | 0 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████████░░░░░░░` 64% | 2672/4169 | 172 |
-| Polish (`pl`) | `████████████░░░░░░░░` 62% | 2574/4169 | 0 |
-| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 42% | 1758/4169 | 118 |
-| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 35% | 1464/4169 | 0 |
-| Portuguese (Brazil) (`pt_BR`) | `███████░░░░░░░░░░░░░` 34% | 1426/4169 | 296 |
-| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 32% | 1331/4169 | 234 |
-| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 29% | 1226/4169 | 302 |
-| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 23% | 969/4169 | 256 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 22% | 899/4169 | 341 |
-| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 17% | 707/4169 | 343 |
-| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 17% | 706/4169 | 342 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 13% | 538/4169 | 381 |
-| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 510/4169 | 390 |
-| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 479/4169 | 357 |
-| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 11% | 465/4169 | 417 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 11% | 457/4169 | 338 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 390/4169 | 371 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 324/4169 | 369 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 242/4169 | 330 |
+| French (`fr`) | `████████████████████` 99% | 4367/4429 | 1 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `███████████████████░` 94% | 4163/4429 | 1 |
+| German (`de`) | `███████████████████░` 94% | 4140/4429 | 0 |
+| Russian (`ru`) | `██████████████████░░` 92% | 4084/4429 | 0 |
+| ca (`ca`) | `██████████████████░░` 92% | 4084/4429 | 0 |
+| Slovak (`sk`) | `██████████████████░░` 92% | 4080/4429 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 77% | 3398/4429 | 280 |
+| Swedish (`sv`) | `███████████████░░░░░` 74% | 3295/4429 | 0 |
+| Italian (`it`) | `██████████████░░░░░░` 70% | 3106/4429 | 0 |
+| Spanish (`es`) | `██████████████░░░░░░` 70% | 3090/4429 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████░░░░░░░░` 60% | 2669/4429 | 172 |
+| Polish (`pl`) | `████████████░░░░░░░░` 58% | 2571/4429 | 0 |
+| Hungarian (`hu`) | `████████░░░░░░░░░░░░` 40% | 1756/4429 | 118 |
+| Arabic (`ar`) | `███████░░░░░░░░░░░░░` 33% | 1463/4429 | 1 |
+| Portuguese (Brazil) (`pt_BR`) | `██████░░░░░░░░░░░░░░` 32% | 1422/4429 | 297 |
+| Japanese (`ja`) | `██████░░░░░░░░░░░░░░` 30% | 1330/4429 | 235 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 28% | 1225/4429 | 303 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 27% | 1190/4429 | 340 |
+| Korean (`ko`) | `████░░░░░░░░░░░░░░░░` 22% | 968/4429 | 257 |
+| Galician (`gl`) | `███░░░░░░░░░░░░░░░░░` 16% | 705/4429 | 343 |
+| Indonesian (`id`) | `███░░░░░░░░░░░░░░░░░` 16% | 706/4429 | 344 |
+| Greek (`el`) | `██░░░░░░░░░░░░░░░░░░` 12% | 537/4429 | 382 |
+| Czech (`cs`) | `██░░░░░░░░░░░░░░░░░░` 12% | 509/4429 | 391 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 11% | 478/4429 | 358 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 10% | 464/4429 | 418 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 456/4429 | 339 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 9% | 389/4429 | 372 |
+| Turkish (`tr`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 323/4429 | 370 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 5% | 241/4429 | 331 |
 <!-- TRANSLATION_STATUS_END -->
 
 </details>

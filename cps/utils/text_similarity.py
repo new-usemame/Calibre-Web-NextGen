@@ -10,6 +10,7 @@ Text similarity utilities for metadata matching
 """
 from typing import List, Set
 import re
+import unicodedata
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -62,12 +63,18 @@ def normalize_string(s: str) -> str:
     - Convert to lowercase
     - Remove special characters and extra whitespace
     - Remove common articles and conjunctions
+    - Drop accents, so "étoffes" and "etoffes" compare equal
     """
     if not s:
         return ""
     
     # Convert to lowercase
     s = s.lower()
+
+    # Strip combining marks (NFKD splits "é" into "e" + accent). Letters with
+    # no decomposition, including non-Latin scripts, are kept as they are.
+    s = ''.join(c for c in unicodedata.normalize('NFKD', s)
+                if not unicodedata.combining(c))
     
     # Remove common articles and conjunctions
     articles = ['the', 'a', 'an', 'and', '&']
@@ -175,3 +182,11 @@ def calculate_year_similarity(year1: str, year2: str) -> float:
             return 0.0
     except (ValueError, AttributeError):
         return 0.0
+
+def main_title(title: str) -> str:
+    """The title without its subtitle ("Play Nice: The Rise..." -> "Play Nice").
+
+    Cuts at the first colon or spaced dash, the two ways Calibre and
+    Hardcover attach a subtitle to a title.
+    """
+    return re.split(r"\s*(?::|\s[-\u2013\u2014]\s)\s*", title or "", maxsplit=1)[0].strip()

@@ -18,7 +18,7 @@ from cps.metadata_constants import (
 )
 from cps.search_metadata import cl as metadata_providers
 from cps.cwa_db_loader import load_cwa_db
-from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid
+from cps.services.isbn import ISBN_IDENTIFIER_TYPES, isbn13, is_valid as isbn_is_valid, normalize as normalize_isbn
 CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
@@ -85,7 +85,7 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
         for provider_id in provider_hierarchy:
             # Check if explicitly disabled (default is enabled if not specified)
             from cps.metadata_constants import metadata_provider_enabled
-            is_enabled = metadata_provider_enabled(provider_id, enabled_map)
+            is_enabled = metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)
             if not is_enabled:
                 log.debug(f"Provider {provider_id} is globally disabled")
                 continue
@@ -104,16 +104,32 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                 
                 # Search for metadata
                 results = provider.search(search_query, "", "en")
-                if not results or len(results) == 0:
-                    continue
-                    
+
                 # Prefer the candidate whose ISBN matches the book's existing ISBN
                 # over a blind first result (fork #402), and refuse a candidate
                 # that isn't plausibly this book at all (fork #1164).
                 metadata = _select_metadata_result(
                     results, book_isbn,
                     book_title=book.title, book_authors=book.authors,
-                )
+                ) if results else None
+
+                # A title search can miss when the library spells the title
+                # differently from the catalog (e.g. without diacritics). A
+                # provider that understands "isbn:<isbn>" gets a second try by
+                # the book's own ISBN, under the same confidence gate.
+                if (metadata is None and getattr(provider, "SUPPORTS_ISBN_QUERY", False) is True
+                        and (isbn_query := normalize_isbn(book_isbn))):
+                    log.debug(f"Retrying {provider.__name__} by ISBN {isbn_query}")
+                    isbn_results = provider.search(f"isbn:{isbn_query}", "", "en")
+                    if isbn_results:
+                        results = isbn_results
+                        metadata = _select_metadata_result(
+                            isbn_results, book_isbn,
+                            book_title=book.title, book_authors=book.authors,
+                        )
+
+                if not results:
+                    continue
                 if metadata is None:
                     log.info(
                         f"No confident match from {provider.__name__} for book: "
@@ -526,9 +542,9 @@ _SERIES_KIND_WORDS = frozenset({
 _SERIES_FILL_LIMIT = 3
 
 # Series-capable providers the fill asks even when the configured order leaves
-# them out: both carry series data of their own. Any other provider (Amazon,
-# Goodreads and the rest scrape pages that throttle bots) is asked only when
-# the administrator put it in the order.
+# them out: both carry series data of their own. Other providers, including
+# the opt-in Wikidata service, are asked only when the administrator put them
+# in the order.
 _SERIES_FILL_EXTRAS = ("hardcover", "kobo")
 
 # The fill has not run yet for this book (None means it ran and found nothing).
@@ -648,7 +664,7 @@ def _find_missing_series_unguarded(book, search_query, applied_provider_id, prov
     for provider_id in ordered:
         provider = by_id[provider_id]
         if (provider_id == applied_provider_id or not getattr(provider, "FILLS_SERIES", False)
-                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map)):
+                or not provider.active or not metadata_provider_enabled(provider_id, enabled_map, provider_hierarchy)):
             continue
         if asked >= _SERIES_FILL_LIMIT:
             break

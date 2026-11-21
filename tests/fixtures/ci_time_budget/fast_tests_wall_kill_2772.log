@@ -1,0 +1,329 @@
+2026-11-19T08:16:51.4241670Z ##[group]Run # --timeout=120 + --timeout-method=thread converts hung tests into named
+2026-11-19T08:16:51.4242332Z [36;1m# --timeout=120 + --timeout-method=thread converts hung tests into named[0m
+2026-11-19T08:16:51.4243085Z [36;1m# test failures instead of opaque step-level timeouts. Without[0m
+2026-11-19T08:17:33.6011676Z [gw1] [  0%] PASSED tests/unit/test_mutation_harness.py::test_isolated_sweep_scrubs_the_full_tree_to_an_immutable_seed 
+2026-11-19T08:17:34.0394407Z [gw0] [  0%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[__main__.py] 
+2026-11-19T08:17:35.2502011Z [gw0] [  1%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[constants.py] 
+2026-11-19T08:17:37.3879334Z [gw0] [  1%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[metadata_provider/apple_books.py] 
+2026-11-19T08:17:38.6486765Z [gw0] [  2%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[services/acquisition/clients.py] 
+2026-11-19T08:17:39.7440422Z [gw0] [  2%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[services/device_sleep_screen.py] 
+2026-11-19T08:17:41.1339087Z [gw0] [  3%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[services/user_notices.py] 
+2026-11-19T08:17:42.2214786Z [gw0] [  3%] PASSED tests/unit/test_1438_undefined_module_globals.py::test_no_undefined_module_globals[user_book_data.py] 
+2026-11-19T08:17:49.5808467Z [gw1] [  3%] PASSED tests/unit/test_opds_filename_template.py::test_invalid_templates_are_rejected[{title:.999s}] 
+2026-11-19T08:17:50.3363201Z [gw1] [  4%] PASSED tests/unit/test_opds_filename_template.py::test_both_admin_editors_treat_whitespace_as_blank[  \t  ] 
+2026-11-19T08:17:51.4472188Z [gw1] [  4%] PASSED tests/unit/test_1942_seed_pipeline.py::test_mixed_active_devices_use_routing_only_seed_on_their_next_local_get 
+2026-11-19T08:17:56.2168110Z [gw0] [  5%] PASSED tests/unit/test_1925_kobo_sync_dedownload.py::test_shelf_only_membership_addition_emits_once 
+2026-11-19T08:18:00.0531124Z [gw1] [  5%] PASSED tests/unit/test_crosspoint_clippings.py::test_parse_item_refuses[bad5] 
+2026-11-19T08:18:04.0711904Z [gw1] [  6%] PASSED tests/unit/test_crosspoint_clippings.py::test_a_put_needs_1_to_50_items[0] 
+2026-11-19T08:18:07.9158810Z [gw1] [  6%] PASSED tests/unit/test_crosspoint_clippings.py::test_a_headerless_crosspoint_pull_can_be_echoed_in_a_koreader_batch 
+2026-11-19T08:18:10.8327418Z [gw1] [  6%] PASSED tests/unit/test_kobo_highlight_colour_vocabulary.py::TestLegacyColumnShapes::test_storage_normaliser_handles_every_legacy_shape[grey-#A0A0A0] 
+2026-11-19T08:18:11.3689281Z [gw1] [  7%] PASSED tests/unit/test_1109_iso6392b_language_codes.py::test_every_bibliographic_code_resolves[baq] 
+2026-11-19T08:18:11.5256172Z [gw1] [  7%] PASSED tests/unit/test_1109_iso6392b_language_codes.py::test_valid_codes_accepts_every_bibliographic_code[mac-mkd] 
+2026-11-19T08:18:11.8182084Z [gw1] [  8%] PASSED tests/unit/test_1611_path_env_overrides.py::test_nonblank_invalid_dirs_json_paths_fail_on_both_sides[/./-calibre_library_dir-CWA_CALIBRE_LIBRARY_DIR-/calibre-library] 
+2026-11-19T08:18:14.7595598Z [gw1] [  8%] PASSED tests/unit/test_cover_designer_v2.py::test_punctuation_inside_a_books_own_text_is_left_alone 
+2026-11-19T08:18:18.1458404Z [gw1] [  9%] PASSED tests/unit/test_cover_designer_v2.py::test_an_older_client_still_gets_the_cover_it_asked_for 
+2026-11-19T08:18:18.4642983Z [gw1] [  9%] PASSED tests/unit/test_templates_no_nested_forms.py::TestNoNestedFormsAnywhere::test_template_has_no_nested_form[login.html] 
+2026-11-19T08:18:18.8377795Z [gw1] [  9%] PASSED tests/unit/test_calibre_content_server_arguments.py::test_both_copies_derive_the_same_library_id[/x/My Library/-My_Library] 
+2026-11-19T08:18:20.2874563Z [gw1] [ 10%] PASSED tests/unit/test_1094_failed_conversion_imports_original.py::TestConversionDeadline::test_env_parsing[-None] 
+2026-11-19T08:18:23.3557447Z [gw1] [ 10%] PASSED tests/unit/test_1094_failed_conversion_imports_original.py::TestIngestServiceTimeoutMessaging::test_internal_timeout_only_bounds_file_stability_wait 
+2026-11-19T08:18:53.1174559Z [gw1] [ 11%] PASSED tests/unit/test_frontend_unit_suites_run.py::test_frontend_unit_suite_passes[unit/namedPreferenceState.test.ts] 
+2026-11-19T08:19:00.2912441Z [gw1] [ 11%] PASSED tests/unit/test_739_sticky_new_ui.py::test_production_web_index_executes_the_preference_contract[/-headers0-None-302] 
+2026-11-19T08:19:02.8195974Z [gw1] [ 12%] PASSED tests/unit/test_my_library_backend_1939.py::test_admin_scoped_migration_can_switch_anonymous_account_once 
+2026-11-19T08:19:08.8510709Z [gw1] [ 12%] PASSED tests/unit/test_helper.py::TestGetValidFilename::test_pipe_replaced_with_comma 
+2026-11-19T08:19:09.0529728Z [gw1] [ 12%] PASSED tests/unit/test_1248_reverseproxy_segment_boundary.py::test_no_cwa_route_is_mangled_by_a_cwa_mount[/cwa-epub-fixer-overview] 
+2026-11-19T08:19:09.6789423Z [gw1] [ 13%] PASSED tests/unit/test_po_wrapped_string_convention.py::test_no_half_replaced_wrapped_strings[es] 
+2026-11-19T08:19:12.8012009Z [gw1] [ 13%] PASSED tests/unit/test_share_place_kosync_gates.py::test_headerless_get_is_never_identified_even_for_a_per_device_device 
+2026-11-19T08:19:31.2416479Z [gw1] [ 14%] PASSED tests/unit/test_share_place_kosync_gates.py::test_a_junk_client_clock_is_receipt_time_on_both_sides[12] 
+2026-11-19T08:19:43.8484139Z [gw0] [ 14%] PASSED tests/unit/test_acquisition_api.py::test_runtime_liveness_does_not_treat_unknown_ingest_as_working[error] 
+2026-11-19T08:19:51.1214893Z [gw0] [ 15%] PASSED tests/unit/test_i18n_format_flags.py::test_po_has_no_entry_flagged_both_python_format_and_brace_format[pt_BR] 
+2026-11-19T08:19:52.3601650Z [gw0] [ 15%] PASSED tests/unit/test_cover_booster.py::TestBoostedCoverPathOrder::test_amazon_cdn_wins_when_record_has_isbn 
+2026-11-19T08:19:52.5604303Z [gw0] [ 15%] PASSED tests/unit/test_cwngsync_plugin_wire_contract.py::test_every_field_the_client_sends_is_an_expected_param[complete_delivery] 
+2026-11-19T08:19:54.2733822Z [gw0] [ 16%] PASSED tests/unit/test_acquisition_clients.py::test_transmission_tracker_error_does_not_override_peer_completion[2-True-Completed] 
+2026-11-19T08:19:58.5346618Z [gw0] [ 16%] PASSED tests/unit/test_calibre_user_plugins.py::TestAutoRegisterPlugins::test_registered_plugin_names_parses_customize_json 
+2026-11-19T08:19:58.9314515Z [gw0] [ 17%] PASSED tests/unit/test_support_pack_state.py::TestStatePrivacy::test_unexpected_environment_values_are_not_exported[UTC\n-NETWORK_SHARE_MODE] 
+2026-11-19T08:20:03.0912595Z [gw0] [ 17%] PASSED tests/unit/test_annotation_device_management.py::test_r3_f1_admin_candidate_scope_excludes_rows_without_page_device_data 
+2026-11-19T08:20:09.7609225Z [gw0] [ 18%] PASSED tests/unit/test_kobo_resume_point.py::test_enhanced_deflate_flag_leaves_member_names_and_bytes_unchanged 
+2026-11-19T08:20:23.4851761Z [gw0] [ 18%] PASSED tests/unit/test_kosync_text_anchor.py::test_words_in_another_case_still_find_their_place 
+2026-11-19T08:20:25.0481493Z [gw0] [ 19%] PASSED tests/unit/test_1164_metadata_confidence_gate.py::TestLegitimateMatchesStillApply::test_ordinary_title_variance_matches[Devils] 
+2026-11-19T08:20:25.2118286Z [gw0] [ 19%] PASSED tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_locale_object 
+2026-11-19T08:20:25.3621081Z [gw0] [ 19%] PASSED tests/unit/test_acquisition_opds.py::test_non_download_relations_never_become_automatic_downloads[application/epub+zip-preview] 
+2026-11-19T08:20:25.6393387Z [gw0] [ 20%] PASSED tests/unit/test_1657_kepub_toc_fragments.py::test_bom_prefixed_ncx_preserves_bom_and_all_non_target_bytes 
+2026-11-19T08:20:26.7486524Z [gw0] [ 20%] PASSED tests/unit/test_zip_member_rewrite.py::test_unchanged_local_record_and_descriptor_survive[True-False-False] 
+2026-11-19T08:20:43.2940603Z [gw0] [ 21%] PASSED tests/unit/test_ci_e2e_commit_gate.py::test_named_engine_and_concurrency_surfaces_trigger_e2e[cps/api/shelves.py] 
+2026-11-19T08:21:10.5155946Z [gw0] [ 21%] PASSED tests/unit/test_ci_e2e_commit_gate.py::test_neutral_alias_requires_the_newest_relevant_ancestor_and_matching_dev 
+2026-11-19T08:21:15.1659269Z [gw1] [ 22%] PASSED tests/unit/test_workflow_safety_invariants.py::test_changed_paths_classifies_build_definition_edits[changed7-true-true] 
+2026-11-19T08:21:17.6037527Z [gw1] [ 22%] PASSED tests/unit/test_api_v1_custom_column_edit.py::test_read_value_serialization[bool-rows6-False] 
+2026-11-19T08:21:18.9775101Z [gw1] [ 22%] PASSED tests/unit/test_ereader_scope_kobo_parity.py::test_kobo_delivers_exactly_the_ereader_scope[shelves] 
+2026-11-19T08:21:40.0010828Z [gw1] [ 23%] PASSED tests/unit/test_ereader_scope_kobo_parity.py::test_a_scoped_kobo_removes_exactly_what_left_its_device_scope[shelves-and-my-library/shelves-kobo-and-plain] 
+2026-11-19T08:22:08.8605793Z [gw0] [ 23%] PASSED tests/unit/test_hardcover_configuration_cluster.py::test_legacy_rollback_mirror_tracks_persisted_value_not_env_override 
+2026-11-19T08:22:09.5520020Z [gw0] [ 24%] PASSED tests/unit/test_isbn_check_digits.py::test_malformed_isbns_do_not_become_cover_keys_or_apple_lookups[9780441013593junk-cover_identifier] 
+2026-11-19T08:22:09.7262514Z [gw0] [ 24%] PASSED tests/unit/test_1660_kobo_checkforchanges_filter.py::test_ownership_unknown_is_treated_as_owned 
+2026-11-19T08:22:11.9901289Z [gw0] [ 25%] PASSED tests/unit/test_api_v1_auth.py::test_auth_config_is_public_and_shaped 
+2026-11-19T08:22:14.0670815Z [gw0] [ 25%] PASSED tests/unit/test_cover_preview.py::TestPresetCatalogCoverage::test_historical_kobo_presets_preserved 
+2026-11-19T08:22:21.0235246Z [gw0] [ 25%] PASSED tests/unit/test_f5c1146_kobo_patch_recovery_spool.py::test_failed_new_write_does_not_destroy_the_existing_recovery_record 
+2026-11-19T08:22:28.9245005Z [gw1] [ 26%] PASSED tests/unit/test_dev_image_build_once_when_image_relevant_never_when_ignored.py::test_dockerignore_matcher_tracks_moby_pattern_cases[a/*.txt-a/deep/file.txt-False] 
+2026-11-19T08:22:31.6236131Z [gw0] [ 26%] PASSED tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] 
+2026-11-19T08:22:34.9035405Z [gw0] [ 27%] PASSED tests/unit/test_book_list_export.py::test_csv_formula_cells_are_neutralized_even_after_invisible_prefixes 
+2026-11-19T08:22:35.8906197Z [gw0] [ 27%] PASSED tests/unit/test_acquisition_catalog.py::test_admin_cannot_open_a_catalog_onto_a_network_that_must_stay_denied[100.64.0.0/10] 
+2026-11-19T08:22:41.1763957Z [gw0] [ 28%] PASSED tests/unit/test_acquisition_http.py::test_slow_child_start_consumes_entire_large_nzb_before_post[10000] 
+2026-11-19T08:22:45.6174390Z [gw0] [ 28%] PASSED tests/unit/test_acquisition_http.py::test_magnet_redirect_rejects_source_secret_and_unbounded_uri[magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x7f] 
+2026-11-19T08:22:48.1934247Z [gw0] [ 28%] PASSED tests/unit/test_smart_shelf_naming.py::test_renamed_smart_shelf_copy_is_present_in_compiled_catalog[sk] 
+2026-11-19T08:22:50.0602207Z [gw1] [ 29%] PASSED tests/unit/test_acquisition_epub_resources.py::test_local_header_crc_and_sizes_must_agree_with_central_directory[22] 
+2026-11-19T08:22:51.6722261Z [gw0] [ 29%] PASSED tests/unit/test_615_residual_i18n.py::test_spa_placeholders_survive_translation[id] 
+2026-11-19T08:22:57.5103729Z [gw0] [ 30%] PASSED tests/unit/test_acquisition_v2_magnets.py::test_recovered_attempt_never_reads_files_without_usable_matching_full_metadata[True-properties8-client_job_mismatch] 
+2026-11-19T08:22:58.7296056Z [gw0] [ 30%] PASSED tests/unit/test_acquisition_v2_magnets.py::test_unqualified_single_btmh_refusal_has_no_durable_or_submission_effect[qbittorrent-] 
+2026-11-19T08:22:59.4446806Z [gw1] [ 31%] PASSED tests/unit/test_api_v1_admin.py::test_create_user_seeds_theme_from_config[3-3] 
+2026-11-19T08:22:59.9583103Z [gw1] [ 31%] PASSED tests/unit/test_changelog_diff_guard.py::test_removing_an_accidentally_duplicated_entry_is_allowed 
+2026-11-19T08:23:00.5373867Z [gw0] [ 31%] PASSED tests/unit/test_2720_browse_contract.py::test_name_filter_is_literal_and_unicode_case_insensitive[\xc5land-\xe5L-/authors] 
+2026-11-19T08:23:02.1483501Z [gw0] [ 32%] PASSED tests/unit/test_tag_naming.py::test_changed_tag_copy_survives_actual_gettext_compilation[zh_Hans_CN] 
+2026-11-19T08:23:03.7134346Z [gw1] [ 32%] PASSED tests/unit/test_1462_config_dir_ssot.py::TestConfigDirMatchesCps::test_an_existing_legacy_config_app_db_does_not_redirect_the_default 
+2026-11-19T08:23:05.6362292Z [gw1] [ 33%] PASSED tests/unit/test_acquisition_usenet.py::test_definite_submit_rejection_resolves_existing_adopter_and_allows_retry 
+2026-11-19T08:23:09.1857768Z [gw1] [ 33%] PASSED tests/unit/test_koreader_pairing.py::test_an_approved_code_connects_the_device_exactly_once 
+2026-11-19T08:23:10.6809486Z [gw0] [ 34%] PASSED tests/unit/test_po_source_location_churn.py::test_no_line_numbers_in_catalog[no] 
+2026-11-19T08:23:10.9736620Z [gw0] [ 34%] PASSED tests/unit/test_f011141_locale_validated_on_write.py::TestTheReadPathIsTheBoundary::test_get_locale_resolves_a_hostile_or_stale_stored_row[123-shipped3-de-de] 
+2026-11-19T08:23:11.4981887Z [gw0] [ 34%] PASSED tests/unit/test_migrate_brand_title.py::test_should_migrate_recognizes_legacy[  Calibre-Web  ] 
+2026-11-19T08:23:12.6056555Z [gw0] [ 35%] PASSED tests/unit/test_translations_compile.py::test_po_file_compiles_cleanly[vi] 
+2026-11-19T08:23:20.5184245Z [gw0] [ 35%] PASSED tests/unit/test_annotation_text_quote.py::test_each_client_deletes_only_its_own_highlights 
+2026-11-19T08:23:21.6103285Z [gw1] [ 36%] PASSED tests/unit/test_catalog_custom_fields_retention.py::test_malformed_stored_selection_matches_me_default_all[stored1] 
+2026-11-19T08:23:24.1379012Z [gw1] [ 36%] PASSED tests/unit/test_kindle_epub_fixer_amazon_marker.py::test_process_removes_only_amazon_attribute_and_second_run_is_noop[CHAPTER.HTML] 
+2026-11-19T08:23:24.6902300Z [gw1] [ 37%] PASSED tests/unit/test_1370_api_origin_check.py::test_cross_site_referer_without_origin_is_rejected 
+2026-11-19T08:23:26.3108070Z [gw0] [ 37%] PASSED tests/unit/test_920_koreader_push_only_authority.py::test_reported_delete_never_crosses_user_or_book 
+2026-11-19T08:23:27.7565667Z [gw1] [ 37%] PASSED tests/unit/test_automerge_base_branch_gate.py::test_cli_refuses_stacked_base 
+2026-11-19T08:23:28.1415342Z [gw1] [ 38%] PASSED tests/unit/test_measure_kobo_patch_failure_is_safe.py::test_device_path_is_shell_quoted 
+2026-11-19T08:23:29.0796527Z [gw0] [ 38%] PASSED tests/unit/test_750_opds_feed_titles.py::test_resolver_maps_endpoint_to_ssot_title[opds.feed_author-Authors] 
+2026-11-19T08:23:30.3412434Z [gw1] [ 39%] PASSED tests/unit/test_acquisition_torrent_v2.py::test_pure_v2_requires_reviewed_envelope_and_known_version[unknown_info] 
+2026-11-19T08:23:32.9578119Z [gw0] [ 39%] PASSED tests/unit/test_1343_read_status_two_carriers.py::TestCustomColumnRoundTrip::test_marking_unread_unwedges_the_reader 
+2026-11-19T08:23:34.9708346Z [gw0] [ 40%] PASSED tests/unit/test_920_koreader_annotation_sync_observability.py::test_a_highlight_sent_again_unchanged_is_not_reported_as_dropped 
+2026-11-19T08:23:37.6433300Z [gw0] [ 40%] PASSED tests/unit/test_acsm_import_fulfillment.py::test_failed_backup_preserves_original_for_manual_recovery 
+2026-11-19T08:23:37.9510925Z [gw0] [ 40%] PASSED tests/unit/test_cover_url_validator.py::TestGoogleImgresLinks::test_validate_probes_the_inner_url_and_reports_resolved_url 
+2026-11-19T08:23:38.2072545Z [gw0] [ 41%] PASSED tests/unit/test_description_editor_allowlist_ssot.py::test_rich_text_module_ships 
+2026-11-19T08:23:40.4200820Z [gw0] [ 41%] PASSED tests/unit/test_kosync_helpers.py::TestIsValidField::test_rejects_empty_string 
+2026-11-19T08:23:40.6816731Z [gw0] [ 42%] PASSED tests/unit/test_1883_config_paths.py::test_processed_books_override_rejects_unsafe_paths[/] 
+2026-11-19T08:23:44.7688503Z [gw1] [ 42%] PASSED tests/unit/test_acquisition_worker.py::test_completed_cleanup_is_not_starved_by_retained_directories 
+2026-11-19T08:23:52.5168341Z [gw0] [ 43%] PASSED tests/unit/test_2844_api_basic_reads.py::test_a_request_naming_no_account_still_reads_as_the_guest[credentials2] 
+2026-11-19T08:24:01.0278624Z [gw1] [ 43%] PASSED tests/unit/test_kobo_per_device_cover_aspect.py::test_known_families_resolve_case_and_space_insensitively[Kobo Clara HD-kobo_clara] 
+2026-11-19T08:24:01.3116536Z [gw0] [ 43%] PASSED tests/unit/test_cwa_db.py::TestCWADBSettings::test_can_update_setting 
+2026-11-19T08:24:02.1864096Z [gw0] [ 44%] PASSED tests/unit/test_progress_syncing_models.py::TestEnsureProgressSyncingTables::test_is_idempotent 
+2026-11-19T08:24:03.7551849Z [gw1] [ 44%] PASSED tests/unit/test_1462_service_user_chown.py::TestServiceIds::test_returns_none_when_the_account_is_absent 
+2026-11-19T08:24:04.2439928Z [gw1] [ 45%] PASSED tests/unit/test_acquisition_storage.py::test_restart_rehydrates_due_work_without_any_network_effect 
+2026-11-19T08:24:09.1670702Z [gw1] [ 45%] PASSED tests/unit/test_device_scope_devices_api.py::test_a_choice_the_page_could_not_offer_is_refused_and_changes_nothing[missing-shelf] 
+2026-11-19T08:24:17.7609097Z [gw0] [ 46%] PASSED tests/unit/test_shared_book_continuation.py::test_unmanaged_editor_still_hears_not_found_for_a_book_it_cannot_see[monolibrary] 
+2026-11-19T08:24:18.9059360Z [gw0] [ 46%] PASSED tests/unit/test_api_v1_reader.py::test_save_empty_bookmark_clears_without_merge 
+2026-11-19T08:24:20.3007591Z [gw0] [ 46%] PASSED tests/unit/test_cover_picker_service.py::TestGatherCoverCandidates::test_amazon_highres_candidate_deduplicates_existing_grid_url 
+2026-11-19T08:24:30.3658633Z [gw1] [ 47%] PASSED tests/unit/test_duplicate_index.py::test_manual_full_scan_not_needed_while_ingest_active 
+2026-11-19T08:24:33.3214113Z [gw1] [ 47%] PASSED tests/unit/test_1274_calibre_version_from_runtime.py::test_version_digits_are_taken_verbatim[ebook-convert (calibre 10.0)-v10.0] 
+2026-11-19T08:24:39.8215865Z [gw0] [ 48%] PASSED tests/unit/test_ingest_startup_sweep_1360.py::test_startup_sweep_handles_real_world_filenames 
+2026-11-19T08:24:46.9470503Z [gw1] [ 48%] PASSED tests/unit/test_2842_api_basic_app_password_writes.py::test_app_password_convert_still_needs_the_edit_role 
+2026-11-19T08:24:52.3973253Z [gw0] [ 49%] PASSED tests/unit/test_findings_ledger.py::test_runs_as_a_subprocess_with_no_third_party_imports 
+2026-11-19T08:24:53.7024784Z [gw0] [ 49%] PASSED tests/unit/test_user_book_data_d4.py::TestMigrate::test_kobo_synced_marker_dropped_not_migrated 
+2026-11-19T08:24:56.8975170Z [gw0] [ 49%] PASSED tests/unit/test_1372_kepub_metadata_replacement.py::test_enforcer_imports_only_public_kepub_package_rewriter 
+2026-11-19T08:24:57.1431116Z [gw0] [ 50%] PASSED tests/unit/test_acquisition_opds_entries.py::test_entry_cannot_bypass_existing_document_budgets[limits0] 
+2026-11-19T08:24:59.1594435Z [gw0] [ 50%] PASSED tests/unit/test_cover_preview_cache.py::TestWriteToCache::test_atomic_write_never_exposes_partial_file 
+2026-11-19T08:25:00.2028176Z [gw0] [ 51%] PASSED tests/unit/test_custom_sort_export_merge.py::test_combined_visible_and_select_all_keep_custom_order[archived-desc-expected1] 
+2026-11-19T08:25:02.0999571Z [gw0] [ 51%] PASSED tests/unit/test_1167_duplicate_notification_revalidates_cache.py::TestNotificationRevalidatesCache::test_empty_cache_is_not_reported 
+2026-11-19T08:25:05.4005117Z [gw0] [ 52%] PASSED tests/unit/test_annotation_portable.py::test_to_portable_none_safe 
+2026-11-19T08:25:06.2505971Z [gw0] [ 52%] PASSED tests/unit/test_debug_pack_log_sanitizer.py::TestSanitizerRedactsInstallPaths::test_root_and_relative_dirs_ignored 
+2026-11-19T08:25:06.4679003Z [gw0] [ 52%] PASSED tests/unit/test_kobo_import_parser.py::TestBookmarkTypeIsRecovered::test_the_device_word_is_stored_verbatim 
+2026-11-19T08:25:10.9768017Z [gw1] [ 53%] PASSED tests/fitness/test_no_new_bare_except_pass.py::test_a_planted_new_handler_is_caught[cps-try:\n    x = 1\nexcept:\n    pass\n] 
+2026-11-19T08:25:16.0448422Z [gw1] [ 53%] PASSED tests/unit/test_1942_device_reading_position.py::test_supplied_null_location_value_clears_the_stored_value 
+2026-11-19T08:25:17.2585763Z [gw1] [ 54%] PASSED tests/unit/test_944_duplicate_cooldown.py::TestSettingsAllowlistHasOneSourceOfTruth::test_every_integer_default_is_allowlisted 
+2026-11-19T08:25:21.9922115Z [gw0] [ 54%] PASSED tests/fitness/test_no_new_datetime_min.py::test_a_planted_new_use_is_caught[cps-from datetime import datetime as dt\nx = dt.min\n] 
+2026-11-19T08:25:28.8190055Z [gw0] [ 55%] PASSED tests/unit/test_script_import_side_effects.py::TestImportIsSideEffectFree::test_import_succeeds_even_with_stale_lockfile[ingest_processor-kindle_epub_fixer.lock] 
+2026-11-19T08:25:31.8736172Z [gw0] [ 55%] PASSED tests/unit/test_1462_scripts_app_paths.py::test_auto_library_reports_an_unwritable_library_dir_instead_of_a_traceback 
+2026-11-19T08:25:44.1062138Z [gw0] [ 55%] PASSED tests/unit/test_2637_kobo_star_rating.py::test_a_failed_save_answers_503_and_keeps_the_old_score 
+2026-11-19T08:25:45.1624023Z [gw0] [ 56%] PASSED tests/unit/test_annotation_backup.py::TestBackupModel::test_model_declares_expected_columns 
+2026-11-19T08:25:46.6404251Z [gw0] [ 56%] PASSED tests/unit/test_cover_image_provenance.py::TestImageOrigin::test_legacy_amazon_host_is_amazon 
+2026-11-19T08:25:52.4322458Z [gw0] [ 57%] PASSED tests/unit/test_format_delete_http_integration.py::test_format_cleanup_failure_retains_quarantine_without_path_leak[classic] 
+2026-11-19T08:25:57.1471065Z [gw0] [ 57%] PASSED tests/unit/test_metadata_title_tokens.py::TestApostropheNormalization::test_acute_accent_used_as_apostrophe_is_stripped 
+2026-11-19T08:26:05.8218639Z [gw0] [ 58%] PASSED tests/unit/test_2227_service_status_before_first_run.py::test_a_long_run_is_polled_as_a_bounded_tail[epub-fixer] 
+2026-11-19T08:26:08.0526165Z [gw0] [ 58%] PASSED tests/unit/test_application_factory.py::test_register_blueprints_preserves_order_on_each_factory_product[False] 
+2026-11-19T08:26:15.9884018Z [gw0] [ 58%] PASSED tests/unit/test_oauth_environment_config.py::test_invalid_or_incomplete_declaration_fails_closed[overrides3] 
+2026-11-19T08:26:18.9905613Z [gw0] [ 59%] PASSED tests/unit/test_share_place_switch_on.py::test_a_malformed_value_is_off_and_says_so[on] 
+2026-11-19T08:26:21.2032579Z [gw0] [ 59%] PASSED tests/unit/test_1009_admin_table_kobo_shelf_transition.py::test_needs_shelf_reconciliation_only_fires_off_to_on[False-True-True] 
+2026-11-19T08:26:23.6075047Z [gw1] [ 60%] PASSED tests/unit/test_api_v1_info.py::test_anonymous_user_is_never_admin 
+2026-11-19T08:26:27.1878781Z [gw1] [ 60%] PASSED tests/unit/test_reverse_proxy_auto_create_email.py::test_trusted_caller_email_is_validated_and_deduplicated[trusted@example.test] 
+2026-11-19T08:26:29.4290014Z [gw0] [ 61%] PASSED tests/unit/test_1233_custom_column_none_sentinel.py::TestBoolSentinelPreserved::test_bool_none_still_clears_an_existing_value 
+2026-11-19T08:26:30.5467932Z [gw0] [ 61%] PASSED tests/unit/test_annotations_view_export.py::TestMarkdownExport::test_metadata_line_when_color_or_note_present 
+2026-11-19T08:26:32.7678616Z [gw0] [ 61%] PASSED tests/unit/test_convert_library_lock_and_cancel.py::test_stale_lock_is_cleared[dead] 
+2026-11-19T08:26:36.6924347Z [gw0] [ 62%] PASSED tests/unit/test_hardcover_bulk_sync.py::TestBulkSyncBehaviour::test_deleted_book_is_skipped 
+2026-11-19T08:26:37.4482209Z [gw0] [ 62%] PASSED tests/unit/test_koreader_xpointer.py::test_every_page_start_the_kindle_recorded_maps_to_the_cfi_of_that_text_and_back[metamorphosis-221] 
+2026-11-19T08:26:40.1227939Z [gw0] [ 63%] PASSED tests/unit/test_oauth_default_role.py::TestNoRegressionSourcePin::test_register_user_uses_effective_role_helper 
+2026-11-19T08:26:44.3177813Z [gw1] [ 63%] PASSED tests/smoke/test_dnb_cover_validation_smoke.py::test_default_cover_mode_is_skip 
+2026-11-19T08:26:46.5375728Z [gw1] [ 64%] PASSED tests/unit/test_2272_standard_login_lockout.py::test_classic_login_post_passes_the_gate_unless_sso_can_replace_it[ldap] 
+2026-11-19T08:26:47.2333382Z [gw1] [ 64%] PASSED tests/unit/test_585_sidebar_customize.py::test_sidebar_component_applies_saved_order 
+2026-11-19T08:26:48.0879144Z [gw1] [ 65%] PASSED tests/unit/test_architecture_aliases.py::test_classic_admin_index_flashes_only_for_other_processors[AMD64-False] 
+2026-11-19T08:26:50.5599191Z [gw1] [ 65%] PASSED tests/unit/test_kobo_import_hidden_text_boolean.py::TestHiddenIsATextWord::test_hidden_flag_coercion[0-False1] 
+2026-11-19T08:26:54.9982087Z [gw0] [ 65%] PASSED tests/unit/test_kobo_sync_composite_keyset_cursor.py::TestCompositeKeysetAlgorithm::test_composite_keyset_handles_giant_collision_block 
+2026-11-19T08:27:03.7379254Z [gw0] [ 66%] PASSED tests/unit/test_opds_lang_propagation_160.py::TestPaginationPreservesQueryArgs::test_feed_template_uses_opds_paged_url_helper 
+2026-11-19T08:27:04.7922110Z [gw1] [ 66%] PASSED tests/unit/test_1372_kepub_metadata_enforcement.py::test_kepub_uses_ebook_meta_not_ebook_polish 
+2026-11-19T08:27:05.7131580Z [gw1] [ 67%] PASSED tests/unit/test_cover_preview_read_endpoint.py::TestConditional::test_etag_header_on_miss 
+2026-11-19T08:27:14.2338356Z [gw1] [ 67%] PASSED tests/unit/test_hierarchy.py::TestParseTagHierarchy::test_whitespace_is_stripped 
+2026-11-19T08:27:18.7271963Z [gw0] [ 68%] PASSED tests/unit/test_progress_syncing_checksums.py::TestCalculatePartialMD5::test_returns_32_char_hex 
+2026-11-19T08:27:24.6566521Z [gw0] [ 68%] PASSED tests/unit/test_share_place_kobo_device_only_highlights.py::test_identified_kobo_gets_only_its_own_visible_rows_and_legacy_kobo_rows 
+2026-11-19T08:27:26.4958734Z [gw0] [ 68%] PASSED tests/unit/test_1608_lcpl_upload_format_migration.py::test_reconciliation_runs_immediately_after_config_load 
+2026-11-19T08:27:26.9347060Z [gw1] [ 69%] PASSED tests/unit/test_acquisition_calibre_transaction.py::test_acquisition_preserves_existing_and_selected_editions[True-False] 
+2026-11-19T08:27:27.3729741Z [gw0] [ 69%] PASSED tests/unit/test_caliblur_grid_read_action.py::test_read_on_an_unreadable_book_opens_no_reader_and_leaves_the_click_to_the_cover[mobi,azw3,fb2,html] 
+2026-11-19T08:27:28.9785404Z [gw1] [ 70%] PASSED tests/unit/test_kobo_progress_popup_fix.py::TestCurrentBookmarkResponseShape::test_progress_percent_present_when_zero 
+2026-11-19T08:27:39.0968347Z [gw0] [ 70%] PASSED tests/unit/test_my_library_admin_intro.py::test_dismiss_marks_permanent_and_undo_resets_it 
+2026-11-19T08:27:44.0395170Z [gw0] [ 71%] PASSED tests/unit/test_user_hide_ux_safety_319.py::TestAdminFeatureConfigToggle::test_admin_save_handler_persists_field 
+2026-11-19T08:27:54.4252402Z [gw0] [ 71%] PASSED tests/fitness/test_no_new_flask_apps.py::test_a_planted_new_app_is_caught[import flask\napp = flask.Flask('isolated')\n] 
+2026-11-19T08:27:54.8727320Z [gw0] [ 71%] PASSED tests/unit/test_30d264_checkforchanges_containment.py::test_owned_content_is_contained_before_auth_and_config_bypass[sync-disabled] 
+2026-11-19T08:27:55.4977816Z [gw1] [ 72%] PASSED tests/unit/test_duplicate_trigger_scan_not_gated_by_pending_followup.py::TestTaskLevelGatePreserved::test_task_level_gate_still_calls_followup_pending 
+2026-11-19T08:27:55.9521607Z [gw1] [ 72%] PASSED tests/unit/test_kobo_synctoken_compression_331.py::TestCompressedTokens::test_schema_version_includes_delivery_epoch 
+2026-11-19T08:27:58.8855334Z [gw0] [ 73%] PASSED tests/unit/test_smtp_error_text.py::test_mail_task_no_longer_does_raw_args_join 
+2026-11-19T08:28:00.5331510Z [gw1] [ 73%] PASSED tests/unit/test_1366_web_reader_to_koreader.py::test_browser_ahead_replaces_a_stale_locator 
+2026-11-19T08:28:01.8587444Z [gw0] [ 74%] PASSED tests/unit/test_2670_umask_every_service.py::test_child_gets_the_configured_umask[027-0027] 
+2026-11-19T08:28:05.9985620Z [gw1] [ 74%] PASSED tests/unit/test_account_browser_migration.py::test_deleted_account_annotation_history_cannot_block_upgrade 
+2026-11-19T08:28:10.1143266Z [gw1] [ 74%] PASSED tests/unit/test_apple_books_provider.py::TestParseItem::test_parses_full_search_hit 
+2026-11-19T08:28:11.9275718Z [gw0] [ 75%] PASSED tests/unit/test_cwngsync_plugin_migration.py::test_final_cwasync_package_is_a_notice_only_plugin 
+2026-11-19T08:28:12.4728789Z [gw0] [ 75%] PASSED tests/unit/test_hardcover_handler.py::test_push_existing_uses_update_journal_entry 
+2026-11-19T08:28:14.8744981Z [gw1] [ 76%] PASSED tests/unit/test_magic_shelf_custom_columns.py::TestCustomColumnFilterFailsClosed::test_invalid_enum_value_rejected_server_side 
+2026-11-19T08:28:20.2149585Z [gw0] [ 76%] PASSED tests/unit/test_2170_hierarchical_columns.py::test_unreadable_preference_is_not_an_invented_hierarchy 
+2026-11-19T08:28:20.6924358Z [gw0] [ 77%] PASSED tests/unit/test_914_tag_rename.py::test_tag_rename_rejects_malformed_or_unrepresentable_names[payload3] 
+2026-11-19T08:28:21.9890091Z [gw0] [ 77%] PASSED tests/unit/test_acsm_ingest_guidance_448.py::TestGuidanceHelper::test_acsm_guidance_names_both_recovery_paths 
+2026-11-19T08:28:23.8526529Z [gw1] [ 77%] PASSED tests/unit/test_calibre_content_server_admin.py::test_invalid_server_form_rejects_before_other_configuration_writes[form2-listen address] 
+2026-11-19T08:28:24.9612417Z [gw0] [ 78%] PASSED tests/unit/test_duplicate_detection_normalize.py::test_title_author_prefix_and_normalization 
+2026-11-19T08:28:25.4376796Z [gw0] [ 78%] PASSED tests/unit/test_kobo_bug_cluster_2026_05_17.py::TestB1HandleTagUpdateTerminatesRetryLoop::test_calls_redirect_or_proxy_request_unconditionally 
+2026-11-19T08:28:29.4727004Z [gw1] [ 79%] PASSED tests/unit/test_place_arbiter.py::test_an_older_device_time_loses 
+2026-11-19T08:28:39.6375397Z [gw0] [ 79%] PASSED tests/unit/test_1288_upload_config_gate.py::test_upload_role_check_still_precedes_config_check 
+2026-11-19T08:28:46.0041602Z [gw1] [ 80%] PASSED tests/unit/test_2831_clear_reading_position.py::test_clear_position_route_is_idempotent_when_nothing_is_stored 
+2026-11-19T08:28:48.4298888Z [gw1] [ 80%] PASSED tests/unit/test_calibre_server_readiness.py::test_readiness_requires_calibre_protocol_without_credentials[other-service-200-None-body0-False] 
+2026-11-19T08:28:58.7608465Z [gw0] [ 80%] PASSED tests/unit/test_kobo_span_web_resume.py::test_raising_the_archive_cap_resumes_a_large_proven_book_through_the_api 
+2026-11-19T08:29:09.9044696Z [gw0] [ 81%] PASSED tests/unit/test_pytest_tempdir_isolation.py::test_mounted_unwritable_volume_falls_back_and_reports_why 
+2026-11-19T08:29:12.1082327Z [gw1] [ 81%] PASSED tests/unit/test_share_place_kobo_review4_findings.py::test_a_checked_kobo_is_served_a_shared_trusted_fast_clock_tie_winner 
+2026-11-19T08:29:15.9725154Z [gw1] [ 82%] PASSED tests/unit/test_1054_card_actions_toggle.py::test_no_book_card_surface_is_missing_from_the_preference_map 
+2026-11-19T08:29:18.1285096Z [gw0] [ 82%] PASSED tests/unit/test_share_place_kobo_exact_span_review1.py::test_an_unresolved_kobo_gets_the_stored_native_location_not_the_converted_span 
+2026-11-19T08:29:19.6114308Z [gw0] [ 83%] PASSED tests/unit/test_633_kosync_furthest_position.py::test_equal_percentage_refreshes_exact_location 
+2026-11-19T08:29:20.5611719Z [gw0] [ 83%] PASSED tests/unit/test_catalog_custom_fields.py::test_custom_fields_commit_failure_rolls_back_both_choices 
+2026-11-19T08:29:23.3620996Z [gw1] [ 83%] PASSED tests/unit/test_app_password_signin_cost.py::test_only_the_accounts_own_live_app_passwords_sign_it_in 
+2026-11-19T08:29:28.2671833Z [gw1] [ 84%] PASSED tests/unit/test_kobo_magic_shelf_sub_cursor_large_shelves.py::TestSubCursorAdvanceAndReset::test_fold_resets_sub_cursor_to_minus_one 
+2026-11-19T08:29:33.3921170Z [gw1] [ 84%] PASSED tests/unit/test_magic_shelf_language_bypass_461.py::TestRulesReferenceReadStatus::test_empty_or_missing_rules_not_detected 
+2026-11-19T08:29:36.4669325Z [gw1] [ 85%] PASSED tests/unit/test_reader_font_catalog.py::test_validator_exec_scope_matches_calibre_command_runner 
+2026-11-19T08:29:38.7522080Z [gw1] [ 85%] PASSED tests/unit/test_share_place_kobo_download_attribution.py::test_two_kobos_a_headerless_download_still_stages_the_annotation_restore 
+2026-11-19T08:29:44.8021373Z [gw1] [ 86%] PASSED tests/unit/test_1411_booklist_title_sort.py::test_raw_text_order_reproduces_no_such_column_crash[title] 
+2026-11-19T08:29:45.8238344Z [gw1] [ 86%] PASSED tests/unit/test_866_kobo_shelf_only_archive_sweep.py::test_synced_rows_survive_so_the_device_gets_told_866 
+2026-11-19T08:29:50.1175586Z [gw1] [ 86%] PASSED tests/unit/test_config_dir_env_contract_1162.py::test_runtime_migration_markers_are_excluded_from_the_build_context 
+2026-11-19T08:29:53.1276048Z [gw0] [ 87%] PASSED tests/unit/test_kobo_magic_shelf_membership_uses_id_list_1307.py::test_genuine_query_failure_is_still_unreliable 
+2026-11-19T08:29:54.3077184Z [gw0] [ 87%] PASSED tests/unit/test_opds_error_responses_atom.py::test_opds_error_handlers_return_atom_content_type 
+2026-11-19T08:29:57.1526181Z [gw0] [ 88%] PASSED tests/unit/test_theme_force_airtight.py::TestStandaloneTemplatesDefaultToCaliblur::test_no_bare_nonresilient_check[shelfdown.html] 
+2026-11-19T08:30:00.1980600Z [gw1] [ 88%] PASSED tests/unit/test_share_place_kobo_review3_findings.py::test_a_newer_status_beats_a_fast_status_after_a_place_only_report[control] 
+2026-11-19T08:30:08.2519164Z [gw0] [ 89%] PASSED tests/unit/test_2724_kobo_download_device_tag.py::test_a_url_naming_another_accounts_device_proves_nothing 
+2026-11-19T08:30:13.2029604Z [gw1] [ 89%] PASSED tests/unit/test_acquisition_publication_policy.py::test_revocation_before_permit_transaction_cannot_issue_or_publish_client_book[client_disabled] 
+2026-11-19T08:30:15.5817092Z [gw1] [ 89%] PASSED tests/unit/test_classic_support_link.py::test_host_support_replaces_project_destination_in_each_classic_theme[1] 
+2026-11-19T08:30:16.1678650Z [gw1] [ 90%] PASSED tests/unit/test_cwngsync_plugin_version_bump_gate.py::test_plugin_cannot_declare_a_version_no_release_will_ship[4.1.36.1] 
+2026-11-19T08:30:20.6110394Z [gw0] [ 90%] PASSED tests/unit/test_ingest_long_filename_553.py::test_truncate_ingest_name_overlong_extension_still_fits 
+2026-11-19T08:30:26.3224130Z [gw1] [ 91%] PASSED tests/unit/test_kosync_silent_failures_logged.py::TestBookMatchFailureLogged::test_no_match_logs_at_info_with_checksum 
+2026-11-19T08:30:27.8772354Z [gw0] [ 91%] PASSED tests/unit/test_kosync_book_id_keyed_lookup.py::TestGetProgressRecordCrossKeyLookup::test_returns_book_id_record_when_checksum_unknown 
+2026-11-19T08:30:30.1661312Z [gw0] [ 92%] PASSED tests/unit/test_1076_task_status_html_escaping.py::test_task_without_error_keeps_none 
+2026-11-19T08:30:32.6817056Z [gw0] [ 92%] PASSED tests/unit/test_2750_new_reader_open_marks_reading.py::test_reopening_an_in_progress_book_is_not_a_new_session 
+2026-11-19T08:30:38.7632401Z [gw0] [ 92%] PASSED tests/unit/test_api_v1_auth_gate.py::test_anonbrowse_mode_bypasses_gate 
+2026-11-19T08:30:43.2306929Z [gw0] [ 93%] PASSED tests/unit/test_cwa_update_notice_persistence.py::test_same_day_notification_short_circuits_before_the_version_check 
+2026-11-19T08:30:46.8938154Z [gw0] [ 93%] PASSED tests/unit/test_kobo_android_app_compat.py::TestKoboAndroidAppCompat::test_metadata_payload_defaults_series_to_empty_dict 
+2026-11-19T08:30:48.8921820Z [gw1] [ 94%] PASSED tests/unit/test_metadata_search_hierarchy_order_405.py::test_metadata_search_orders_provider_status_by_hierarchy 
+2026-11-19T08:31:00.1210309Z [gw1] [ 94%] PASSED tests/unit/test_1254_list_item_shelves.py::test_items_name_the_viewers_shelves_in_shelf_order 
+2026-11-19T08:31:03.4116727Z [gw1] [ 95%] PASSED tests/unit/test_2862_desktop_compat_shelf_counts.py::test_unchanged_library_reuses_counts_across_requests 
+2026-11-19T08:31:04.8779704Z [gw1] [ 95%] PASSED tests/unit/test_annotation_device_origin_migration.py::test_full_metadata_create_all_has_column 
+2026-11-19T08:31:11.2543345Z [gw0] [ 96%] PASSED tests/unit/test_2201_kobo_multipage_drain.py::test_bulk_library_drains_across_sync_sessions[mixed-text-all] 
+2026-11-19T08:31:16.3829574Z [gw1] [ 96%] PASSED tests/unit/test_mobile_sidebar_backdrop_close.py::TestToggleLooksLikeAMenuButton::test_mobile_toggle_repainted_as_hamburger 
+2026-11-19T08:31:18.1446407Z [gw1] [ 96%] PASSED tests/unit/test_update_banner_message.py::test_format_update_banner_message_builds_translatable_emoji_free_string 
+2026-11-19T08:31:23.0024756Z [gw1] [ 97%] PASSED tests/unit/test_2699_single_book_lookup_plan.py::test_list_page_reads_through_indexes_only 
+2026-11-19T08:31:24.2633538Z [gw1] [ 97%] PASSED tests/unit/test_annotation_migration_preservation.py::test_preservation_row_count 
+2026-11-19T08:31:31.2671572Z [gw1] [ 98%] PASSED tests/unit/test_helper_koreader_checksum_guard.py::TestStoreChecksumPureUtility::test_calculate_and_store_checksum_does_not_check_setting_internally 
+2026-11-19T08:31:33.7515648Z [gw0] [ 98%] PASSED tests/unit/test_thumbnail_deadlock_regression.py::test_cover_thumbnail_refresh_is_not_queued_before_metadata_commit 
+2026-11-19T08:31:37.7059866Z [gw1] [ 99%] PASSED tests/unit/test_991_document_digest_precedence.py::test_binary_document_precedence_behavior[document_digest_test.lua] 
+2026-11-19T08:31:39.5276310Z [gw0] [ 99%] PASSED tests/unit/test_opds_search_custom_column_restrictions.py::test_opds_search_hides_boolean_denials_for_the_basic_auth_user[unrestricted-cookie] 
+2026-11-19T08:31:41.8132059Z [gw0] [ 99%] PASSED tests/unit/test_mobile_organizer_buttons_right.py::TestMobileOrganizerButtonsRightAligned::test_right_group_is_flex_end_on_mobile 
+2026-11-19T08:31:42.0025698Z tests/unit/test_kobo_sync_batch_commits.py::test_sync_page_uses_one_commit_and_inserts_only_missing_user_book_pairs 
+2026-11-19T08:31:42.0055522Z [gw1] [ 99%] PASSED tests/unit/test_kobo_sync_batch_commits.py::test_sync_page_uses_one_commit_and_inserts_only_missing_user_book_pairs 
+2026-11-19T08:31:42.0721013Z tests/unit/test_kosync_progress_timestamp_utc.py::test_a_pulled_position_carries_the_time_it_was_saved 
+2026-11-19T08:31:42.0753455Z [gw1] [ 99%] PASSED tests/unit/test_kosync_progress_timestamp_utc.py::test_a_pulled_position_carries_the_time_it_was_saved 
+2026-11-19T08:31:42.0786146Z tests/unit/test_theme_persistence.py::test_user_table_migration_does_not_force_reset_saved_theme 
+2026-11-19T08:31:42.0818229Z [gw1] [ 99%] PASSED tests/unit/test_theme_persistence.py::test_user_table_migration_does_not_force_reset_saved_theme 
+2026-11-19T08:31:42.0928203Z tests/unit/test_update_translations_commit_ci.py::test_translation_commit_runs_ci_and_keeps_its_canonical_message 
+2026-11-19T08:31:42.1754484Z [gw1] [ 99%] PASSED tests/unit/test_update_translations_commit_ci.py::test_translation_commit_runs_ci_and_keeps_its_canonical_message 
+2026-11-19T08:31:42.1786804Z [gw0] [ 99%] PASSED tests/unit/test_removed_device_list_filters.py::test_device_filters_keep_owner_scope_and_refresh_after_restore 
+2026-11-19T08:31:42.1823022Z tests/unit/test_share_place_plugin_annotation_pull_headers.py::test_annotation_pull_sends_the_device_identity_headers 
+2026-11-19T08:31:42.1854053Z [gw0] [ 99%] PASSED tests/unit/test_share_place_plugin_annotation_pull_headers.py::test_annotation_pull_sends_the_device_identity_headers 
+2026-11-19T08:31:42.1884201Z tests/unit/test_subprocess_argument_serialization.py::test_windows_calibre_arguments_keep_username_spaces_quotes_and_empty_values 
+2026-11-19T08:31:52.4724864Z [gw0] [100%] PASSED tests/unit/test_subprocess_argument_serialization.py::test_windows_calibre_arguments_keep_username_spaces_quotes_and_empty_values 
+2026-11-19T08:31:52.4725693Z 
+2026-11-19T08:31:52.4726045Z ============================= slowest 10 durations =============================
+2026-11-19T08:31:52.4726885Z 44.16s setup    tests/unit/test_ci_test_lanes.py::test_fast_lane_files_do_not_silently_opt_out
+2026-11-19T08:31:52.4728046Z 16.07s call     tests/unit/test_frontend_unit_suites_run.py::test_frontend_unit_suite_passes[tests/unit/rootUnitLane.test.ts]
+2026-11-19T08:31:52.4729719Z 8.01s call     tests/unit/test_udf_gil_deadlock_serialized_connection.py::TestSerializedConnectionBreaksDeadlock::test_unguarded_connection_freezes_proving_harness_detects
+2026-11-19T08:31:52.4731688Z 7.04s call     tests/unit/test_ci_e2e_commit_gate.py::test_concurrency_closure_is_independent_of_python_hash_order
+2026-11-19T08:31:52.4733039Z 6.08s call     tests/unit/test_file_lock_portability.py::test_restore_lock_two_process_contention
+2026-11-19T08:31:52.4734252Z 6.02s call     tests/fitness/test_no_new_flask_apps.py::test_no_test_file_adds_a_flask_app
+2026-11-19T08:31:52.4735402Z 6.01s call     tests/unit/test_1074_guest_read_book_shadowed_import.py::test_no_conditionally_shadowed_module_import_in_cps
+2026-11-19T08:31:52.4736616Z 5.88s call     tests/unit/test_e2e_specs_are_reachable.py::test_every_spec_is_matched_by_a_project_ci_runs
+2026-11-19T08:31:52.4737618Z 5.30s call     tests/fitness/test_no_new_datetime_min.py::test_no_file_adds_a_datetime_min
+2026-11-19T08:31:52.4738665Z 5.13s call     tests/unit/test_classic_custom_sort_query.py::test_real_custom_relationship_filter_and_sort_sql
+2026-11-19T08:31:52.4739442Z =========================== short test summary info ============================
+2026-11-19T08:31:52.4740104Z SKIPPED [1] tests/unit/test_mutation_harness.py:184: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4740849Z SKIPPED [1] tests/unit/test_mutation_harness.py:197: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4741626Z SKIPPED [1] tests/unit/test_mutation_harness.py:211: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4742356Z SKIPPED [1] tests/unit/test_mutation_harness.py:257: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4743346Z SKIPPED [1] tests/unit/test_mutation_harness.py:270: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4744067Z SKIPPED [1] tests/unit/test_mutation_harness.py:296: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4744791Z SKIPPED [1] tests/unit/test_mutation_harness.py:307: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4745516Z SKIPPED [1] tests/unit/test_mutation_harness.py:330: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4746244Z SKIPPED [2] tests/unit/test_mutation_harness.py:370: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4746960Z SKIPPED [7] tests/unit/test_mutation_harness.py:437: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4747686Z SKIPPED [1] tests/unit/test_mutation_harness.py:494: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4748528Z SKIPPED [1] tests/unit/test_mutation_harness.py:516: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4749263Z SKIPPED [3] tests/unit/test_mutation_harness.py:537: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4749981Z SKIPPED [1] tests/unit/test_mutation_harness.py:563: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4750700Z SKIPPED [1] tests/unit/test_mutation_harness.py:594: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4751429Z SKIPPED [2] tests/unit/test_mutation_harness.py:616: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4752153Z SKIPPED [1] tests/unit/test_mutation_harness.py:729: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4753093Z SKIPPED [1] tests/unit/test_mutation_harness.py:802: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4753835Z SKIPPED [1] tests/unit/test_mutation_harness.py:813: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4754559Z SKIPPED [1] tests/unit/test_mutation_harness.py:861: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4755286Z SKIPPED [6] tests/unit/test_mutation_harness.py:912: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4756020Z SKIPPED [2] tests/unit/test_mutation_harness.py:1001: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4756772Z SKIPPED [1] tests/unit/test_mutation_harness.py:1048: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4757606Z SKIPPED [2] tests/unit/test_mutation_harness.py:1075: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4758417Z SKIPPED [1] tests/unit/test_mutation_harness.py:1105: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4759137Z SKIPPED [1] tests/unit/test_mutation_harness.py:1126: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4759869Z SKIPPED [2] tests/unit/test_mutation_harness.py:1139: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4760653Z SKIPPED [1] tests/unit/test_mutation_harness.py:1250: requires macOS diagnostic process backend
+2026-11-19T08:31:52.4761493Z SKIPPED [3] tests/unit/test_mutation_harness.py:1361: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4762407Z SKIPPED [1] tests/unit/test_mutation_harness.py:1389: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4763446Z SKIPPED [1] tests/unit/test_mutation_harness.py:1410: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4764352Z SKIPPED [1] tests/unit/test_mutation_harness.py:1449: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4765241Z SKIPPED [6] tests/unit/test_mutation_harness.py:1565: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4766112Z SKIPPED [1] tests/unit/test_mutation_harness.py:1610: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4766996Z SKIPPED [3] tests/unit/test_mutation_harness.py:1622: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4767873Z SKIPPED [4] tests/unit/test_mutation_harness.py:1659: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4768759Z SKIPPED [1] tests/unit/test_mutation_harness.py:2113: Local python:3.12 image required; run docker pull python:3.12
+2026-11-19T08:31:52.4769638Z SKIPPED [1] tests/unit/test_helper.py:446: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4770516Z SKIPPED [1] tests/unit/test_helper.py:458: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4771376Z SKIPPED [1] tests/unit/test_helper.py:468: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4772236Z SKIPPED [1] tests/unit/test_helper.py:478: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4773339Z SKIPPED [1] tests/unit/test_helper.py:488: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4774321Z SKIPPED [1] tests/unit/test_helper.py:498: Password validation not modified in CWA - inherited from Calibre-Web
+2026-11-19T08:31:52.4775122Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:212: authorize sends no body
+2026-11-19T08:31:52.4775844Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:212: get_library sends no body
+2026-11-19T08:31:52.4776561Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:212: get_progress sends no body
+2026-11-19T08:31:52.4777307Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:212: pull_annotations sends no body
+2026-11-19T08:31:52.4778025Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:249: authorize sends no body
+2026-11-19T08:31:52.4778720Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:249: get_library sends no body
+2026-11-19T08:31:52.4779425Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:249: get_progress sends no body
+2026-11-19T08:31:52.4780156Z SKIPPED [1] tests/unit/test_cwngsync_plugin_wire_contract.py:249: pull_annotations sends no body
+2026-11-19T08:31:52.4782877Z SKIPPED [2] tests/unit/test_duplicate_scan_index_rewire.py: quarantined: spec_from_file_location shim is stale: it registers a stub `cps` in sys.modules with no __path__, so relative imports the module has gained since the shim was written ('.metadata_constants', '.duplicates') fail to resolve. The app's own imports are fine — this is test-harness rot, and it went unseen for as long as the test was deselected. #1106
+2026-11-19T08:31:52.4784864Z SKIPPED [1] tests/smoke/test_smoke.py:54: Not running inside the container image (source checkout)
+2026-11-19T08:31:52.4785498Z SKIPPED [5] tests/smoke/test_smoke.py: Calibre tools not installed
+2026-11-19T08:31:52.4786178Z SKIPPED [1] tests/smoke/test_smoke.py:259: Not in a built image - CWA_INSTALLED_VERSION is not stamped
+2026-11-19T08:31:52.4787021Z SKIPPED [12] tests/unit/test_generate_checksums.py:32: KOReader sync disabled in test environment
+2026-11-19T08:31:52.4787887Z SKIPPED [1] tests/unit/test_995_metadata_dirs_under_config.py:149: kindle_epub_fixer.py has no module-level cps import
+2026-11-19T08:31:52.4788948Z SKIPPED [1] tests/unit/test_kobo_sqlite_provider_real_schema.py:250: set CWNG_REAL_KOBO_DB=/path/to/KoboReader.sqlite copy to replay on a real device DB
+2026-11-19T08:31:52.4791431Z SKIPPED [4] tests/unit/test_oauth_session.py: quarantined: asserts against oauth_bb.{github,google,generic}_logged_in as module attributes, but all three are nested inside init_oauth_blueprints() (cps/oauth_bb.py:922) and are only ever bound as oauth_authorized signal receivers. This assertion cannot have passed at any point — the test was written, never run, and never known to be wrong. #1106
+2026-11-19T08:31:52.8841217Z SKIPPED [5] tests/unit/test_duplicate_scan_queue_settings.py: quarantined: spec_from_file_location shim is stale: it registers a stub `cps` in sys.modules with no __path__, so relative imports the module has gained since the shim was written ('.metadata_constants', '.duplicates') fail to resolve. The app's own imports are fine — this is test-harness rot, and it went unseen for as long as the test was deselected. #1106
+2026-11-19T08:31:52.8844037Z SKIPPED [1] tests/integration/test_ingest_checksums.py:327: Requires mocking infrastructure
+2026-11-19T08:31:52.8845288Z SKIPPED [1] tests/unit/test_2559_case_only_title_rename.py:57: needs a case-insensitive filesystem (the reporter's macOS APFS library)
+2026-11-19T08:31:52.8846575Z SKIPPED [2] tests/unit/test_2687_cover_keep_aspect.py:144: Calibre (ebook-polish, calibre-debug) not installed
+2026-11-19T08:31:52.8847537Z == 13872 passed, 117 skipped, 1 xfailed, 74657 warnings in 899.07s (0:14:59) ===
+2026-11-19T08:31:54.2392433Z ##[error]The action 'Run smoke and unit tests' has timed out after 15 minutes.
+2026-11-19T08:31:54.2485654Z ##[group]Run actions/github-script@v9
+2026-11-19T08:31:54.2485974Z with:
+2026-11-19T08:31:54.5297020Z ##[error]Unhandled error: HttpError: Resource not accessible by integration - https://docs.github.com/rest/issues/comments#create-an-issue-comment

@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["e2e", "unit", "src", "playwright.config.ts"]
+  "include": ["e2e", "unit", "component-tests", "src", "playwright.config.ts", "playwright.components.config.ts"]
 }

@@ -16,6 +16,163 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.72] - 2026-11-20
+
+### Added
+
+- **Restore covers that exist on disk but never show.** A new admin page, "Restore missing covers", in both the classic and the new interface, finds books with a `cover.jpg` in their folder that the library marks as having no cover, lists them, and restores the cover for the books you select. A select-all control handles large lists. Nothing changes until you confirm, and covers you removed on purpose stay removed unless you select them. Works with split libraries; not available for Google Drive libraries. Reported and contributed by @sgreadly (#2678, #2695).
+
+- **Sort the Read list by when you finished a book.** With the Read filter on, the sort menu now offers "Date read, newest first" and "Date read, oldest first", so a book you finished today appears at the top even if it was added to the library long ago. Books finished before the date was recorded use their last-changed date, preserved at upgrade. On the Read list, "Newest" and "Oldest" are now labelled "Added, newest first" and "Added, oldest first" (#2800, thanks @sgreadly).
+
+- **Edit custom column values in both interfaces.** Rename, merge, delete, move, create and reorder tag-like custom column values in the Classic interface and the New UI. Renaming or moving a branch carries its books and sub-values; merges require confirmation, and deleting a value keeps its books. Curated sibling order survives renames, including implicit parent categories. Enumeration columns keep Calibre's allowed values. Thanks to @Rol3333. (#2600)
+
+- **Choose how a custom column is displayed.** UI Configuration now offers Automatic, Always a hierarchy and Never a hierarchy for each browsable column. Automatic follows Calibre's hierarchy preference, with value-based detection for older libraries. The explicit modes apply consistently to the sidebar, book details, Classic, New UI and OPDS. Thanks to @Rol3333. (#2600)
+
+- **Custom column values can be chosen from a list while editing a book.** Editing
+  a text custom column — a genre, a Dewey or LCC number — meant typing the value
+  from memory, and a dotted hierarchy meant reproducing its exact spelling or
+  quietly creating a new, near-duplicate one. Supported text custom columns have a
+  list button beside its field that opens a searchable checklist of the values
+  already in the library, and applying it fills the field for you. The list is
+  shaped to match how the column is stored and browsed: a hierarchical column
+  such as `Genre` is drawn as an indented tree where nesting is dot depth, while
+  a flat column is drawn as a plain list, so `778.3` stays one entry rather than
+  a `778` with a `3` underneath it. Values already on the book arrive ticked, you
+  can add a new dotted value from the same dialog, and typing by hand still works
+  exactly as before. Single-value columns allow one choice, filtering keeps your
+  selections, and existing spelling is preserved when you apply it. Choices
+  respect your access to books, independently of personal browse visibility.
+  Available in both the new and the classic interface. Thanks @Rol3333 (#2434).
+
+- **Automatic metadata fetch retries Databáze knih by ISBN.** When a book's
+  title does not find it — for example a Czech title stored without
+  diacritics — and the book has an ISBN, the fetch searches again by that
+  ISBN when Databáze knih is in the automatic provider order. The result
+  must still match the book before anything is applied. Contributed by @misko903.
+
+- **Czech and Slovak books can pull metadata from Databáze knih.** A new
+  `Databáze knih` (databazeknih.cz) source appears in metadata search and in
+  the provider list. It finds editions by ISBN or title, prefers the Slovak or
+  Czech edition that matches the query, and fills in the full description,
+  series and index, year, publisher, language, genres and tags, rating, cover,
+  ISBN, original title, translator and page count. Turn it on in manual
+  metadata search or check it in the automatic provider order in NextGen
+  settings. Contributed by @misko903.
+
+- **Admins can browse books without a Hardcover ID by review status, allow
+  rejected books to be tried again, and re-run matching over pending reviews.**
+  The list is paginated and translated into French and Dutch. Thanks @lguerard (#2503).
+
+- **New opt-in setting for each Kobo: align its percentage with CrossPoint.** A Kobo reports only whole percents, measured on its own copy of the book. On the Devices page, each Kobo now has **Align this Kobo's percentage with CrossPoint**. With it on, and the Kobo holding the library's current KEPUB, the server works out the percentage CrossPoint would show at the Kobo's place and shares that instead, so the readers agree and a move within one percent still reaches the other devices. Hardcover gets the same percentage, so the page it shows changes, and the book page shows it while that Kobo's report is the latest place. The Kobo itself keeps the value it reported. The setting is off by default, and with it off nothing changes. Credit: @wolffshots (#2887).
+
+- **Clean up tags across the library from one page.** Admin > Metadata clean-up keeps a map of tag rules: rename a tag, split it into several, or drop it, matched regardless of case and accents. The page lists every book the rules would change, old tags next to new, and changes nothing until you apply. Each book is reported as changed, skipped (left out, or edited since the preview) or failed, the book files are updated when metadata enforcement is on, and an applied run can be undone from History. The map exports to JSON and imports back, so a cleanup can be shared or run again (Discussion #2481, #2438; thanks @splitsec2).
+
+- **Wikidata as an opt-in metadata source, mainly for series and series order.** It needs no key and returns a book's title, authors, first publication date, series and position, including positions like 24.5, from Wikidata's catalogue of works. Turn on Wikidata in manual metadata search, or enable it in the metadata provider settings and save it in the automatic provider order. Only then can it supply missing series metadata; existing installations do not contact this new service by default. Contributed by @splitsec2.
+
+### Changed
+
+- **CI: the E2E browser install step gets 20 minutes, not 10.** When the Ubuntu package mirror is slow, installing the browsers' system packages takes 4 to 14 minutes. On 2026-11-19, 7 of 25 E2E runs failed at the old 10-minute limit while packages were still downloading.
+
+- **Hardcover auto-fetch uses ISBNs, alternative titles, subtitles and accents
+  to find translated and subtitled books, and breaks equal scores by popularity.**
+  Invalid ISBNs and conflicting subtitles cannot bypass those comparisons.
+  Thanks @lguerard (#2503).
+
+### Fixed
+
+- **The new UI's email settings now show whether mail is configured, can switch from Gmail OAuth to standard SMTP, and can send a test email.** A server left on the Gmail (OAuth) type with no token ignored every SMTP field saved in the new UI, so mail stayed off and "Send to e-reader" silently never appeared. The form now shows whether mail is configured, offers "Use standard SMTP instead" when Gmail OAuth is selected, and has a "Save and send test email" button that queues a test to your own address, like the classic page. A working Gmail OAuth setup is not switched unless you choose it; unsupported mail server types are rejected before saving. Thanks @sgreadly (#2771, #2772).
+
+- **Kobo's reading-changes check stops returning unauthorized when "Proxy unknown requests to Kobo Store" is off.** With the proxy off, the device's token is one CWNG issued, and Kobo rejected every forwarded `checkforchanges` call with 401. CWNG now answers that call itself with the "nothing changed" reply that is measured safe for on-device highlights. Reported by @fabdrol, reproduced by @sgreadly.
+
+- **"Keep the oldest copy" no longer keeps the same book as "Keep the newest copy" when two copies were added at the same moment.** Books imported in one batch can share a timestamp; the book added first now counts as the oldest and the one added last as the newest. Follow-up to #2752, thanks @sgreadly.
+
+- **Reading progress can reach Hardcover when a matched book has no edition
+  selected.** Sync chooses an edition with pages, preferring the book's own
+  identifier, Hardcover's defaults, then popular e-books. Works with more
+  than 100 editions. Thanks @lguerard (#2503).
+
+- **Tests check the French Discover subtitle the page actually shows.** The new-UI catalog test now asserts "A few random picks from your Discover source", so main stays green after the translation catalog dropped the old wording.
+
+- **A Kobo with "Align this Kobo's percentage with CrossPoint" on no longer shares a percentage far from its own.** If CrossPoint's percentage at the Kobo's reading place is more than 5 points from the Kobo's own, the Kobo's own value is shared with KOReader, CrossPoint and Hardcover instead, so a wrong match can no longer hold other readers ahead. Follow-up to #2887.
+
+## [v4.1.71] - 2026-11-19
+
+### Added
+
+- **The new UI's Send to e-reader panel now has a tickbox for each saved address.** With several e-reader addresses saved, they arrived as one comma-separated string in the Recipient(s) field, so sending to just one meant deleting the rest by hand every time. Each saved address now gets its own tickbox, all ticked to start so the default is unchanged, and the free-text field stays for one-off recipients. With a single saved address the panel looks as before. Unticking every box disables Send rather than falling back to all saved addresses. Thanks to @sgreadly (#1763, #2770).
+
+- **Retained originals can live on another disk.** Set `CWA_PROCESSED_BOOKS_DIR` to move the `processed_books` tree (imported and converted originals, EPUB fixer originals, failed imports and duplicate resolutions) out of the config dir. Unset, it stays at `processed_books` in the config dir as before. Requested in #1883; contributed by @BeatLink (#2403).
+
+- **Password fields can be revealed, and the password rules are shown up front.** Password and credential fields in the classic account and admin forms and the new interface now have a show/hide button. The new-user, profile and change-password forms list the configured requirements (length, number, upper/lowercase, special character) before you type instead of only after a rejected save. Thanks to @sgreadly and @misko903 (#2632, #2635).
+
+- **An administrator can start a user's My Library empty.** Switching an account to My Library used to fill it with every book it could see, so a new user who was meant to curate their own shelf began with the whole archive and no way to clear it in one step. The user's Library contents section now has a "Start My Library empty" option, shown in both the new and the classic admin pages (and as `start_empty` on the admin user API), that gives the account an empty library to add to from the global library. It is only offered when My Library is first enabled, and is refused for an account without the global-browse role (it could not add anything), an account with an existing selection (including an interrupted first setup), and an account that already syncs books to a Kobo (an empty set would remove them from the device). Part of #2352. Thanks to @sgreadly (#2660).
+
+- **NixOS can run NextGen without Docker.** The repository is now a Nix flake with a package and a NixOS module (`services.calibre-web-nextgen`) that runs the web app, the ingest watcher and the other background services as systemd units, creating `app.db` and an empty library on first start like the container does. The NixOS channel is community-maintained. See the README's NixOS section. Contributed by @BeatLink (#2404, #2411).
+
+- **CrossPoint's Sync Clippings works with CWNG.** An Xteink or other CrossPoint reader with Sync Clippings on asked for `/kosync/api/v1/clippings/...`, got an error, and stopped the whole Sync Progress. CWNG now speaks that API: each clipping is kept as a highlight on the book, placed where the reader made it (a short phrase that repeats in the book too), shown in the web reader with the reader's name, and given back to the same reader after it deletes and downloads the book again. Like Kobo highlights since v4.1.48, a clipping goes back only to the reader that made it. Keep the `X-CWNG-Device-ID` custom header on the reader so CWNG can tell your readers apart. CWNG checks the HTTP Basic login on these requests, as on every KOSync route, and CrossPoint 2.0.0 sends no Basic login on clipping requests, so it needs a CrossPoint build that does. Credit: @wolffshots (#2822).
+
+- **New UI: the Duplicates page can now resolve duplicates automatically, like the classic view.** Admins get a "Resolve automatically" panel: pick a strategy (newest, oldest, merge formats, best format, most complete metadata or largest files), preview exactly which books would be kept and deleted (with each book's publisher and year, so different editions stand out from true copies), then confirm. Nothing is deleted until you confirm, and a changed plan requires a fresh preview. French and Dutch translations are included. Reported anonymously in #1902. Thanks to @sgreadly (#2752).
+
+- **The support pack now includes a manifest and the system state maintainers usually have to ask for.** `manifest.json` records the pack schema version, CWNG version and generation time, and `state/*.json` adds runtime and container limits, free space and mount type per role (config, library, ingest), database health and row counts for `app.db`, `cwa.db` and the Calibre `metadata.db`, and scheduler and ingest queue depth. Counts, sizes and versions only: no paths, IPs, usernames, titles or row contents (#2728). Database table names come from the shipped schemas; unknown format and job-state values are grouped as counts, and failed or timed-out collectors are flagged in the manifest. Thanks @sgreadly (#2742).
+
+### Changed
+
+- **The ingest service can run outside the container.** Its body moved from the s6 `run` file to `scripts/services/cwa-ingest-service.sh`, and the paths it used to hardcode under `/config` (`cwa.db`, the retry queue, status and batch files, the failed-books folder) follow `CALIBRE_DBPATH`. The container sets that to `/config` for this service, as it already does for the web app, so nothing moves there. Part of #2094; contributed by @BeatLink (#2410).
+
+- **Five background services can run outside the container.** The auto-zipper, cover-preview cache sweeper, metadata change detector, KOReader checksum backfill and auto-library bodies moved from their s6 `run` files to `scripts/services/*.sh`, which systemd or a plain shell can start. The container runs them exactly as before. The auto-zipper's error messages for exit codes 2 and 3 now print; they used to re-read `$?` after the first check and never matched. Part of #2094; contributed by @BeatLink (#2410).
+
+- **Exact Kobo resume can be enabled for larger illustrated EPUBs.** Books over 16 MiB (compressed) always fell back to the percentage popup, with no hint why. The limit is now adjustable with `CWA_KOBO_RESUME_MAX_ARCHIVE_MIB` (1-256, default unchanged at 16), and a book skipped for size logs one INFO line naming the limit and the setting. Thanks to @sgreadly. Refs #2591.
+
+### Fixed
+
+- **New UI: a book you upload now appears in the library by itself, without a manual refresh.** The library was refreshed the moment the upload finished, before the import had run, so the new book only showed up after reloading by hand a few times. The app now follows the import and refreshes the library as books arrive, whether you uploaded one file or a few hundred, and the Upload page estimates import progress from the library's book count (#1044). Thanks @sgreadly.
+
+- **Installs outside Docker no longer fall back to the container's folders.**
+  Library auto-detect and the admin database page look for `metadata.db` in the
+  configured library folder, the duplicate-merge disk-space check measures the
+  real config folder, `generate_book_checksums.py` defaults to the configured
+  library, and Calibre user plugins load from the config folder named by
+  `CALIBRE_DBPATH`. The sanitized debug pack now hides this install's own config
+  and library paths, which off Docker often include a username. In network-share
+  mode, a relocated ingest, library or config share is no longer chowned by
+  uploads or the updater. Contributed by @BeatLink (#2402).
+
+- **The Google Scholar metadata source loads again.** `scholarly` needs the 1.x `bibtexparser`, but nothing capped it, so fresh installs pulled 2.x and the source silently failed to import (`No module named 'bibtexparser.bibdatabase'` in the debug log on every start and upload). `bibtexparser` is now pinned below 2.0. The message was harmless to uploads themselves. (#2579)
+
+- **Windows startup and library maintenance no longer fail on Unix-only APIs.** Kobo startup tolerates the absence of fork hooks, ingest uses the shared cross-platform process lock, and service scripts skip Unix account and ownership operations when unavailable. Library refresh, conversion, EPUB fixing, and cover enforcement use the running Python interpreter, including virtual environments. Thanks to @Rol3333. (#2614)
+
+- **One swipe in the KOReader library turns one page.** With a plugin that keeps its own bar on screen over full-screen views, such as Simple UI, every swipe in the CWNG Sync library skipped two pages (1, 3, 5 ...). The library now tells KOReader it handled the swipe, so the other plugin no longer passes the same swipe on a second time. (#2730)
+
+- **A Kobo library shows a percentage calculated for the exact page shared from the web reader or KOReader.** The web reader counts the book by text and a Kobo by the size of each KEPUB document, so the same place was 26% in one and 16% in the other, and the shelf showed the web's figure until the book was opened and closed. The exact place is now sent with a byte-weighted percentage, including when a sync reply is retried. Thanks to @sgreadly for the fix and device measurements. (#2821, #2825)
+
+- **A KOReader setup restored onto a different kind of e-reader shows up as its own device.** Copying the `koreader` folder from a Kindle onto a Tolino (or another reader running KOReader's Android build) also copied the Kindle's sync ID, so the website listed both as one device and only one of them was updated. The CWNG Sync plugin now also recognises a settings file that arrives on a different model of e-reader and gives that reader its own ID, with a short message saying why. Two readers of the same Android model set up from one copy still share an ID; deleting the `["device_id"]` line in `settings.reader.lua` on one of them separates them. (#2952)
+
+- **The plugin saves its copy check straight away.** It used to be written only when KOReader exited, so a settings file copied while KOReader was running carried the sync ID without the check, and the second Kindle quietly kept the first one's ID. (#2351)
+
+- **The Devices page explains when smart shelves add no books to an e-reader.** When the server's Sync smart shelves setting is off, smart-shelf choices are disabled with an explanation. Saved smart-shelf choices are kept for when an administrator enables syncing, but cannot count toward saving a new shelf-only choice while syncing is off. (#2953)
+
+- **A password or role changed outside the app takes effect on the next request.** Each account lookup for OPDS Basic Auth, the reverse-proxy header login and signed-in sessions now re-reads the account from app.db. Before, an account loaded by an earlier request kept its old values until a restart: a password set by an admin script was refused while the old one kept working, and a reader whose download role was removed could still download over OPDS. Thanks to @splitsec2 (#2568).
+
+- **Completed the translation for German.** 11 fuzzy and 1,730 untranslated texts have now been fully translated to German. In addition, the 2,404 existing texts were reviewed, and the informal “Sie” was consistently adopted throughout all translations.
+
+- **ISBNs are checked by their check digit before they are used.** In automatic metadata fetch, a book's ISBN-10 now finds the provider record carrying the same edition's ISBN-13, an ISBN that fails its check digit no longer picks a record, and a provider's invalid ISBN is no longer written to the book. The cover booster and cover picker no longer look up a cover by an invalid ISBN, Apple Books no longer treats one as an ISBN lookup, and Kobo results drop one. Hardcover matching and Goodreads' list of books you do not own also recognize both forms of a valid ISBN. Thanks to @splitsec2.
+
+- **Proxy-created accounts with an email address as their username get a usable profile email.** When the proxy sends an email address as the username, new accounts use that address if it is valid and available instead of adding a second `@localhost` and blocking profile saves. Separate `Remote-Email` and `X-Remote-Email` headers are ignored. An email already held by another account falls back to a placeholder; proxy login matches existing accounts by username only, never by their editable profile email. Thanks to @splitsec2. (#2426)
+
+- **The classic account form shows Library contents and OPDS Shelf Exposure on every server.** Both sat inside the "OAuth & API Integrations" card, which only appears when Kobo sync, Hardcover or an OAuth login is turned on. On a server with none of them, an administrator could not switch a user to My Library (or start it empty) from the classic user page, a user could not do it from their own profile, and every save of either form turned the account's "Expose only books in selected shelves to OPDS" off, because the form no longer sent the checkbox. They now have their own card.
+
+- **An upload watch that stalls on a failing server stops asking it.** When every check of the library failed, the watch reached its time limit but still retried its last check up to three times afterwards. It now cancels that retry when the watch ends.
+
+- **Metadata edits can update a downloaded book in Kobo’s My Books without downloading it again.** When NextGen can verify that only metadata changed since the Kobo last synced the book, the next sync refreshes its library entry in place. Publication-date-only edits in the classic editor also reach the next sync. (#2520, #2868, thanks @Andxre)
+
+- **A highlight sent to the Hardcover journal is tagged with the reader it came from, and shows its page.** Every journal entry got the tags `#CWA` and `#Kobo`, so a KOReader or web reader highlight also said Kobo. The second tag now names the source as the Annotations page does (`Kobo`, `KOReader`, `Web reader` or `CrossPoint`), and a source with no known reader gets only `#CWA`. A highlight from KOReader or CrossPoint, or any highlight with a KOReader position, went with no position and showed page 0. CWNG now sends its place in the book, and Hardcover shows the page from it. A highlight from the Kobo showed a page near the start of the book, for example page 10 of 1315 for a highlight at 52%. CWNG sent its progress in the chapter, a value from 0 to 1, as a percent of the book. CWNG now converts the chapter progress to a book percent, as it did before the annotation sync targets were split. Invalid or ambiguous positions leave the highlight synced without a page. Credit: @wolffshots (#2823).
+
+### Security
+
+- **The web reader's bundled XML parser is updated.** The EPUB reader library (epubjs) ships with an old copy of `@xmldom/xmldom` (0.7.13) that has several published advisories. Browsers use their own built-in XML parser, so that copy is not normally run, but it is still bundled. CWNG now pins it to 0.8.15, the maintained fix line, so the bundle no longer carries the flagged version and `npm audit` stops reporting it. (#1655)
+
+- **Images are read with Pillow 13.** Pillow 12.3.0, which the image installed, has critical advisories that are fixed only in 13.0.0, among them heap buffer overflows in JPEG and FlashPix decoding (CVE-2026-112403, CVE-2026-112398) and argument injection in the Ghostscript call (CVE-2026-112900). Calibre-Web-NextGen opens covers that readers upload and covers that come with downloaded books, so these were reachable. Covers, the cover designer and KOReader placeholders work the same.
+
 ## [v4.1.70] - 2026-11-15
 
 ### Changed

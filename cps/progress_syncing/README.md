@@ -241,6 +241,7 @@ curl -s -u alice:APP_PASSWORD \
 | `percentage_push` | `PUT /kosync/syncs/progress` accepts `position_kind: "percentage"` with no `progress`. |
 | `anchor` | A percentage `PUT` may carry an `anchor`, and `GET` returns one on `?position_kinds=…,anchor`. |
 | `book_id_document` | A decimal Calibre book id is accepted as `document`, alongside the KOReader digest. |
+| `crosspoint_clippings` | `/kosync/api/v1/clippings/<document>` backs up and restores CrossPoint clippings. Requires firmware that sends HTTP Basic on clipping requests (crosspoint-reader#4323). |
 | `annotations_text_quote` | `/kosync/syncs/annotations` places pushed `text_quote` highlights and, on `?text_quote=1`, names pulled ones by their words. |
 | `sleep_screen_v1` | The sleep-screen routes used by our own plugin. |
 
@@ -435,6 +436,8 @@ when this table and the served routes disagree.
 | `GET` | `/kosync/export` | All of the user's reading progress as JSON, with titles, authors and identifiers. Percentages are 0-100, not 0-1. |
 | `GET` | `/kosync/syncs/annotations/<document>` | Highlights and notes for a book, server to device. |
 | `PUT` | `/kosync/syncs/annotations` | Highlights and notes the device made, changed or deleted. |
+| `GET` | `/kosync/api/v1/clippings/<document>` | CrossPoint clippings for a book, paged by revision. Uses the device header to select its own and shared clippings. |
+| `PUT` | `/kosync/api/v1/clippings/<document>` | Uploads CrossPoint clippings and deletion tombstones. A supplied device header must register successfully. |
 | `GET` | `/kosync/syncs/library` | The books this account's e-readers should hold, one page at a time. |
 | `GET` | `/kosync/syncs/library/books/<book_id>/placeholder` | Small EPUB that stands in for a book not downloaded yet. |
 | `GET` | `/kosync/syncs/library/books/<book_id>/file` | The book file, in the format KOReader reads best. |

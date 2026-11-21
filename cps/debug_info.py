@@ -18,7 +18,7 @@ import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
 
-from flask import send_file
+from flask import has_request_context, request, send_file
 from flask_babel.speaklater import LazyString
 
 from . import logger, config, constants, support_pack_state
@@ -855,11 +855,36 @@ def _pack_filename(stem: str, now=None) -> str:
     return f"{moment:%Y%m%d-%H%M%S}Z-{stem}.zip"
 
 
-def _send_zip(memory_zip, filename: str):
+# Download-start signal for the pages that offer the pack. A page generates a
+# random token, requests the normal download URL with ``?dl_token=<token>``, and
+# watches for this cookie. It appears only on a successful download, so the page
+# can tell "started" from "busy" or "failed" without holding the file in memory:
+# saving from a blob: URL is blocked by this app's CSP in Firefox (#2710).
+PACK_TOKEN_COOKIE = "cwng_pack_token"
+PACK_TOKEN_COOKIE_SECONDS = 60
+_PACK_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{8,64}")
+
+
+def _requested_token():
+    """The page's download token, if the request carries a well-formed one."""
+    if not has_request_context():
+        return None
+    token = request.args.get("dl_token", "")
+    return token if _PACK_TOKEN_PATTERN.fullmatch(token) else None
+
+
+def _send_zip(memory_zip, filename: str, token=None):
     version = importlib.metadata.version("flask")
     if int(version.split('.')[0]) < 2:
-        return send_file(memory_zip, as_attachment=True, attachment_filename=filename)
-    return send_file(memory_zip, as_attachment=True, download_name=filename)
+        response = send_file(memory_zip, as_attachment=True, attachment_filename=filename)
+    else:
+        response = send_file(memory_zip, as_attachment=True, download_name=filename)
+    if token:
+        # Readable by the page's script on purpose (not HttpOnly): it carries only
+        # a random token the page itself made up.
+        response.set_cookie(PACK_TOKEN_COOKIE, token, max_age=PACK_TOKEN_COOKIE_SECONDS,
+                            path="/", samesite="Lax", secure=request.is_secure)
+    return response
 
 
 def _send_pack(sanitize: bool, stem: str):
@@ -867,7 +892,7 @@ def _send_pack(sanitize: bool, stem: str):
         data = _get_pack(sanitize)
     except PackBusy:
         return _busy_response()
-    return _send_zip(BytesIO(data), _pack_filename(stem))
+    return _send_zip(BytesIO(data), _pack_filename(stem), _requested_token())
 
 
 def send_debug():

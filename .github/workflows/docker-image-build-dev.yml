@@ -326,8 +326,8 @@ jobs:
     # repo is also a meaningful attack surface (any PR can execute on
     # operator hardware), so GitHub-hosted is the safer default.
     runs-on: ubuntu-24.04-arm
-    # ci-time-budget 2026-11-20: shorten 30 -> 15 min; p50 3.6, p95 5.2, max 5.5 min over 39 main runs; p95 5.2 min is 17% of the 30-min limit.
-    timeout-minutes: 15
+    # ci-time-budget 2026-11-21: shorten 15 -> 10 min; p50 3.7, p95 5.2, max 5.5 min over 36 main runs; p95 5.2 min is 34% of the 15-min limit.
+    timeout-minutes: 10
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:

@@ -6042,37 +6042,31 @@ def HandleAuthRequest():
 
 
 
-def _kobo_device_url_for(endpoint, **values):
-    """Absolute URL a Kobo should use to reach ``endpoint``.
+def _kobo_direct_origin():
+    """Use the configured external port when there is no reverse proxy."""
+    host = request.host
+    if ':' in host and not host.endswith(']'):
+        host = host.rsplit(':', 1)[0]
+    return f"{request.scheme}://{host}:{config.config_external_port}"
 
-    A request that did not come through a reverse proxy reaches us on whatever
-    port the device used, and ``url_for(_external=True)`` builds the URL from
-    the ``Host`` header, so a Host without a port gives a URL on port 80.
-    ``HandleInitRequest`` already rebuilds ``library_sync``, ``image_host`` and
-    ``reading_services_host`` on ``config_external_port`` for that case; the
-    OAuth URLs have to agree with them, or the device follows the first URLs
-    to the app and the OAuth ones to whatever is listening on port 80.
-    """
-    if current_app.wsgi_app.is_proxied:
-        return url_for(endpoint, _external=True, **values)
-    if ':' in request.host and not request.host.endswith(']'):
-        host = "".join(request.host.split(':')[:-1])
-    else:
-        host = request.host
-    return "{scheme}://{host}:{port}{path}".format(
-        scheme=request.scheme,
-        host=host,
-        port=config.config_external_port,
-        path=url_for(endpoint, **values),
-    )
+
+def _kobo_oauth_base_url():
+    # Some Kobos omit the port in Host. With the store proxy off, the local
+    # OAuth URLs need the same external port as the rest of the sync URLs.
+    use_request_origin = config.config_kobo_proxy or current_app.wsgi_app.is_proxied
+    oauth_url = url_for("kobo.HandleOauthRequest",
+                        auth_token=get_auth_token(),
+                        _external=use_request_origin)
+    if not use_request_origin:
+        oauth_url = _kobo_direct_origin() + oauth_url
+    return oauth_url.rsplit("/oauth", 1)[0]
 
 
 @csrf.exempt
 @kobo.route('/oauth/.well-known/openid-configuration', methods=['GET', 'POST'])
 @requires_kobo_auth
 def HandleOidcDiscovery():
-    base_url = _kobo_device_url_for("kobo.HandleOauthRequest",
-                                    auth_token=get_auth_token()).rsplit("/oauth", 1)[0]
+    base_url = _kobo_oauth_base_url()
     payload = {
         'issuer': base_url,
         'authorization_endpoint': base_url + '/oauth/authorize',
@@ -6144,15 +6138,7 @@ def HandleInitRequest():
 
     if not current_app.wsgi_app.is_proxied:
         log.debug('Kobo: Received unproxied request, changed request port to external server port')
-        if ':' in request.host and not request.host.endswith(']'):
-            host = "".join(request.host.split(':')[:-1])
-        else:
-            host = request.host
-        calibre_web_url = "{url_scheme}://{url_base}:{url_port}".format(
-            url_scheme=request.scheme,
-            url_base=host,
-            url_port=config.config_external_port
-        )
+        calibre_web_url = _kobo_direct_origin()
         log.debug('Kobo: Received unproxied request, changed request url to %s', calibre_web_url)
         kobo_resources["image_host"] = calibre_web_url
         kobo_resources["image_url_quality_template"] = unquote(calibre_web_url +
@@ -6214,12 +6200,9 @@ def HandleInitRequest():
                                                   _external=True)
         kobo_resources["rating"] = _rating_resource_url()
 
-    # When not proxying Kobo Store requests, point oauth_host to CWA and
-    # serve dummy OAuth responses for unregistered devices.
+    # Point devices at local OAuth when they aren't using the Kobo Store.
     if not config.config_kobo_proxy:
-        oauth_token_url = _kobo_device_url_for("kobo.HandleOauthRequest",
-                                               auth_token=kobo_auth.get_auth_token())
-        kobo_resources["oauth_host"] = oauth_token_url.rsplit("/oauth", 1)[0] + "/oauth"
+        kobo_resources["oauth_host"] = _kobo_oauth_base_url() + "/oauth"
 
     response = make_response(jsonify({"Resources": kobo_resources}))
     response.headers["x-kobo-apitoken"] = "e30="

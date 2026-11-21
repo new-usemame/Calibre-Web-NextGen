@@ -12,6 +12,8 @@ and stopped right after Init: "sync failed".
 These drive the real Kobo blueprint.
 """
 
+from types import SimpleNamespace
+
 import pytest
 from flask import Blueprint
 
@@ -64,12 +66,27 @@ def test_the_discovery_document_points_at_the_external_port(world):
 
     assert document["token_endpoint"] == f"{HOST}:{EXTERNAL_PORT}/kobo/reader-token/oauth/token"
     assert document["issuer"] == f"{HOST}:{EXTERNAL_PORT}/kobo/reader-token"
+    assert document["authorization_endpoint"] == f"{document['issuer']}/oauth/authorize"
 
 
-def test_a_port_in_the_host_header_is_replaced_by_the_external_port(world):
-    resources = world("/v1/initialization", base_url=f"{HOST}:8083").get_json()["Resources"]
+@pytest.mark.parametrize("host", [HOST, "http://[2001:db8::1]"])
+def test_a_port_in_the_host_header_is_replaced_by_the_external_port(world, host):
+    resources = world("/v1/initialization", base_url=f"{host}:8083").get_json()["Resources"]
+    document = world("/oauth/.well-known/openid-configuration", base_url=f"{host}:8083").get_json()
 
-    assert resources["oauth_host"] == f"{HOST}:{EXTERNAL_PORT}/kobo/reader-token/oauth"
+    assert resources["library_sync"].startswith(f"{host}:{EXTERNAL_PORT}/")
+    assert resources["oauth_host"] == f"{host}:{EXTERNAL_PORT}/kobo/reader-token/oauth"
+    assert document["token_endpoint"] == f"{host}:{EXTERNAL_PORT}/kobo/reader-token/oauth/token"
+
+
+def test_discovery_keeps_its_request_origin_with_store_proxy_on(world, monkeypatch):
+    from cps import kobo
+
+    monkeypatch.setattr(kobo.config, "config_kobo_proxy", True)
+    request_origin = f"{HOST}:8083"
+    document = world("/oauth/.well-known/openid-configuration", base_url=request_origin).get_json()
+
+    assert document["token_endpoint"] == f"{request_origin}/kobo/reader-token/oauth/token"
 
 
 def test_behind_a_reverse_proxy_the_urls_are_left_to_the_proxy(world):
@@ -80,3 +97,19 @@ def test_behind_a_reverse_proxy_the_urls_are_left_to_the_proxy(world):
 
     assert resources["oauth_host"] == f"{base_url}/kobo/reader-token/oauth"
     assert document["token_endpoint"] == f"{base_url}/kobo/reader-token/oauth/token"
+
+
+@pytest.mark.parametrize("store_resources", [
+    {},
+    {"Resources": {"oauth_host": "https://oauth.kobo.com"}},
+])
+def test_store_proxy_keeps_the_store_oauth_host(world, monkeypatch, store_resources):
+    from cps import kobo
+
+    monkeypatch.setattr(kobo.config, "config_kobo_proxy", True)
+    monkeypatch.setattr(kobo, "make_request_to_kobo_store",
+                        lambda: SimpleNamespace(json=lambda: store_resources))
+
+    resources = world("/v1/initialization").get_json()["Resources"]
+
+    assert resources["oauth_host"] == "https://oauth.kobo.com"

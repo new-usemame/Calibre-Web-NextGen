@@ -556,6 +556,7 @@ jobs:
     # a real fork after merge. They run in pull_request with a read-only token,
     # public upstream build dependencies, and no registry login or secrets.
     continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+    # ci-time-budget: keep 120m for the release image and 60m for setup and tests.
     timeout-minutes: 180
     permissions:
       actions: read    # inspect the exact Build & Push producer before another poll

@@ -546,8 +546,8 @@ jobs:
         needs.changed_paths.outputs.concurrency == 'true'
       ))
       )
-    # The direct dev-image build budgets total 60m: 5m classify, 15m mirror,
-    # 30m for the parallel architecture builds, and 10m to merge the manifest.
+    # The direct dev-image build budgets total 55m: 5m classify, 15m mirror,
+    # up to 30m for the parallel architecture builds, and 5m to merge the manifest.
     # Image-neutral main commits can also wait 95m for the source image alias.
     # Keep the paired resolver's 95m cap for that path. Release tags retain
     # their independent 120m wait and at least 60m for setup and test retries.

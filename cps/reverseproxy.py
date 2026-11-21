@@ -45,6 +45,8 @@ import ipaddress
 import os
 import re
 
+from flask import has_request_context, request
+
 from . import logger
 
 log = logger.create()
@@ -68,6 +70,7 @@ _PROXY_HEADERS = (
 )
 
 DIRECT_PEER = "cps.direct_peer"
+_PROXY_ORIGIN = "cps.proxy_origin"
 # The proxy headers as the connection sent them, before any were removed:
 # whether a call is this host's own depends on them even when they are not
 # believed (cwa_functions._is_local_call).
@@ -235,7 +238,7 @@ class ReverseProxied(object):
         self.env_port = port or os.getenv('PROXY_PORT', '')
 
     def __call__(self, environ, start_response):
-        self.proxied = False
+        proxied = False
 
         # Normalise the mount prefix to the one shape PEP 3333 allows: a
         # non-empty SCRIPT_NAME starts with exactly one '/' and does not end in
@@ -251,7 +254,7 @@ class ReverseProxied(object):
         script_name = (environ.get('HTTP_X_SCRIPT_NAME', '') or self.env_script).rstrip('/')
         if script_name:
             script_name = '/' + script_name.lstrip('/')
-            self.proxied = True
+            proxied = True
             environ['SCRIPT_NAME'] = script_name
             path_info = environ.get('PATH_INFO', '')
             # Strip the mount prefix only on a path-SEGMENT boundary (#1248).
@@ -275,18 +278,28 @@ class ReverseProxied(object):
             or self.env_scheme
         )
         if scheme:
-            self.proxied = True
+            proxied = True
             environ['wsgi.url_scheme'] = scheme
 
         host = environ.get('HTTP_X_FORWARDED_HOST', '') or self.env_host
         if host:
-            self.proxied = True
+            proxied = True
             if self.env_port and ':' not in host:
                 host = '{}:{}'.format(host, self.env_port)
             environ['HTTP_HOST'] = host
 
+        environ[_PROXY_ORIGIN] = self.proxied = proxied
         return self.app(environ, start_response)
 
     @property
     def is_proxied(self):
+        if has_request_context() and _PROXY_ORIGIN in request.environ:
+            environ = request.environ
+            original = environ.get("werkzeug.proxy_fix.orig", {})
+            # ProxyFix can apply a forwarded prefix itself. Both pieces of
+            # evidence belong to this request, even when other requests overlap.
+            return environ[_PROXY_ORIGIN] or any(
+                key in original and original[key] != environ.get(key)
+                for key in ("SCRIPT_NAME", "HTTP_HOST", "SERVER_PORT", "wsgi.url_scheme")
+            )
         return self.proxied

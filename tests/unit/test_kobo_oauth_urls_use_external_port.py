@@ -15,7 +15,8 @@ These drive the real Kobo blueprint.
 from types import SimpleNamespace
 
 import pytest
-from flask import Blueprint
+from flask import Blueprint, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .kobo_pairing_world import HEADERS, kobo_app  # noqa: F401
 
@@ -23,20 +24,10 @@ HOST = "http://192.168.1.2"
 EXTERNAL_PORT = 8093
 
 
-class Fronting:
-    """What ``create_app`` wraps around the WSGI app: it knows if a reverse proxy sent the request."""
-
-    def __init__(self, app, is_proxied):
-        self.app = app
-        self.is_proxied = is_proxied
-
-    def __call__(self, environ, start_response):
-        return self.app(environ, start_response)
-
-
 @pytest.fixture
 def world(kobo_app, monkeypatch):
     from cps import kobo
+    from cps.reverseproxy import ReverseProxied, TrustedProxyPeers, parse_trusted_networks
 
     monkeypatch.setattr(kobo.config, "config_external_port", EXTERNAL_PORT, raising=False)
     monkeypatch.setattr(kobo.config, "config_hardcover_annotations_sync", False, raising=False)
@@ -45,11 +36,19 @@ def world(kobo_app, monkeypatch):
     web.add_url_rule("/", "index", lambda: "")
     kobo_app.app.register_blueprint(web)
 
-    def ask(path, proxied=False, base_url=HOST):
-        kobo_app.app.wsgi_app = Fronting(kobo_app.app.wsgi_app.app if isinstance(
-            kobo_app.app.wsgi_app, Fronting) else kobo_app.app.wsgi_app, proxied)
-        return kobo_app.app.test_client().get(
-            "/kobo/reader-token" + path, headers=HEADERS, base_url=base_url)
+    app = kobo_app.app
+    app.wsgi_app = TrustedProxyPeers(
+        ReverseProxied(ProxyFix(app.wsgi_app, x_host=1, x_proto=1, x_prefix=1)),
+        parse_trusted_networks(None),
+    )
+
+    def ask(path, *, base_url=HOST, proxy_headers=None):
+        return app.test_client().get(
+            "/kobo/reader-token" + path,
+            headers={**HEADERS, **(proxy_headers or {})},
+            base_url=base_url,
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
 
     return ask
 
@@ -89,14 +88,34 @@ def test_discovery_keeps_its_request_origin_with_store_proxy_on(world, monkeypat
     assert document["token_endpoint"] == f"{request_origin}/kobo/reader-token/oauth/token"
 
 
-def test_behind_a_reverse_proxy_the_urls_are_left_to_the_proxy(world):
-    base_url = "https://books.example.org"
-    resources = world("/v1/initialization", proxied=True, base_url=base_url).get_json()["Resources"]
-    document = world("/oauth/.well-known/openid-configuration", proxied=True,
-                     base_url=base_url).get_json()
+@pytest.mark.parametrize("prefix_header", ["X-Script-Name", "X-Forwarded-Prefix"])
+def test_a_reverse_proxy_prefix_keeps_the_public_origin(world, prefix_header):
+    public_origin = "https://books.example.org:8443"
+    proxy_headers = {prefix_header: "/books"}
+    resources = world("/v1/initialization", base_url=public_origin,
+                      proxy_headers=proxy_headers).get_json()["Resources"]
+    document = world("/oauth/.well-known/openid-configuration", base_url=public_origin,
+                     proxy_headers=proxy_headers).get_json()
 
-    assert resources["oauth_host"] == f"{base_url}/kobo/reader-token/oauth"
-    assert document["token_endpoint"] == f"{base_url}/kobo/reader-token/oauth/token"
+    base_url = f"{public_origin}/books/kobo/reader-token"
+    assert resources["library_sync"].startswith(f"{base_url}/")
+    assert resources["oauth_host"] == f"{base_url}/oauth"
+    assert document["token_endpoint"] == f"{base_url}/oauth/token"
+
+
+def test_an_interleaved_direct_request_does_not_change_the_proxy_origin(world, kobo_app):
+    @kobo_app.app.before_request
+    def serve_direct_request_while_proxied_request_is_active():
+        if request.script_root == "/books":
+            assert kobo_app.app.test_client().get("/").status_code == 200
+
+    public_origin = "https://books.example.org:8443"
+    resources = world("/v1/initialization", base_url=public_origin,
+                      proxy_headers={"X-Script-Name": "/books"}).get_json()["Resources"]
+
+    base_url = f"{public_origin}/books/kobo/reader-token"
+    assert resources["library_sync"].startswith(f"{base_url}/")
+    assert resources["oauth_host"] == f"{base_url}/oauth"
 
 
 @pytest.mark.parametrize("store_resources", [

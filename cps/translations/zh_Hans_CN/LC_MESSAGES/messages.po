@@ -3229,7 +3229,7 @@ msgstr "从我的书库中移除"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {title} from my library"
-msgstr "从我的书库中移除 {title}"
+msgstr "从我的书库中移除 「{title}」"
 
 #: cps/spa_strings.py
 msgid "Removed from your library"
@@ -5053,6 +5053,8 @@ msgid ""
 "ticked here adds no books. An administrator can turn on Sync smart shelves "
 "in the settings."
 msgstr ""
+"此服务器未启用智能书架同步，因此在此勾选智能书架不会向设备添加任何书籍。"
+"管理员可以在设置中开启智能书架同步。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5085,7 +5087,7 @@ msgstr "无法保存书籍选择。请重试。"
 
 #: cps/spa_strings.py
 msgid "Clear reading position"
-msgstr ""
+msgstr "清除阅读位置"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5094,14 +5096,16 @@ msgid ""
 "Kobo and in KOReader? Your read status is not changed. A device that still "
 "holds its own position can send it back the next time it syncs."
 msgstr ""
+"要清除您在网页阅读器、Kobo 和 KOReader 中保存的「{title}」阅读位置吗？"
+"您的阅读状态不会改变。仍保留该位置的设备可能会在下次同步时将其重新上传到服务器。"
 
 #: cps/spa_strings.py
 msgid "Reading position cleared."
-msgstr ""
+msgstr "阅读位置已清除"
 
 #: cps/spa_strings.py
 msgid "Could not clear the reading position."
-msgstr ""
+msgstr "无法清除阅读位置"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -9401,7 +9405,7 @@ msgstr "收件人"
 
 #: cps/spa_strings.py
 msgid "Saved e-reader addresses:"
-msgstr ""
+msgstr "已保存的电子阅读器邮箱地址："
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
@@ -11703,7 +11707,7 @@ msgstr "视图设置"
 
 #: cps/spa_strings.py
 msgid "Viewer"
-msgstr "查看器"
+msgstr "允许在线阅读"
 
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
@@ -12296,41 +12300,41 @@ msgstr "← 书库"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Password requirements:"
-msgstr ""
+msgstr "密码要求："
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a letter"
-msgstr ""
+msgstr "1个字母"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a lowercase letter"
-msgstr ""
+msgstr "1个小写字母"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a number"
-msgstr ""
+msgstr "1个数字"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a special character"
-msgstr ""
+msgstr "1个特殊字符"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "an uppercase letter"
-msgstr ""
+msgstr "1个大写字母"
 
 #: cps/spa_strings.py
 msgid "at least 1 character"
-msgstr ""
+msgstr "至少1个字符"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "at least {count} characters"
-msgstr ""
+msgstr "至少 {count} 个字符"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "including {rules}"
-msgstr ""
+msgstr "包含 {rules}"
 
 #: cps/spa_strings.py
 msgid "Keep"
@@ -12446,6 +12450,9 @@ msgid ""
 "library themselves. Not available once an account already syncs books to a "
 "Kobo."
 msgstr ""
+"选择「我的书库」时适用。"
+"用户需要自行从全局书库中添加图书。"
+"如果账号已将图书同步到 Kobo，则无法使用此功能。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12453,15 +12460,18 @@ msgid ""
 "Give {name} an empty My Library? They start with no books and add what they "
 "want from the global library."
 msgstr ""
+"要为 {name} 创建一个空的「我的书库」吗？"
+"其中不会包含任何图书，用户可以自行从全局书库中添加所需的图书。"
 
 #: cps/spa_strings.py
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
 msgstr ""
+"需要「浏览全局书库」权限，否则用户无法自行添加书籍。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
-msgstr ""
+msgstr "以空的「我的书库」开始"
 
 #: cps/spa_strings.py cps/templates/custom_column_modal.html
 msgid "Apply selection"
@@ -12514,12 +12524,12 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{done} of {total} imported"
-msgstr ""
+msgstr "已导入 {done}/{total} 本"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No new books have appeared for a while; {count} not imported yet."
-msgstr ""
+msgstr "已有一段时间没有发现新图书，有 {count} 本尚未导入。"
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -16379,7 +16389,7 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Preserve cover aspect ratio in EPUBs"
-msgstr ""
+msgstr "保留 EPUB 封面图片比例"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -16388,6 +16398,8 @@ msgid ""
 "This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
 "covers written from now on; KEPUB files are not changed."
 msgstr ""
+"封面与元数据写入服务将新封面写入 EPUB 时，封面页会保留图片的原始宽高比，避免拉伸图片来填满屏幕。"
+"此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。仅对之后写入的封面生效，KEPUB 文件不受影响。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -19738,11 +19750,11 @@ msgstr "重置用户密码"
 #, python-format
 msgid "at least %(num)d character"
 msgid_plural "at least %(num)d characters"
-msgstr[0] ""
+msgstr[0] "至少 %(num)d 个字符"
 
 #: cps/templates/user_edit.html
 msgid "including"
-msgstr ""
+msgstr "包含"
 
 #: cps/templates/user_edit.html
 msgid "eReader Configuration"
@@ -19898,6 +19910,9 @@ msgid ""
 "and adds what they want from the global library, so they need the global-"
 "browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
+"仅在上方选择「我的书库」时生效。"
+"用户的书库初始为空，需要自行从全局书库中添加所需书籍，因此必须拥有「浏览全局书库」权限。"
+"已向 Kobo 同步过书籍的账号无法使用此功能。"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

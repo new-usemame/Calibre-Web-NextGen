@@ -180,7 +180,7 @@ export function ConnectedDevice({ id }: { id: string }) {
           <button type="button" className={styles.secondary} onClick={() => { void device.refresh(); }}
             disabled={device.busy !== null}>
             <RefreshCw size={15} aria-hidden="true" focusable={false} />
-            {device.busy ?? t('Refresh')}
+            {device.busy ? t(device.busy) : t('Refresh')}
           </button>
           <button type="button" className={styles.primary} data-testid="device-eject"
             disabled={device.busy !== null}

@@ -346,29 +346,87 @@ class _LogScrubber:
 _PER_FILE_MAX_BYTES = 10 * 1024 * 1024
 
 
+# APScheduler logs a "Running job" / "executed successfully" pair at INFO on
+# every run, and some jobs run every 5 seconds (#2673). Current releases keep
+# the executor logger at WARNING, but older rotated logs still hold the
+# pairs, and they come back at DEBUG, which is the level reporters are asked
+# to reproduce at. They are the bulk of such a log and say nothing a
+# maintainer needs, so the sanitised pack counts them instead of carrying
+# them. Failures, warnings and missed runs do not match and are kept.
+_ROUTINE_SCHEDULER_MARKER = "INFO {apscheduler.executors.default:"
+_LOG_TIMESTAMP_PATTERN = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+# Bound the work on a pathological file: past this many times the cap, only the
+# tail is even looked at.
+_RAW_READ_FACTOR = 4
+
+
+def _is_routine_scheduler_line(line: str) -> bool:
+    """A successful-run line from the APScheduler executor, at INFO."""
+    return (_ROUTINE_SCHEDULER_MARKER in line
+            and (" executed successfully" in line or ' Running job "' in line))
+
+
+def _omitted_lines_header(count: int, first_ts, last_ts) -> str:
+    span = f" logged between {first_ts} and {last_ts}" if first_ts and last_ts else ""
+    return (f"[support pack] Omitted {count:,} routine APScheduler per-run lines "
+            f'("Running job" / "executed successfully"){span}. '
+            "Errors, warnings and missed runs are kept.\n")
+
+
 def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
-    """Read a log file, sanitize each line, return the sanitized bytes
-    capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the most
-    recent content, drop the head if oversize)."""
+    """Read a log file, drop routine scheduler lines, sanitize the rest, and
+    return the result capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the
+    most recent content, drop the head if oversize).
+
+    Order matters. Routine lines are dropped *before* the cap, so the cap
+    spends its budget on lines worth reading rather than on noise, and the cap
+    is applied *before* scrubbing, so no CPU goes on bytes that would be
+    dropped anyway."""
     if not raw:
         return raw
-    # Tail-truncate first so we never burn CPU sanitizing bytes we'd
-    # drop anyway.
-    if len(raw) > _PER_FILE_MAX_BYTES:
-        raw = raw[-_PER_FILE_MAX_BYTES:]
+    if len(raw) > _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:
+        raw = raw[-_PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:]
+        newline = raw.find(b"\n")
+        if newline != -1:
+            raw = raw[newline + 1:]  # the first line is cut mid-way
     try:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
-        return raw
+        return raw[-_PER_FILE_MAX_BYTES:]
     if scrubber is None:
         install_paths = _install_path_patterns()
 
         def scrubber(line):
             return _sanitize_log_line(line, install_paths)
-    sanitized_lines = []
+
+    kept = []
+    omitted = 0
+    first_ts = last_ts = None
     for line in text.splitlines(keepends=True):
-        sanitized_lines.append(scrubber(line))
-    return "".join(sanitized_lines).encode("utf-8")
+        if _is_routine_scheduler_line(line):
+            omitted += 1
+            stamp = _LOG_TIMESTAMP_PATTERN.match(line)
+            if stamp:
+                ts = stamp.group(1)
+                first_ts = ts if first_ts is None or ts < first_ts else first_ts
+                last_ts = ts if last_ts is None or ts > last_ts else last_ts
+            continue
+        kept.append(line)
+
+    # Tail cap on what is left, counted in bytes.
+    total = 0
+    start = len(kept)
+    for index in range(len(kept) - 1, -1, -1):
+        total += len(kept[index].encode("utf-8", errors="replace"))
+        if total > _PER_FILE_MAX_BYTES:
+            break
+        start = index
+    kept = kept[start:]
+
+    body = "".join(scrubber(line) for line in kept)
+    if omitted:
+        body = _omitted_lines_header(omitted, first_ts, last_ts) + body
+    return body.encode("utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -554,6 +612,10 @@ _SANITIZED_NOTE = (
     "          (<email_1>, <email_2>, ...) and account names (<user_1>, ...).\n"
     "          The same email or account gets the same label throughout this\n"
     "          pack; labels are not stable between packs.\n"
+    "  * Logs: routine APScheduler per-run lines (\"Running job\" and\n"
+    "          \"executed successfully\") are omitted and counted in a note at\n"
+    "          the top of each log file. Failures, warnings and missed runs\n"
+    "          are kept.\n"
     "\n"
     "What was kept:\n"
     "  * Loopback IP (127.0.0.1), timestamps, log levels, error messages,\n"

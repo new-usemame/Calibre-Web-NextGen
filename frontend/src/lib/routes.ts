@@ -38,6 +38,7 @@ export const SPA_ROUTES = {
   archived: '/archived',
   search: '/search',
   global: '/global',
+  connectedDevice: '/device/:id',
   account: '/account',
   deviceDetail: '/account/devices/:id',
   devices: '/account/devices',

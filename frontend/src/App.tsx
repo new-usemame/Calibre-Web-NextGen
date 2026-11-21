@@ -13,6 +13,8 @@ import { BrowseList } from './pages/BrowseList';
 import { TagsBrowse, TagGroup } from './pages/TagsBrowse';
 import { NotFound } from './pages/NotFound';
 import { Shelves } from './pages/Shelves';
+import { ConnectedDevice } from './pages/ConnectedDevice';
+import { canUseKindleUsb } from './lib/permissions';
 import { ShelfEditor } from './pages/ShelfEditor';
 import { MagicShelves } from './pages/MagicShelves';
 import { Shelf } from './pages/Shelf';
@@ -263,6 +265,9 @@ export function App() {
           {/* Shelves */}
           <Route path={SPA_ROUTES.shelfNew}>{() => <ShelfEditor />}</Route>
           <Route path={SPA_ROUTES.shelfEdit}>{(p) => <ShelfEditor key={p.id} id={p.id} />}</Route>
+          <Route path={SPA_ROUTES.connectedDevice}>
+            {(p) => canUseKindleUsb(me) ? <ConnectedDevice key={p.id} id={p.id} /> : <NotFound />}
+          </Route>
           <Route path={SPA_ROUTES.shelves}>{() => <Shelves />}</Route>
           <Route path={SPA_ROUTES.shelf}>{(p) => <Shelf id={p.id} />}</Route>
 

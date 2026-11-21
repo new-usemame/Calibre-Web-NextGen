@@ -74,6 +74,7 @@ export interface ServerFeatures {
    *  Absent on older servers → treat as off, so the SPA does not call a
    *  preference endpoint that would 404. */
   kobo_two_way_annotations?: boolean;
+  kindle_usb?: boolean;
   /** #1288 — the admin's "Enable Uploads" switch. Classic gates its navbar
    *  upload button on this; the SPA offered Upload regardless. Absent on older
    *  servers → treat as ON, matching the server's column default (the other

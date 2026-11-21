@@ -56,6 +56,75 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.72',
+    date: '2026-11-20',
+    items: [
+      {
+        title: 'Find books you finished recently',
+        body: 'Open the Read list and choose Date read to put recently finished books at the top, even if you added them years ago. The date-added sorts are still there.',
+        category: 'Reading',
+      },
+      {
+        title: 'Clean up tags across your library',
+        body: 'In Admin, open Metadata clean-up to set rules that rename, split, or remove tags. Preview the affected books before you apply and use History to undo an applied run.',
+        category: 'Admin',
+        link: { to: '/admin/metadata-cleanup', label: 'Metadata clean-up' },
+      },
+      {
+        title: 'Choose existing custom values when editing a book',
+        body: 'Use the list button beside a supported custom field to choose a value already in your library. Hierarchical columns show a tree, so you can see where a value belongs before applying it.',
+        category: 'Library',
+      },
+      {
+        title: 'Edit custom column categories in one place',
+        body: 'Rename, combine, move, or reorder browsable custom values. UI Configuration also lets you choose which columns display as a hierarchy.',
+        category: 'Library',
+      },
+      {
+        title: 'Restore covers that are already on disk',
+        body: 'In Admin, open Restore missing covers to find books whose cover file exists but is hidden by a missing-cover flag. Choose which covers to restore before you confirm.',
+        category: 'Admin',
+      },
+      {
+        title: 'Check mail settings and send yourself a test',
+        body: 'The mail settings show whether email is configured and let you send a test to your own address. If you are moving away from Gmail sign-in, choose Use standard SMTP instead.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Admin' },
+      },
+      {
+        title: 'Kobo reading changes are checked locally when the Store proxy is off',
+        body: 'When the Store proxy is off, CWNG handles the Kobo reading-changes check locally. This avoids the unauthorized response that interrupted the device check while preserving on-device highlights.',
+        category: 'Sync',
+      },
+      {
+        title: 'Share a Kobo percentage that matches CrossPoint',
+        body: "On the Devices page, opt in for an individual Kobo to share CrossPoint's percentage for the same spot. If the two percentages differ by more than five points, the Kobo's own percentage is shared.",
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Find metadata for Czech and Slovak editions',
+        body: 'Enable Databáze knih in metadata search or add it to your automatic provider order. When a title search misses and the book has an ISBN, automatic fetch can retry by ISBN.',
+        category: 'Library',
+      },
+      {
+        title: 'Fill in series and series order with Wikidata',
+        body: 'Enable Wikidata in metadata search or add it to the automatic provider order. It can supply series names and positions, including fractional positions.',
+        category: 'Library',
+      },
+      {
+        title: 'Find better Hardcover matches',
+        body: 'Matching uses ISBNs, subtitles, and alternate titles to find the right book. Admins can review unmatched books, and reading progress can sync when Hardcover has a suitable edition with a page count.',
+        category: 'Library',
+      },
+      {
+        title: 'Keep the intended copy when imports share a timestamp',
+        body: 'When two copies were added at the same time, duplicate cleanup now uses the order they were added to distinguish the oldest and newest copies.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
     version: 'v4.1.71',
     date: '2026-11-19',
     items: [

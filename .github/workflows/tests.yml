@@ -531,10 +531,10 @@ jobs:
     # regardless of what the PR did to the SPA — green either way, and worse
     # than skipping because it would look like a gate.
     #
-    # Frontend-only PRs take the API from :dev and overlay the PR's OWN SPA
-    # bundle into the container. Backend/build PRs wait for integration-tests,
-    # then load their own full image from the same GHA layer cache; otherwise a
-    # branch API change would be tested against main's Python code.
+    # Same-repo frontend-only PRs overlay their own SPA on :dev; backend/build
+    # PRs reuse the integration build cache. Fork PRs build their checked-out
+    # head locally, including concurrency changes: their read-only producer
+    # cannot publish a head-SHA image. All paths run the same Playwright suite.
     if: |
       always() && (
       startsWith(github.ref, 'refs/tags/v') ||
@@ -543,23 +543,18 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e) ||
       (github.event_name == 'pull_request' && (
         needs.changed_paths.outputs.frontend == 'true' ||
-        (needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true)
+        needs.changed_paths.outputs.concurrency == 'true'
       ))
       )
-    # Main/PR dev-image producers may consume their full 5m classify + 15m
-    # mirror + 60m architecture + 15m manifest budgets. Their resolver is
-    # bounded to those 95m and exits as soon as the exact run/job fails. Release
-    # tags retain their independent 120m artifact wait. Leave at least 60m for
-    # setup and Playwright's two retries of a roughly 15m suite.
+    # The direct dev-image build budgets total 55m: 5m classify, 15m mirror,
+    # up to 30m for the parallel architecture builds, and 5m to merge the manifest.
+    # Image-neutral main commits can also wait 95m for the source image alias.
+    # Keep the paired resolver's 95m cap for that path. Release tags retain
+    # their independent 120m wait and at least 60m for setup and test retries.
     #
-    # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
-    # the resolve/pull/overlay path above has never been exercised from one —
-    # #1274, the only recent fork PR, touched no frontend files and skipped
-    # this job. Hard-gating an unmeasured infrastructure path would block
-    # community PRs for a reason unrelated to their change, which is the same
-    # trade integration-tests documents. Forks still RUN the suite and the
-    # result is still surfaced; only the block is deferred. Promote (drop the
-    # fork clause) once a real fork run shows the path works.
+    # Fork PRs stay advisory while the local-build path awaits verification on
+    # a real fork after merge. They run in pull_request with a read-only token,
+    # public upstream build dependencies, and no registry login or secrets.
     continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
     timeout-minutes: 180
     permissions:
@@ -571,6 +566,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Refuse unsupported dev-branch image wait
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
@@ -589,11 +585,13 @@ jobs:
       - name: Set up Docker Buildx
         if: >-
           github.event_name == 'pull_request' &&
-          needs.changed_paths.outputs.build == 'true' &&
-          needs.changed_paths.outputs.concurrency != 'true'
+          (github.event.pull_request.head.repo.fork == true ||
+           (needs.changed_paths.outputs.build == 'true' &&
+            needs.changed_paths.outputs.concurrency != 'true'))
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR (app image and pbs-cache mirror)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -605,13 +603,14 @@ jobs:
 
       # A static SPA overlay is sound only when the PR did not change the API.
       # For backend/build PRs, changed_paths already made integration-tests build
-      # this exact tree; reuse its GHA cache and load a full-stack image so e2e
-      # cannot silently exercise main's Python code under the branch's UI.
+      # this exact tree; reuse its GHA cache and load a full-stack image. Forks
+      # always build the checked-out head without private mirror credentials.
       - name: Build full-stack PR image
         if: >-
           github.event_name == 'pull_request' &&
-          needs.changed_paths.outputs.build == 'true' &&
-          needs.changed_paths.outputs.concurrency != 'true'
+          (github.event.pull_request.head.repo.fork == true ||
+           (needs.changed_paths.outputs.build == 'true' &&
+            needs.changed_paths.outputs.concurrency != 'true'))
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -632,6 +631,12 @@ jobs:
           image="ghcr.io/new-usemame/calibre-web-nextgen"
           producer_args=()
           if [[ "${{ github.event_name }}" == "pull_request" \
+                  && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            # Forks cannot publish a head-SHA image. Test only the full image
+            # built from their checked-out head above, never a published base.
+            echo "image=cwng-e2e-head:local" >> "$GITHUB_OUTPUT"
+            exit 0
+          elif [[ "${{ github.event_name }}" == "pull_request" \
                   && "${{ needs.changed_paths.outputs.build }}" == "true" \
                   && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
             # Non-concurrency backend PRs already built their checked-out full
@@ -644,7 +649,7 @@ jobs:
             attempts=240
           elif [[ "${{ github.event_name }}" == "pull_request" \
                   && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
-            # Frontend-only PRs (including forks) still overlay their own SPA on
+            # Same-repo frontend-only PRs still overlay their own SPA on
             # the currently published backend. Freeze that backend to a digest
             # immediately; capability probes own routes it may not have.
             tag=dev
@@ -658,7 +663,7 @@ jobs:
           else
             # Main pushes and concurrency-shaped same-repo PRs are paired with
             # docker-image-build-dev.yml. Wait only while that exact run is
-            # live, and no longer than its 95-minute job budget. No :dev
+            # live, up to the 95-minute alias polling window. No :dev
             # fallback is allowed: an absent subject cannot earn a verdict.
             tag="sha-$SUBJECT_SHA"
             attempts=191
@@ -999,12 +1004,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
-      # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
-      # 193s (>3m) with both caches warm. Ten minutes per step gives >17x/28x
-      # median headroom and >3x that observed stall floor, while still failing
-      # a real setup hang far before the job's 180m guard.
+      # Run 33848680049 twice saw npm ci stall for 193s with warm caches.
       - name: Install frontend dependencies (npm ci)
+        # ci-time-budget: keep a margin of at least 3x the observed warm-cache stall.
         timeout-minutes: 10
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
@@ -1020,14 +1022,15 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium webkit
 
-      # Frontend-only PRs intentionally reuse a digest-pinned :dev backend to
+      # Same-repo frontend-only PRs reuse a digest-pinned :dev backend to
       # avoid a full multi-arch build for a static-bundle change. Overlay their
       # own bundle/templates. Main and concurrency-shaped PRs already boot the
       # triggering commit's sha-tagged image and must remain byte-for-byte that
-      # artifact; overlaying them would weaken the image identity proof.
+      # artifact. Fork images already contain their head's SPA and templates.
       - name: Overlay the SPA bundle under test into the container
         if: >-
           github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork != true &&
           needs.changed_paths.outputs.build != 'true' &&
           needs.changed_paths.outputs.concurrency != 'true'
         working-directory: frontend

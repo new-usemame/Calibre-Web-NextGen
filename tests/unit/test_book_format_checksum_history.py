@@ -210,31 +210,31 @@ class TestDoDownloadFileCallsCalculateAfterEmbed:
 
 
 @pytest.mark.unit
-class TestGetBookByChecksumMatchesAnyVersion:
-    """Pin the lookup side: KOReader pushing progress with EITHER the
-    original-import checksum OR a post-embed checksum must find the book.
-    Without this, history-tracking is pointless."""
+def test_lookup_finds_original_download_and_filename_checksums(test_db, tmp_path, monkeypatch):
+    from types import SimpleNamespace
 
-    def test_lookup_matches_any_stored_checksum_row(self):
-        """Source-pin: `get_book_by_checksum` lives in
-        `cps/progress_syncing/protocols/kosync.py` and queries the
-        `BookFormatChecksum` table by checksum equality (matches any
-        row, not just `latest`). Without this, history-tracking is
-        pointless — devices using the original-import file would never
-        find the book after a download regenerates the checksum."""
-        from pathlib import Path
-        repo_root = Path(__file__).resolve().parent.parent.parent
-        src = (repo_root / "cps" / "progress_syncing" / "protocols" /
-               "kosync.py").read_text()
-        import re
-        match = re.search(
-            r"def get_book_by_checksum\(.*?(?=\n(?:def |class )\w)",
-            src, re.DOTALL,
-        )
-        assert match is not None, "get_book_by_checksum not found in kosync.py"
-        body = match.group(0)
-        assert "BookFormatChecksum.checksum == document_checksum" in body, (
-            "lookup must match against ANY stored checksum row for the book — "
-            "matching only `latest` would break sync from devices using the "
-            "original-import file (fork #102 history-tracking expectation)"
-        )
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    import cps
+    from cps.progress_syncing.checksums import CHECKSUM_VERSION, FILENAME_CHECKSUM_VERSION
+    from cps.progress_syncing.protocols.kosync import get_book_by_checksum
+
+    test_db.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, path TEXT)")
+    test_db.execute("INSERT INTO books VALUES (42, 'Book', 'Author/Book')")
+    rows = [
+        ("a" * 32, CHECKSUM_VERSION),
+        ("b" * 32, CHECKSUM_VERSION),
+        ("c" * 32, FILENAME_CHECKSUM_VERSION),
+    ]
+    for checksum, version in rows:
+        store_checksum(42, "EPUB", checksum, version=version, db_connection=test_db)
+    test_db.commit()
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'metadata.db'}")
+    with Session(engine) as session:
+        monkeypatch.setattr(cps, "calibre_db", SimpleNamespace(session=session), raising=False)
+        for checksum, version in rows:
+            assert get_book_by_checksum(checksum) == (42, "EPUB", "Book", "Author/Book", version)
+        assert get_book_by_checksum(rows[-1][0], version=CHECKSUM_VERSION)[0] is None
+    engine.dispose()

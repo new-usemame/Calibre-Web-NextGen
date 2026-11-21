@@ -43,6 +43,7 @@ import os
 import re
 import time
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Dict, Optional, Any, Tuple
 from urllib.parse import quote
 
@@ -56,7 +57,7 @@ from ...kobo import push_reading_state_to_hardcover
 from flask import Blueprint, g, has_request_context, request, jsonify, send_from_directory
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
-from sqlalchemy import func, desc, cast, select, String
+from sqlalchemy import func, desc, cast, select, String, text as sql_text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
 from werkzeug.exceptions import BadRequest, HTTPException
 
@@ -510,117 +511,116 @@ def handle_sync_error(error: KOSyncError) -> tuple:
     }, status)
 
 
-# Issue #1190: a device stuck on an unknown checksum polls repeatedly, and one
-# inventory PUT can carry thousands of unmatched files, so the extra detail on
-# a lookup miss is budgeted per interval: each checksum is diagnosed at most
-# once per window, at most _MISS_DIAG_MAX_TRACKED checksums are diagnosed per
-# window, and the library-wide count is taken once per window. The plain
-# "No book found" line is still logged every time.
+# Issue #1190: a device stuck on an unknown checksum polls repeatedly. Keep
+# detailed diagnoses bounded per process and reserve fewer slots for full table
+# scans (#2960). Inventory lookups do not use these diagnostics.
 _MISS_DIAG_INTERVAL = 300.0
 _MISS_DIAG_MAX_TRACKED = 256
-_miss_diag_last: Dict[str, float] = {}
-_miss_diag_window = {"start": None, "total": None}
+_MISS_DIAG_MAX_SCANS = 4
+_miss_diag_lock = Lock()
+_miss_diag_last: set[tuple[str, str | None]] = set()
+_miss_diag_window = {"start": None, "total": None, "scans": 0, "damage_warned": False}
+
+
+def _probe_checksum_index(session, checksum, version):
+    # Both reads must see the same snapshot. A concurrent registration
+    # between the original lookup and this probe can make both find a row.
+    candidate_version = "AND candidate.version = :version" if version is not None else ""
+    indexed_version = "AND indexed.version = :version" if version is not None else ""
+    return session.execute(sql_text(f"""
+        SELECT candidate.book, candidate.format, live_book.id, EXISTS (
+            SELECT 1
+            FROM book_format_checksums AS indexed
+            JOIN books AS indexed_book ON indexed_book.id = indexed.book
+            WHERE indexed.checksum = :checksum {indexed_version}
+        ) AS indexed_match
+        FROM book_format_checksums AS candidate NOT INDEXED
+        LEFT JOIN books AS live_book ON live_book.id = candidate.book
+        WHERE candidate.checksum = :checksum {candidate_version}
+        ORDER BY (live_book.id IS NOT NULL) DESC, candidate.created DESC, candidate.version DESC
+        LIMIT 1
+    """), {"checksum": checksum, "version": version}).first()
 
 
 def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
-    """Say why a checksum lookup missed, or return "" when not diagnosing.
-
-    Three different causes produce the same miss and need different answers
-    from the admin (#1190):
-
-    * a ``book_format_checksums`` row exists but its book id is not in
-      ``books`` (stale id, e.g. after a Calibre database rebuild);
-    * no checksums are registered at all (the backfill never ran, or
-      registration is failing);
-    * checksums exist but not this one (the device holds a file the server
-      never served, or whose bytes changed after it was registered).
-
-    Read-only, and never raises: diagnostics must not turn a clean miss into
-    an error.
-    """
-    now = time.monotonic()
-    started = _miss_diag_window["start"]
-    if started is None or now - started >= _MISS_DIAG_INTERVAL:
-        _miss_diag_last.clear()
-        _miss_diag_window["start"] = now
-        _miss_diag_window["total"] = None
-        _miss_diag_window["damage_warned"] = False
-    if document_checksum in _miss_diag_last:
-        return ""
-    if len(_miss_diag_last) >= _MISS_DIAG_MAX_TRACKED:
-        return ""
-    _miss_diag_last[document_checksum] = now
+    """Explain a lookup miss without changing its result or the database."""
+    with _miss_diag_lock:
+        now = time.monotonic()
+        started = _miss_diag_window["start"]
+        if started is None or now - started >= _MISS_DIAG_INTERVAL:
+            _miss_diag_last.clear()
+            started = now
+            _miss_diag_window.update(start=started, total=None, scans=0, damage_warned=False)
+        key = (document_checksum, version)
+        if key in _miss_diag_last or len(_miss_diag_last) >= _MISS_DIAG_MAX_TRACKED:
+            return ""
+        _miss_diag_last.add(key)
+        can_scan = _miss_diag_window["scans"] < _MISS_DIAG_MAX_SCANS
+        if can_scan:
+            _miss_diag_window["scans"] += 1
 
     try:
-        from sqlalchemy import text as sql_text
-
         from ... import calibre_db
         from ...db import BookFormatChecksum, Books
 
-        stale = calibre_db.session.query(
-            BookFormatChecksum.book, BookFormatChecksum.format
-        ).outerjoin(
-            Books, BookFormatChecksum.book == Books.id
-        ).filter(
-            BookFormatChecksum.checksum == document_checksum,
-            Books.id.is_(None),
-        )
-        if version is not None:
-            stale = stale.filter(BookFormatChecksum.version == version)
-        stale = stale.order_by(
-            BookFormatChecksum.created.desc(), BookFormatChecksum.version.desc()
-        ).first()
+        session = calibre_db.session
+        probe = _probe_checksum_index(session, document_checksum, version) if can_scan else None
+        if probe and probe[2] is not None:
+            book_id, book_format, _, indexed_match = probe
+            if indexed_match:
+                return "a matching checksum is visible now; retry the lookup"
+            with _miss_diag_lock:
+                warn = _miss_diag_window["start"] == started and not _miss_diag_window["damage_warned"]
+                if warn:
+                    _miss_diag_window["damage_warned"] = True
+            if warn:
+                log.warning(
+                    "KOReader sync: checksum index may be damaged: a row for book id %s (%s) "
+                    "and checksum %s is visible without the index. Stop writes and run "
+                    "PRAGMA integrity_check on a consistent copy of the library's metadata.db",
+                    book_id, book_format, document_checksum,
+                )
+            return (
+                "the checksum row for book id %s (%s) is visible without the index; "
+                "the checksum index may be damaged. Run PRAGMA integrity_check on "
+                "a consistent copy of the library's metadata.db"
+                % (book_id, book_format)
+            )
+
+        # If no scan ran or returned a hit, keep the existing cheap stale-id
+        # diagnostic for rows that are still visible through the index.
+        stale = probe
+        if stale is None:
+            query = session.query(
+                BookFormatChecksum.book, BookFormatChecksum.format,
+            ).outerjoin(
+                Books, BookFormatChecksum.book == Books.id,
+            ).filter(
+                BookFormatChecksum.checksum == document_checksum,
+                Books.id.is_(None),
+            )
+            if version is not None:
+                query = query.filter(BookFormatChecksum.version == version)
+            stale = query.order_by(
+                BookFormatChecksum.created.desc(), BookFormatChecksum.version.desc(),
+            ).first()
         if stale:
             return (
-                "a checksum row exists for book id %s (%s) but that book is not "
+                "book id %s (%s) was registered for this checksum but no longer exists "
                 "in the library; the id is stale, e.g. after a Calibre database "
                 "rebuild" % (stale[0], stale[1])
             )
-        # Issue #2960: the lookup above and the stale-id check both go
-        # through the checksum index. If that index has lost entries (seen
-        # after a library file was written by two processes at once), the
-        # row exists and every plain read of the table finds it, but
-        # ``WHERE checksum = ?`` cannot. Look once more without the index so
-        # that case is named instead of reading as "never registered".
-        probe = (
-            "SELECT book, format FROM book_format_checksums NOT INDEXED "
-            "WHERE checksum = :checksum"
-        )
-        params = {"checksum": document_checksum}
-        if version is not None:
-            probe += " AND version = :version"
-            params["version"] = version
-        probe += " ORDER BY created DESC, version DESC LIMIT 1"
-        unindexed = calibre_db.session.execute(sql_text(probe), params).first()
-        if unindexed:
-            # The miss line carries the cause per checksum; this is the one
-            # line an admin filtering for warnings will see, once per window
-            # however many books are affected.
-            if not _miss_diag_window.get("damage_warned"):
-                _miss_diag_window["damage_warned"] = True
-                log.warning(
-                    "KOReader sync: checksum index damaged: book id %s (%s) "
-                    "has a row for checksum %s that the indexed lookup cannot "
-                    "find. Run PRAGMA integrity_check on the library's "
-                    "metadata.db and rebuild the file; other books may be "
-                    "affected too",
-                    unindexed[0], unindexed[1], document_checksum,
-                )
-            return (
-                "a checksum row exists for book id %s (%s) but the lookup by "
-                "checksum did not find it; if this repeats, the checksum "
-                "index in metadata.db is damaged. Run PRAGMA integrity_check "
-                "on the library's metadata.db and rebuild the file"
-                % (unindexed[0], unindexed[1])
-            )
-        total = _miss_diag_window["total"]
+        with _miss_diag_lock:
+            total = _miss_diag_window["total"] if _miss_diag_window["start"] == started else None
         if total is None:
-            total = calibre_db.session.query(
+            total = session.query(
                 func.count(BookFormatChecksum.id)
             ).scalar() or 0
             if total:
                 # An empty table may be a backfill still running; recount.
-                _miss_diag_window["total"] = total
+                with _miss_diag_lock:
+                    if _miss_diag_window["start"] == started:
+                        _miss_diag_window["total"] = total
         if total == 0:
             return (
                 "no checksums are registered library-wide; the checksum "
@@ -635,7 +635,7 @@ def _describe_checksum_miss(document_checksum: str, version: str = None) -> str:
         return "diagnostics unavailable (%s)" % type(e).__name__
 
 
-def get_book_by_checksum(document_checksum: str, version: str = None):
+def get_book_by_checksum(document_checksum: str, version: str = None, *, diagnose_miss: bool = True):
     """
     Lookup a book in the Calibre library by its partial MD5 checksum.
 
@@ -645,6 +645,7 @@ def get_book_by_checksum(document_checksum: str, version: str = None):
     Args:
         document_checksum: The partial MD5 checksum from KOReader
         version: Optional algorithm version to filter by (None = any version)
+        diagnose_miss: Enable detailed diagnostic queries for a single lookup
 
     Returns:
         Tuple of (book_id, book_format, book_title, book_path, version) or
@@ -693,7 +694,7 @@ def get_book_by_checksum(document_checksum: str, version: str = None):
         # CWA, my device pushes a checksum, nothing happens" — the
         # checksum is in the message so the admin can grep the
         # book_format_checksums table for it.
-        detail = _describe_checksum_miss(document_checksum, version)
+        detail = _describe_checksum_miss(document_checksum, version) if diagnose_miss else ""
         log.info(
             "KOReader sync: No book found for checksum: %s%s",
             document_checksum, " (%s)" % detail if detail else "",
@@ -1706,7 +1707,9 @@ def update_inventory():
         resolved = []
         matched_count = 0
         for entry in normalized:
-            book_id, _fmt, _title, _path, _version = get_book_by_checksum(entry["checksum"])
+            book_id, _fmt, _title, _path, _version = get_book_by_checksum(
+                entry["checksum"], diagnose_miss=False,
+            )
             if book_id is not None:
                 matched_count += 1
             resolved.append((entry, book_id))

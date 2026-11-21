@@ -14,6 +14,7 @@ checksum because a stuck device polls repeatedly.
 
 from __future__ import annotations
 
+import logging
 import sys
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -219,6 +220,9 @@ def damaged_index_session():
         conn.exec_driver_sql(
             "CREATE INDEX idx_checksum ON book_format_checksums(checksum)"
         )
+        conn.exec_driver_sql(
+            "CREATE INDEX idx_checksum_version ON book_format_checksums(checksum, version)"
+        )
     s = sessionmaker(bind=engine)()
     checksums = [f"{i:032x}" for i in range(40)]
     for book_id, checksum in enumerate(checksums, start=1):
@@ -311,7 +315,7 @@ def test_damaged_index_logs_one_warning_per_window(damaged_index_session):
     assert found_second >= 1, "need a second affected checksum to prove dedupe"
     assert warning.call_count == 1
     line = warning.call_args.args[0] % warning.call_args.args[1:]
-    assert "checksum index damaged" in line
+    assert "checksum index may be damaged" in line
     assert "book id %d" % first_book in line and first in line, line
     assert "integrity_check" in line, line
 
@@ -322,3 +326,93 @@ def test_no_damage_warning_for_an_ordinary_miss(session):
     with patch.object(k.log, "warning") as warning:
         _describe(session)
     warning.assert_not_called()
+
+
+def test_registration_between_lookup_and_diagnostic_is_not_index_damage(session, monkeypatch, caplog):
+    from cps.db import Books
+
+    k = _kosync()
+    diagnose = k._describe_checksum_miss
+
+    def register_then_diagnose(*args):
+        session.execute(Books.__table__.insert().values(
+            id=7, title="New book", sort="New book", author_sort="", path="p", uuid="u", has_cover=0,
+        ))
+        session.add(BookFormatChecksum(7, "EPUB", CHECKSUM))
+        session.commit()
+        return diagnose(*args)
+
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        with monkeypatch.context() as changes:
+            changes.setattr(k, "_describe_checksum_miss", register_then_diagnose)
+            assert k.get_book_by_checksum(CHECKSUM)[0] is None
+        assert k.get_book_by_checksum(CHECKSUM)[0] == 7
+
+    assert not any("checksum index" in record.message for record in caplog.records)
+
+
+def test_a_wrong_version_miss_does_not_consume_the_affected_lookup(damaged_index_session, caplog):
+    session, checksum, _ = damaged_index_session
+    k = _kosync()
+
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        assert k.get_book_by_checksum(checksum, "unregistered-version")[0] is None
+        assert not any("checksum index" in record.message for record in caplog.records)
+        assert k.get_book_by_checksum(checksum, "koreader")[0] is None
+
+    warnings = [
+        record for record in caplog.records
+        if record.levelno == logging.WARNING and "checksum index" in record.message
+    ]
+    assert len(warnings) == 1
+
+
+def test_bulk_lookups_skip_index_diagnostics(session, caplog):
+    k = _kosync()
+    scans = []
+
+    def observe(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if "NOT INDEXED" in statement:
+            scans.append(statement)
+
+    event.listen(session.get_bind(), "before_cursor_execute", observe)
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        for i in range(6):
+            assert k.get_book_by_checksum(f"{i:032x}", diagnose_miss=False)[0] is None
+    assert not scans
+    assert not any("checksum index" in record.message for record in caplog.records)
+
+
+def test_full_scans_have_their_own_window_budget(session, monkeypatch):
+    k = _kosync()
+    scans = []
+
+    def observe(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if "NOT INDEXED" in statement:
+            scans.append(statement)
+
+    event.listen(session.get_bind(), "before_cursor_execute", observe)
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        for i in range(12):
+            k.get_book_by_checksum(f"{i:032x}")
+        assert 0 < len(scans) <= 4
+        count = len(scans)
+        next_window = k._miss_diag_window["start"] + k._MISS_DIAG_INTERVAL
+        monkeypatch.setattr(k.time, "monotonic", lambda: next_window)
+        k.get_book_by_checksum(f"{0:032x}")
+        assert len(scans) == count + 1
+
+
+def test_unindexed_orphan_is_reported_as_stale(damaged_index_session, caplog):
+    from cps.db import Books
+
+    session, checksum, book_id = damaged_index_session
+    session.execute(Books.__table__.delete().where(Books.id == book_id))
+    session.commit()
+
+    with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
+        assert _kosync().get_book_by_checksum(checksum)[0] is None
+
+    assert any(f"book id {book_id}" in record.message and "stale" in record.message
+               for record in caplog.records)
+    assert not any("checksum index" in record.message for record in caplog.records)

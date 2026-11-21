@@ -1710,6 +1710,18 @@ def _handle_check_for_changes():
 
 
 @csrf.exempt
+@readingservices_userstorage.route("/Metadata", methods=["GET"])
+def handle_user_storage_metadata():
+    if config.config_kobo_sync and not config.config_kobo_proxy:
+        # After local OAuth, Kobo refuses CWNG's bearer token. An empty metadata
+        # object lets the device continue syncing without consulting Kobo.
+        response = jsonify({})
+        response.cache_control.no_store = True
+        return response
+    return handle_user_storage("Metadata")
+
+
+@csrf.exempt
 @readingservices_userstorage.route("/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @requires_reading_services_auth_and_config
 def handle_user_storage(subpath):

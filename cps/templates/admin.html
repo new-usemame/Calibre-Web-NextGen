@@ -232,9 +232,15 @@
 
   <div class="row form-group">
     <h2>{{_('Administration&nbsp;&nbsp;🚀')}}</h2>
-    <a class="btn btn-primary" id="support_pack" href="{{url_for('admin.download_support_pack')}}" title="{{_('Sanitized: safe to attach to a public GitHub issue. Passwords, tokens, IPs, and install paths are scrubbed.')}}">{{_('Get Support Pack')}}</a>
-    <a class="btn btn-default" id="debug" href="{{url_for('admin.download_debug')}}" title="{{_('Full unredacted pack. Admin/private use only — contains secrets and IPs.')}}">{{_('Download Debug Package')}}</a>
+    <a class="btn btn-default" id="support_pack" data-pack-download href="{{url_for('admin.download_support_pack')}}" title="{{_('Sanitized: safe to attach to a public GitHub issue. Passwords, tokens, IPs, and install paths are scrubbed.')}}">{{_('Get Support Pack')}}</a>
+    <a class="btn btn-default" id="debug" data-pack-download href="{{url_for('admin.download_debug')}}" title="{{_('Full unredacted pack. Admin/private use only — contains secrets and IPs.')}}">{{_('Download Debug Package')}}</a>
     <a class="btn btn-default" id="logfile" href="{{url_for('admin.view_logfile')}}">{{_('View Logs')}}</a>
+    <span id="pack_status" class="pack-status" role="status" aria-live="polite" style="margin-left: 10px;"
+          data-preparing="{{_('Preparing the pack… this can take a little while. Please don\'t click again.')}}"
+          data-done="{{_('Your download has started.')}}"
+          data-busy="{{_('A pack is already being prepared. Please wait a few seconds, then try again.')}}"
+          data-failed="{{_('The pack could not be created. Please try again, or check the logs.')}}"
+          data-timeout="{{_('This is taking longer than expected. If nothing downloads, wait a minute and try again.')}}"></span>
   </div>
   <div class="row form-group">
     <div class="btn btn-default" id="restart_database" data-toggle="modal" data-target="#StatusDialog">{{_('Reconnect Calibre Database')}}</div>
@@ -345,6 +351,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block js %}
+<script src="{{ url_for('static', filename='js/support_pack_download.js') }}"></script>
 {% endblock %}
 {% block modal %}
 {{ change_confirm_modal() }}

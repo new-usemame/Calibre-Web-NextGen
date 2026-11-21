@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
@@ -22,6 +23,7 @@ from flask_babel.speaklater import LazyString
 
 from . import logger, config, constants, support_pack_state
 from .about import collect_stats
+from .services import parallel
 
 log = logger.create()
 
@@ -552,39 +554,69 @@ def _known_usernames():
         return None
 
 
-def _build_debug_zip(sanitize: bool):
-    """Build the in-memory debug pack. When ``sanitize`` is True the
-    settings file is redacted and every log line is scrubbed for IPs,
-    paths, and auth headers."""
-    file_list = glob.glob(logger.get_logfile(config.config_logfile) + '*')
-    file_list.extend(glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*'))
+def _prepare_pack(sanitize: bool) -> dict:
+    """Everything the pack needs from live application state.
+
+    Runs on the request greenlet, on purpose. The database session, the
+    config object and the worker's task list are not safe to touch from the
+    offload thread while other requests use them, so they are read here, into
+    plain data. ``_assemble_pack`` then does the heavy file work on that data
+    and nothing else.
+    """
+    app_logs = glob.glob(logger.get_logfile(config.config_logfile) + '*')
+    access_logs = glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*')
     for element in [logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR]:
-        if element in file_list:
-            file_list.remove(element)
+        for files in (app_logs, access_logs):
+            if element in files:
+                files.remove(element)
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
+    names = None
+    if sanitize:
+        settings_dict = _redact_for_export(settings_dict)
+        names = _known_usernames()
+    return {
+        "sanitize": sanitize,
+        "app_logs": app_logs,
+        "access_logs": access_logs,
+        "settings": settings_dict,
+        "libs": libs_dict,
+        "paths": _resolve_state_paths(),
+        "integrations": _resolve_integration_inputs(),
+        "names": names,
+    }
+
+
+def _assemble_pack(prep: dict):
+    """Build the in-memory zip from ``_prepare_pack``'s data.
+
+    Pure file and SQLite work, so it is safe to run on the offload pool, which
+    is where the endpoints run it: reading, scrubbing and compressing logs is
+    seconds of CPU on a Raspberry Pi, and gevent here is not monkey-patched, so
+    doing it on the request greenlet froze every other request until it
+    finished.
+    """
+    sanitize = prep["sanitize"]
     state_files = support_pack_state.collect_all(
-        _resolve_state_paths(), sanitized=sanitize, integrations=_resolve_integration_inputs()
+        prep["paths"], sanitized=sanitize, integrations=prep["integrations"]
     )
     scrubber = None
     note = _SANITIZED_NOTE
     if sanitize:
-        settings_dict = _redact_for_export(settings_dict)
-        names = _known_usernames()
-        scrubber = _LogScrubber(known_names=names or ())
-        if names is None:
+        scrubber = _LogScrubber(known_names=prep["names"] or ())
+        if prep["names"] is None:
             note += _USERNAME_LOOKUP_FAILED_NOTE
 
     memory_zip = BytesIO()
     with zipfile.ZipFile(memory_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('settings.txt', json.dumps(settings_dict, sort_keys=True, indent=2))
-        zf.writestr('libs.txt', json.dumps(libs_dict, sort_keys=True, indent=2, cls=lazyEncoder))
+        zf.writestr('settings.txt', json.dumps(prep["settings"], sort_keys=True, indent=2))
+        zf.writestr('libs.txt', json.dumps(prep["libs"], sort_keys=True, indent=2, cls=lazyEncoder))
         for state_name, state_bytes in state_files.items():
             zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
-        for fp in file_list:
+        for fp in prep["app_logs"] + prep["access_logs"]:
             if sanitize:
                 with open(fp, 'rb') as fd:
                     raw = fd.read()
@@ -593,6 +625,12 @@ def _build_debug_zip(sanitize: bool):
                 zf.write(fp, os.path.basename(fp))
     memory_zip.seek(0)
     return memory_zip
+
+
+def _build_debug_zip(sanitize: bool):
+    """Build the pack synchronously: prepare, then assemble. The endpoints use
+    ``_get_pack`` instead, which assembles off the request greenlet."""
+    return _assemble_pack(_prepare_pack(sanitize))
 
 
 _USERNAME_LOOKUP_FAILED_NOTE = (
@@ -634,6 +672,56 @@ _SANITIZED_NOTE = (
 )
 
 
+class PackBusy(Exception):
+    """A pack is already being built."""
+
+
+# One pack at a time, across both kinds. The flag is guarded by a real lock
+# that is only held for the two assignments, never across the build, so
+# taking it cannot block the hub.
+_pack_state_lock = threading.Lock()
+_pack_in_progress = False
+
+PACK_BUSY_RETRY_SECONDS = 10
+
+
+def _get_pack(sanitize: bool) -> bytes:
+    """Build a pack without freezing the app, one at a time.
+
+    * Off the hub: inputs are read here on the request greenlet, and the file
+      work runs on the shared offload pool (``parallel.run_blocking``), so
+      every other request keeps being served while a pack builds.
+    * Single-flight: a second request while one is building raises
+      ``PackBusy`` straight away instead of queueing another build behind it.
+      Before this, fifteen clicks meant fifteen serial builds on the one
+      thread everything shares, a reverse-proxy 504, and an app that stayed
+      frozen until it was restarted.
+    """
+    global _pack_in_progress
+    with _pack_state_lock:
+        if _pack_in_progress:
+            raise PackBusy()
+        _pack_in_progress = True
+    try:
+        prep = _prepare_pack(sanitize)
+        return parallel.run_blocking(lambda: _assemble_pack(prep).getvalue())
+    finally:
+        with _pack_state_lock:
+            _pack_in_progress = False
+
+
+def _busy_response():
+    """429 with ``Retry-After``: the same pack is already being prepared."""
+    body = json.dumps({
+        "success": False,
+        "busy": True,
+        "message": "A support pack is already being prepared. Please wait a few seconds, "
+                   "then try again.",
+    })
+    return body, 429, {"Content-Type": "application/json",
+                       "Retry-After": str(PACK_BUSY_RETRY_SECONDS)}
+
+
 def _pack_filename(stem: str, now=None) -> str:
     """``YYYYMMDD-HHMMSSZ-<stem>.zip``, stamped in UTC, timestamp first.
 
@@ -654,13 +742,19 @@ def _send_zip(memory_zip, filename: str):
     return send_file(memory_zip, as_attachment=True, download_name=filename)
 
 
+def _send_pack(sanitize: bool, stem: str):
+    try:
+        data = _get_pack(sanitize)
+    except PackBusy:
+        return _busy_response()
+    return _send_zip(BytesIO(data), _pack_filename(stem))
+
+
 def send_debug():
     """Unsanitized debug pack — admin/internal use only."""
-    return _send_zip(_build_debug_zip(sanitize=False),
-                     _pack_filename("Calibre-Web-NextGen-debug-pack"))
+    return _send_pack(False, "Calibre-Web-NextGen-debug-pack")
 
 
 def send_debug_sanitized():
     """Sanitized debug pack — safe to share in public issues."""
-    return _send_zip(_build_debug_zip(sanitize=True),
-                     _pack_filename("Calibre-Web-NextGen-support-pack"))
+    return _send_pack(True, "Calibre-Web-NextGen-support-pack")

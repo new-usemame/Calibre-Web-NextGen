@@ -352,8 +352,8 @@ class TestDownloadFilename:
         from cps import debug_info
 
         built, sent = [], {}
-        monkeypatch.setattr(debug_info, "_build_debug_zip",
-                            lambda sanitize: built.append(sanitize) or io.BytesIO(b"zip"))
+        monkeypatch.setattr(debug_info, "_get_pack",
+                            lambda sanitize: built.append(sanitize) or b"zip")
         monkeypatch.setattr(debug_info, "send_file", lambda *a, **kw: sent.update(kw) or "sent")
         assert getattr(debug_info, endpoint)() == "sent"
         assert built == [sanitize]
@@ -367,7 +367,7 @@ class TestDownloadFilename:
 
         sent = {}
         monkeypatch.setattr(debug_info.importlib.metadata, "version", lambda _name: "1.1.4")
-        monkeypatch.setattr(debug_info, "_build_debug_zip", lambda sanitize: io.BytesIO(b"zip"))
+        monkeypatch.setattr(debug_info, "_get_pack", lambda sanitize: b"zip")
         monkeypatch.setattr(debug_info, "send_file", lambda *a, **kw: sent.update(kw) or "sent")
         debug_info.send_debug_sanitized()
         assert "attachment_filename" in sent and "download_name" not in sent

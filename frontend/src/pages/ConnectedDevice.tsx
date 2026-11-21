@@ -5,6 +5,7 @@ import { useDevice, useDeviceSources, type DeviceEntry, type DeviceSource } from
 import { useMe, useUploadBooks } from '../lib/queries';
 import { canUploadBooks } from '../lib/permissions';
 import { ApiError } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { BookCover } from '../components/BookCover';
@@ -216,7 +217,7 @@ export function ConnectedDevice({ id }: { id: string }) {
                       <BookCover coverUrl={e.book!.cover_url} title={e.book!.title} authors={e.book!.authors} />
                     </div>
                     <span className={styles.tileTitle}>{e.book!.title}</span>
-                    <span className={styles.tileMeta}>{e.book!.authors.join(', ')}</span>
+                    <span className={styles.tileMeta}>{formatAuthors(e.book!.authors)}</span>
                     <span className={styles.tileMeta}>{e.ext.toUpperCase()} · {formatBytes(e.size)}</span>
                   </Link>
                 </li>

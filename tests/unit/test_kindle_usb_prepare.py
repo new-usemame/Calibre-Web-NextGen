@@ -6,14 +6,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import flask
 import pytest
-
-
-def _ctx(path="/api/v1/books/5/kindle-usb"):
-    app = flask.Flask(__name__)
-    app.config["WTF_CSRF_ENABLED"] = False
-    return app.test_request_context(path, method="POST")
 
 
 def _user(download=True, anon=False, edit=True):
@@ -31,13 +24,14 @@ def _book(formats, title="Dune", authors=("Frank Herbert",)):
 
 
 def _call(book, *, converter="/usr/bin/ebook-convert", convert_result=None, user=None, enabled=True):
+    from cps import app
     from cps.api import actions as mod
     db = MagicMock()
     db.get_filtered_book.return_value = book
     db.get_book_format.side_effect = lambda _id, fmt: SimpleNamespace(name="Dune - Frank Herbert", format=fmt)
     cfg = SimpleNamespace(config_kindle_usb_enabled=enabled, config_converterpath=converter,
                           get_book_path=lambda: "/books")
-    with _ctx():
+    with app.test_request_context("/api/v1/books/5/kindle-usb", method="POST"):
         with patch.object(mod, "current_user", user or _user()), \
              patch.object(mod, "calibre_db", db), \
              patch.object(mod, "config", cfg), \

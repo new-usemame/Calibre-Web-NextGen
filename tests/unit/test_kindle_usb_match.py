@@ -6,7 +6,6 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import flask
 import pytest
 
 from cps.services import kindle_usb as ku
@@ -71,11 +70,12 @@ def test_pipe_escaped_commas_in_author_names():
 
 
 def _call(body, *, download=True, rows=(), books=(), cover="/cover/1", enabled=True):
+    from cps import app
     from cps.api import actions as mod
     db = MagicMock()
     query = db.session.query.return_value
     query.filter.return_value.all.side_effect = [list(rows), list(books)]
-    with flask.Flask(__name__).test_request_context(
+    with app.test_request_context(
             "/api/v1/kindle-usb/resolve", method="POST", json=body, content_type="application/json"):
         user = SimpleNamespace(is_authenticated=True, is_anonymous=False, id=1, role_download=lambda: download)
         with patch.object(mod, "current_user", user), patch.object(mod, "calibre_db", db), \

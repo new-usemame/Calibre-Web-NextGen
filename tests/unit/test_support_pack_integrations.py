@@ -327,13 +327,21 @@ class TestDownloadFilename:
 
         moment = datetime(2026, 11, 20, 2, 16, 37, tzinfo=timezone.utc)
         assert _pack_filename("Calibre-Web-NextGen-support-pack", moment) == \
-            "Calibre-Web-NextGen-support-pack-20261120-021637Z.zip"
+            "20261120-021637Z-Calibre-Web-NextGen-support-pack.zip"
 
     def test_default_is_now_and_well_formed(self):
         from cps.debug_info import _pack_filename
 
-        assert re.fullmatch(r"Calibre-Web-NextGen-support-pack-\d{8}-\d{6}Z\.zip",
+        assert re.fullmatch(r"\d{8}-\d{6}Z-Calibre-Web-NextGen-support-pack\.zip",
                             _pack_filename("Calibre-Web-NextGen-support-pack"))
+
+    def test_names_sort_chronologically(self):
+        from datetime import datetime, timezone
+        from cps.debug_info import _pack_filename
+
+        earlier = _pack_filename("Calibre-Web-NextGen-support-pack", datetime(2026, 11, 9, 23, 59, 59, tzinfo=timezone.utc))
+        later = _pack_filename("Calibre-Web-NextGen-support-pack", datetime(2026, 11, 10, 0, 0, 1, tzinfo=timezone.utc))
+        assert sorted([later, earlier]) == [earlier, later]
 
     @pytest.mark.parametrize("endpoint, sanitize, stem", [
         ("send_debug_sanitized", True, "Calibre-Web-NextGen-support-pack"),
@@ -350,7 +358,7 @@ class TestDownloadFilename:
         assert getattr(debug_info, endpoint)() == "sent"
         assert built == [sanitize]
         name = sent.get("download_name") or sent.get("attachment_filename")
-        assert re.fullmatch(stem + r"-\d{8}-\d{6}Z\.zip", name)
+        assert re.fullmatch(r"\d{8}-\d{6}Z-" + stem + r"\.zip", name)
         assert sent["as_attachment"] is True
 
     def test_old_flask_uses_attachment_filename(self, monkeypatch):

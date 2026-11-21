@@ -573,15 +573,16 @@ _SANITIZED_NOTE = (
 
 
 def _pack_filename(stem: str, now=None) -> str:
-    """``<stem>-YYYYMMDD-HHMMSSZ.zip``, stamped in UTC.
+    """``YYYYMMDD-HHMMSSZ-<stem>.zip``, stamped in UTC, timestamp first.
 
     Several packs from the same instance land in one Downloads folder (and in
-    one issue), so the name says when each was made. UTC, because the pack is
-    read by people in other timezones and ``manifest.json`` records
-    ``generated_at_utc``; the trailing ``Z`` says so.
+    one issue), so the name says when each was made, and leading with the
+    stamp makes a folder listing sort chronologically. UTC, because the pack
+    is read by people in other timezones and ``manifest.json`` records
+    ``generated_at_utc``; the ``Z`` says so.
     """
     moment = now if now is not None else datetime.now(timezone.utc)
-    return f"{stem}-{moment:%Y%m%d-%H%M%S}Z.zip"
+    return f"{moment:%Y%m%d-%H%M%S}Z-{stem}.zip"
 
 
 def _send_zip(memory_zip, filename: str):

@@ -1715,7 +1715,9 @@ def handle_user_storage_metadata():
     if config.config_kobo_sync and not config.config_kobo_proxy:
         # After local OAuth, Kobo refuses CWNG's bearer token. An empty metadata
         # object lets the device continue syncing without consulting Kobo.
-        return jsonify({})
+        response = jsonify({})
+        response.cache_control.no_store = True
+        return response
     return handle_user_storage("Metadata")
 
 

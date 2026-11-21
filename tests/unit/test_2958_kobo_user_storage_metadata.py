@@ -27,6 +27,7 @@ def test_proxy_off_metadata_read_is_local_after_oauth(kobo_app, requests_mock):
 
     assert response.status_code == 200
     assert response.json == {}
+    assert response.cache_control.no_store
     assert requests_mock.call_count == 0
 
 

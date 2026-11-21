@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import math
+import os
 import tempfile
 from datetime import datetime, timezone
 
@@ -1292,12 +1293,45 @@ def list_books():
         except BookExportRequestError as exc:
             return jsonify({"error": {"code": exc.code, "message": exc.message}}), exc.status
         query = _join_sort(query, sort_context)
-        total = query.with_entities(db.Books.id).order_by(None).distinct().count()
-        if select_all:
-            ids = [row[0] for row in query.with_entities(db.Books.id)
-                   .order_by(*order).limit(per_page).all()]
-            return _selection_response(ids, total)
-        entries = query.order_by(*order).offset(offset).limit(per_page).all()
+        id_query = query.with_entities(db.Books.id)
+        counts = id_query.order_by(None).distinct()
+        result = None
+        worker_enabled = os.environ.get("CWNG_EXPERIMENTAL_SEARCH_WORKER") == "1"
+        if worker_enabled and search and (select_all or 0 < per_page <= 500):
+            from ..services import catalog_search_worker
+            combined = None
+            if (not select_all and sort_context["sort"] == "new"
+                    and os.environ.get("CWNG_EXPERIMENTAL_SEARCH_SINGLE_SCAN") == "1"):
+                # Each ID has a single timestamp, even when the joins produce
+                # duplicates. Count the distinct, visible IDs before paging.
+                matches = query.with_entities(db.Books.id, db.Books.timestamp).order_by(None).distinct().subquery()
+                combined = select(matches.c.id, func.count().over()).order_by(
+                    matches.c.timestamp.desc(), matches.c.id.desc()
+                ).offset(offset).limit(per_page)
+            try:
+                result = catalog_search_worker.select_page(
+                    query.session, select(func.count()).select_from(counts.subquery()),
+                    id_query.order_by(*order).offset(offset).limit(per_page).statement, request.environ,
+                    combined=combined,
+                )
+            except catalog_search_worker.SearchBusy:
+                return jsonify({"error": {"code": "search_busy",
+                                         "message": "Please retry the search."}}), 503, {"Retry-After": "1"}
+        if result is None:
+            total = counts.count()
+            if select_all:
+                ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
+                return _selection_response(ids, total)
+            entries = query.order_by(*order).offset(offset).limit(per_page).all()
+        else:
+            total, ids = result
+            if select_all:
+                return _selection_response(ids, total)
+            # Keep visibility and all other predicates live during hydration.
+            # Use the worker's page order even for sort keys that have ties.
+            rows = query.filter(db.Books.id.in_(ids)).all() if ids else []
+            by_id = {row.Books.id: row for row in rows}
+            entries = [by_id[i] for i in ids if i in by_id]
         entries = calibre_db.order_authors(entries, list_return=True, combined=True)
         return jsonify(_with_sort({
             "items": to_items(entries),

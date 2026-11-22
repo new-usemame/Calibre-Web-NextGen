@@ -693,6 +693,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // must reset rather than append the new set onto the old (#928).
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', encodeURIComponent(tagPath ?? ''), perPage, showHidden,
     filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
+  const [pagingKey, setPagingKey] = useState(resetKey);
 
   useLayoutEffect(() => {
     if (!changedDiscover) return;
@@ -701,9 +702,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     setSelected(new Set());
     setPage(1); setAllBooks([]); accKeyRef.current = '';
   }, [changedDiscover, discoverIdentity]);
-  // Use page 1 in this render, before the effect updates pagination. Otherwise
-  // changing selection on a loaded page can issue the new query at the old offset.
-  const requestPage = changedLibrary || changedDiscover ? 1 : page;
+  // Reset the request in this render. A later page cached under the new sort
+  // or filter could otherwise reach the accumulator ahead of page 1.
+  const requestPage = changedLibrary || changedDiscover || pagingKey !== resetKey ? 1 : page;
   useEffect(() => {
     if (!changedLibrary) return;
     previousLibraryScope.current = libraryScope;
@@ -715,12 +716,12 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // Any filter change resets paging to the first page — except on the first
   // restored mount, where the rehydrated page must survive (#578).
   useEffect(() => {
-    if (restoringRef.current) return;
+    if (pagingKey === resetKey) return;
+    setPagingKey(resetKey);
     setPage(1);
-  }, [resetKey]);
+  }, [pagingKey, resetKey]);
 
-  // Clear the restoring flag after the initial mount so later filter/URL changes
-  // behave normally. Runs after the two guarded effects above (effect order).
+  // Clear the restoring flag after the initial URL sync effect.
   useEffect(() => {
     restoringRef.current = false;
   }, []);

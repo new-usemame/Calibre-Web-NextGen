@@ -22962,3 +22962,23 @@ msgstr "Afficher la section Lu / Non lu"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Note de la bibliothèque Calibre (1–10)"
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Preparing the pack… this can take a little while. Please don't click again."
+msgstr "Préparation du pack… cela peut prendre un moment. Merci de ne pas cliquer à nouveau."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Your download has started."
+msgstr "Votre téléchargement a démarré."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "A pack is already being prepared. Please wait a few seconds, then try again."
+msgstr "Un pack est déjà en cours de préparation. Patientez quelques secondes, puis réessayez."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "The pack could not be created. Please try again, or check the logs."
+msgstr "Le pack n’a pas pu être créé. Réessayez, ou consultez les journaux."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "This is taking longer than expected. If nothing downloads, wait a minute and try again."
+msgstr "Cela prend plus de temps que prévu. Si rien ne se télécharge, patientez une minute puis réessayez."

@@ -39,6 +39,7 @@ test('Help menu shows the item only behind the predicate, as a download with no 
   assert.match(item[0], /SUPPORT_PACK_URL/);
   assert.match(item[0], /\bdownload\b/);
   assert.match(item[0], /t\('Get Support Pack'\)/);
+  assert.match(item[0], /onDownload=\{pack\.start\}/);
 
   // The download variant must not open a tab or route through the SPA.
   const variant = topBar.match(/if \(href && download\) \{[\s\S]*?\n  \}/);

@@ -302,6 +302,40 @@ test('admin Help menu offers the support pack as an in-place download of the san
   await expect(packLink).not.toHaveAttribute('target', /.*/);
 });
 
+test('admin Help menu shows progress while a pack builds, ignores further clicks, then reports busy', async ({ page }) => {
+  let requests = 0;
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  // Hold the request open (the pack is being built), then answer the way the
+  // server does when a pack is already being prepared.
+  await page.route('**/admin/debug/support-pack*', async (route) => {
+    requests += 1;
+    await held;
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      headers: { 'Retry-After': '10' },
+      body: JSON.stringify({ success: false, busy: true, message: 'A support pack is already being prepared.' }),
+    });
+  });
+
+  await page.getByRole('button', { name: /^Help(?: — new updates available)?$/ }).click();
+  const panel = page.getByText('Help & support').locator('..');
+  const packLink = panel.getByRole('link', { name: 'Get Support Pack' });
+  await packLink.click();
+
+  await expect(panel.getByText(/Preparing the pack/)).toBeVisible();
+  await expect(packLink).toHaveAttribute('aria-busy', 'true');
+  // Clicking again while it builds does nothing: still one request.
+  await packLink.click();
+  await packLink.click();
+  expect(requests).toBe(1);
+
+  release();
+  await expect(panel.getByText(/A pack is already being prepared/)).toBeVisible();
+  await expect(packLink).not.toHaveAttribute('aria-busy', 'true');
+});
+
 test('Help menu renders the Ko-fi label from an authenticated translated catalog', async ({ page }) => {
   await page.route('**/api/v1/auth/me', async (route) => {
     const response = await route.fetch();

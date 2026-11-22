@@ -37,11 +37,11 @@ def inventory_protocol(tmp_path, monkeypatch):
         EPUB_CHECKSUM: (42, "EPUB", "Same work", "Author/Same work", "koreader"),
         MOBI_CHECKSUM: (42, "MOBI", "Same work", "Author/Same work", "koreader"),
     }
-    monkeypatch.setattr(
-        module,
-        "get_book_by_checksum",
-        lambda checksum: matches.get(checksum, (None, None, None, None, None)),
-    )
+    def lookup(checksum, *, diagnose_miss):
+        assert diagnose_miss is False
+        return matches.get(checksum, (None, None, None, None, None))
+
+    monkeypatch.setattr(module, "get_book_by_checksum", lookup)
 
     app = Flask(__name__)
     app.secret_key = "inventory-test-secret"

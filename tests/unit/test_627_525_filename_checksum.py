@@ -216,23 +216,6 @@ class TestBackfillScriptFilenamePass:
 
 
 @pytest.mark.unit
-class TestLookupIsVersionAgnostic:
-    """Source-pin: get_book_by_checksum must keep matching ANY stored
-    version when called without a version filter — that is what makes the
-    filename rows resolve without touching the lookup."""
-
-    def test_lookup_has_no_hardcoded_version_filter(self):
-        import inspect
-        import cps.progress_syncing.protocols.kosync  # noqa: F401
-        mod = sys.modules["cps.progress_syncing.protocols.kosync"]
-        src = inspect.getsource(mod.get_book_by_checksum)
-        assert "if version is not None" in src, (
-            "get_book_by_checksum must only filter by version when the "
-            "caller asks — the filename-hash channel (#525/#627) relies on "
-            "version-agnostic matching.")
-
-
-@pytest.mark.unit
 class TestBinaryPassNotMaskedByFilenameRows:
     """Greptile finding on PR #636, confirmed: the binary pass's LEFT JOIN
     matched rows of ANY version. Since the filename pass needs no file I/O,

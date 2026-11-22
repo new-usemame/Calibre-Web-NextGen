@@ -218,6 +218,71 @@ def kobo_device_xpointer(epub_path, kepub_path, source: str, span_id: str,
     return xpointer
 
 
+def kobo_span_percent(epub_path, kepub_path, source: str, span_id: str) -> Optional[float]:
+    """CrossPoint's percentage (0-100) of a Kobo span, or ``None``.
+
+    Computed on ``epub_path`` (``kepub_alignment.span_book_percent``), and
+    only if neither file changed while it was read.
+    """
+    from .kepub_alignment import span_book_percent
+    try:
+        path, kepub = os.fspath(epub_path), os.fspath(kepub_path)
+        before = (_identity(path), _identity(kepub))
+        percent = span_book_percent(path, kepub, source, span_id)
+        if percent is None or (_identity(path), _identity(kepub)) != before:
+            return None
+    except (OSError, TypeError):
+        return None
+    return percent
+
+
+def kobo_share_percent(*, book_id, device_id, location) -> Optional[float]:
+    """The percentage CrossPoint would show at a Kobo's reported place, or ``None``.
+
+    A Kobo reports a whole percentage, measured on its own KEPUB. The span
+    in ``location`` gives a finer one, measured as CrossPoint measures the
+    library EPUB, so the two readers compare and show like values. Only when
+    device ``device_id`` holds the library KEPUB as it is now
+    (``_holds_library_kepub``), so the span is this file's.
+    """
+    from .. import calibre_db
+    from ..annotations import _book_format_path
+    from .parallel import run_blocking
+
+    if (device_id is None or not isinstance(location, dict)
+            or location.get("Type") != "KoboSpan"):
+        return None
+    source, span_id = location.get("Source"), location.get("Value")
+    if not source or not span_id:
+        return None
+    book = calibre_db.get_book(int(book_id))
+    if book is None:
+        return None
+    epub_path = _book_format_path(book, "EPUB")
+    kepub_path = _book_format_path(book, "KEPUB")
+    if not epub_path or not kepub_path:
+        return None
+    if not _holds_library_kepub([device_id], book_id, kepub_path):
+        return None
+    return run_blocking(lambda: kobo_span_percent(epub_path, kepub_path, source, span_id))
+
+
+def _holds_library_kepub(device_ids, book_id, kepub_path) -> bool:
+    """True when one of the Kobos downloaded the book as a KEPUB no earlier
+    than the library KEPUB was last written, so its span ids are this file's."""
+    from .. import ub
+    try:
+        written = datetime.fromtimestamp(os.stat(kepub_path).st_mtime, timezone.utc)
+    except OSError:
+        return False
+    downloads = ub.session.query(ub.KoboDeviceBookDownload.downloaded_at).filter(
+        ub.KoboDeviceBookDownload.device_id.in_(device_ids),
+        ub.KoboDeviceBookDownload.book_id == int(book_id),
+        func.lower(ub.KoboDeviceBookDownload.book_format) == "kepub",
+    ).all()
+    return any(_utc(at) >= written for (at,) in downloads if at is not None)
+
+
 def kobo_position_for_device(*, user_id, book_id, record, document) -> Optional[str]:
     """The XPointer, in the requesting device's file, of a Kobo's place.
 
@@ -225,14 +290,16 @@ def kobo_position_for_device(*, user_id, book_id, record, document) -> Optional[
     qualifies only when a Kobo wrote it (a percentage-only row) and the span
     behind it is known for certain:
 
-    * the user's Kobo bookmark is a ``KoboSpan`` at exactly the row's
-      percentage, and it is the latest report of one of the user's Kobos
-      (that device's journal row holds the same location and percentage), so
-      the span is the place the row was made from, not a place the server
-      re-placed since (a re-anchored book arms a latch and moves the bookmark
-      away from the device's own report);
+    * the user's Kobo bookmark is a ``KoboSpan``, and it is the latest
+      report of one of the user's Kobos (that device's journal row holds the
+      same location and percentage), so the span is the place the row was
+      made from, not a place the server re-placed since (a re-anchored book
+      arms a latch and moves the bookmark away from the device's own report);
     * that Kobo downloaded the book as a KEPUB no earlier than the library
-      KEPUB was last written, so the span ids it reports are this file's.
+      KEPUB was last written, so the span ids it reports are this file's;
+    * the row holds the bookmark's own percentage, or the CrossPoint
+      percentage of the bookmark's span (``kobo_share_percent`` wrote it
+      from that span, and the same files give the same value).
 
     The XPointer is then derived per request, and only if ``document`` -- the
     digest the device asked with -- is the library EPUB's
@@ -255,7 +322,7 @@ def kobo_position_for_device(*, user_id, book_id, record, document) -> Optional[
     ).first()
     if (bookmark is None or bookmark.location_type != "KoboSpan"
             or not bookmark.location_source or not bookmark.location_value
-            or bookmark.progress_percent != record.percentage):
+            or bookmark.progress_percent is None):
         return None
     reporters = [device_id for (device_id,) in ub.session.query(
         ub.DeviceReadingPosition.device_id,
@@ -268,7 +335,7 @@ def kobo_position_for_device(*, user_id, book_id, record, document) -> Optional[
         ub.DeviceReadingPosition.location_type == bookmark.location_type,
         ub.DeviceReadingPosition.location_source == bookmark.location_source,
         ub.DeviceReadingPosition.location_value == bookmark.location_value,
-        ub.DeviceReadingPosition.progress_percent == record.percentage,
+        ub.DeviceReadingPosition.progress_percent == bookmark.progress_percent,
     )]
     if not reporters:
         return None
@@ -279,19 +346,17 @@ def kobo_position_for_device(*, user_id, book_id, record, document) -> Optional[
     kepub_path = _book_format_path(book, "KEPUB")
     if not epub_path or not kepub_path:
         return None
-    try:
-        written = datetime.fromtimestamp(os.stat(kepub_path).st_mtime, timezone.utc)
-    except OSError:
+    if not _holds_library_kepub(reporters, book_id, kepub_path):
         return None
-    downloads = ub.session.query(ub.KoboDeviceBookDownload.downloaded_at).filter(
-        ub.KoboDeviceBookDownload.device_id.in_(reporters),
-        ub.KoboDeviceBookDownload.book_id == int(book_id),
-        func.lower(ub.KoboDeviceBookDownload.book_format) == "kepub",
-    ).all()
-    if not any(_utc(at) >= written for (at,) in downloads if at is not None):
-        return None
-    return run_blocking(lambda: kobo_device_xpointer(
-        epub_path, kepub_path, bookmark.location_source, bookmark.location_value, document))
+    source, span_id = bookmark.location_source, bookmark.location_value
+    shared, own = record.percentage, bookmark.progress_percent
+
+    def place():
+        if shared != own and shared != kobo_span_percent(epub_path, kepub_path, source, span_id):
+            return None
+        return kobo_device_xpointer(epub_path, kepub_path, source, span_id, document)
+
+    return run_blocking(place)
 
 
 def _utc(value: datetime) -> datetime:

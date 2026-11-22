@@ -39,6 +39,14 @@ export function UploadImportWatcher() {
     if (recordLibraryTotal(probe.data.total)) void refreshLibraryViews(qc);
   }, [probe.dataUpdatedAt]);
 
+  // Disabling the query stops its interval but not a retry it already
+  // scheduled: react-query's retryer runs a failed probe again (three times by
+  // default) even after the watch ended. Cancel it, so a watch that stalled on
+  // a failing server makes no request after its deadline.
+  useEffect(() => {
+    if (!watching) void qc.cancelQueries({ queryKey: ['upload-import-probe'] });
+  }, [watching, qc]);
+
   // A deadline must not depend on a successful HTTP response. Otherwise a
   // disconnected server leaves the watcher (and its polling) alive forever.
   useEffect(() => {

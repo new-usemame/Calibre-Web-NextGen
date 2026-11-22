@@ -34,11 +34,13 @@ for(const theme of ['light','dark']) {
     await page.goto('/app/admin#email-settings');
     await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
     const form=page.locator('#email-settings');
+    // The form has two live regions since #2772: the mail-status line and the save message.
+    const saved=form.getByRole('status').and(form.locator(':not([data-testid="mail-status"])'));
     const template=form.getByRole('textbox',{name:'eReader attachment filename template',exact:true});
     await expect(template).toBeVisible();await expect(template).toHaveValue('');
     await expect(template).toHaveAttribute('aria-describedby','mail-filename-help mail-filename-conditional');
     await template.fill('{series} #{series_index} - {title}');await template.press('Enter');
-    await expect(form.getByRole('status')).toHaveText('Email settings saved.');
+    await expect(saved).toHaveText('Email settings saved.');
     await expect.poll(()=>writes.length).toBe(1);
     expect(writes[0].mail_filename_template).toBe('{series} #{series_index} - {title}');
     expect(writes[0]).not.toHaveProperty('mail_password');
@@ -49,7 +51,7 @@ for(const theme of ['light','dark']) {
       && response.request().method()==='POST'
       && response.request().postDataJSON().mail_filename_template==='{title.__class__}');
     await template.press('Enter');expect((await rejection).status()).toBe(400);
-    await expect(form.getByRole('status')).toHaveText('Use a valid attachment filename template with supported metadata fields.');
+    await expect(saved).toHaveText('Use a valid attachment filename template with supported metadata fields.');
     await expect(template).toHaveValue('{title.__class__}');
     expect(cfg.mail_filename_template).toBe('{series} #{series_index} - {title}');
     await assertNoHorizontalOverflow(page);
@@ -58,7 +60,7 @@ for(const theme of ['light','dark']) {
     await page.screenshot({path:test.info().outputPath(`mail-template-${theme}.jpg`),type:'jpeg',quality:75});
     await template.fill('');await template.press('Tab');
     await expect(form.getByRole('button',{name:'Save email settings',exact:true})).toBeFocused();
-    await page.keyboard.press('Enter');await expect(form.getByRole('status')).toHaveText('Email settings saved.');
+    await page.keyboard.press('Enter');await expect(saved).toHaveText('Email settings saved.');
     await expect.poll(()=>cfg.mail_filename_template).toBe('');
     await page.reload();await expect(template).toHaveValue('');
     // Chromium reports the intentionally asserted failed fetch in the console;

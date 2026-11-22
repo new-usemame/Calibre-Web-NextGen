@@ -1235,15 +1235,17 @@ class EpubProgressCalculator:
             return None
 
         normalized_chapter = chapter_filename.replace('\\', '/')
-        target_chapter_index = None
-        
-        for idx, spine_item in enumerate(self.spine_items):
-            if normalized_chapter in spine_item or spine_item.endswith(normalized_chapter):
-                target_chapter_index = idx
-                break
-        
-        if target_chapter_index is None:
+        matches = [idx for idx, item in enumerate(self.spine_items)
+                   if item == normalized_chapter]
+        if not matches:
+            # Kobo may omit the OPF directory. Match complete path components;
+            # c1.html must not match intro-c1.html, and an ambiguous basename
+            # supplies no trustworthy position.
+            matches = [idx for idx, item in enumerate(self.spine_items)
+                       if item.endswith('/' + normalized_chapter)]
+        if len(matches) != 1:
             return None
+        target_chapter_index = matches[0]
         
         chars_before = sum(self.chapter_lengths[:target_chapter_index])
         chars_in_chapter = self.chapter_lengths[target_chapter_index]
@@ -1638,6 +1640,7 @@ def _handle_check_for_changes():
         log.warning("Not proxying an unrecognized Kobo checkforchanges request")
         return jsonify([])
 
+    proxy_enabled = config.config_kobo_proxy
     filtered_ids = set()
     for index, entry in enumerate(entries):
         content_id = entry["ContentId"]
@@ -1652,10 +1655,21 @@ def _handle_check_for_changes():
                 content_id=content_id,
                 ownership=_capture_ownership_label(ownership),
                 authority_status=_capture_authority_status(ownership),
-                action="suppressed" if is_filtered else "proxied",
+                action="suppressed" if is_filtered or not proxy_enabled else "proxied",
             )
     outbound_entries = _filter_check_for_changes_entries(entries, filtered_ids)
     if not outbound_entries:
+        return jsonify([])
+    if not proxy_enabled:
+        # With the store proxy off the device's bearer token is one CWNG issued
+        # on /oauth/token, which readingservices.kobo.com always rejects with
+        # 401 (#2958), and a 401 surfaces on the device as a sync error. "[]"
+        # is the answer measured safe on hardware: Nickel then sends no
+        # annotations GET and keeps its local highlights for these books.
+        log.debug(
+            "Kobo store proxy is off; answering checkforchanges locally for "
+            "%d non-library content id(s)", len(outbound_entries),
+        )
         return jsonify([])
 
     outbound_body = json.dumps(
@@ -1693,6 +1707,18 @@ def _handle_check_for_changes():
                 action="suppressed" if is_filtered else "returned",
             )
     return jsonify(_filter_check_for_changes_entries(upstream_entries, filtered_ids))
+
+
+@csrf.exempt
+@readingservices_userstorage.route("/Metadata", methods=["GET"])
+def handle_user_storage_metadata():
+    if config.config_kobo_sync and not config.config_kobo_proxy:
+        # After local OAuth, Kobo refuses CWNG's bearer token. An empty metadata
+        # object lets the device continue syncing without consulting Kobo.
+        response = jsonify({})
+        response.cache_control.no_store = True
+        return response
+    return handle_user_storage("Metadata")
 
 
 @csrf.exempt

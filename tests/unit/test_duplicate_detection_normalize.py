@@ -100,3 +100,15 @@ def test_select_newest_and_oldest():
     new = _FakeBook(id=2, timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc))
     assert select_book_to_keep([old, new], "newest").id == 2
     assert select_book_to_keep([old, new], "oldest").id == 1
+
+
+def test_timestamp_tie_newest_and_oldest_keep_different_copies():
+    # Books imported in one batch can share a timestamp. "Keep the oldest copy" must not keep
+    # the same book as "Keep the newest copy": the book id (insertion order) breaks the tie.
+    same = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    a = _FakeBook(id=7, timestamp=same)
+    b = _FakeBook(id=3, timestamp=same)
+    for group in ([a, b], [b, a]):
+        assert select_book_to_keep(group, "newest").id == 7
+        assert select_book_to_keep(group, "oldest").id == 3
+        assert select_book_to_keep(group, "merge").id == 7

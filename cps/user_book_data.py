@@ -84,6 +84,8 @@ def _annotation_children():
         (ub.DeviceRetiredAssignment, ub.DeviceRetiredAssignment.annotation_id),
         (ub.AnnotationContentIdMigration,
          ub.AnnotationContentIdMigration.annotation_row_id),
+        # Holds the verbatim clipping text of a CrossPoint reader.
+        (ub.CrossPointClipping, ub.CrossPointClipping.annotation_id),
     )
 
 
@@ -104,7 +106,8 @@ def _delete_annotation(session, annotation):
 # still handled below.
 PER_USER_BOOK_MODELS = (
     "Annotation",            # + sync-target, device-state, retired-assignment,
-                             #   content-id journal and materialization children
+                             #   content-id journal, materialization and
+                             #   CrossPoint clipping children
     "Bookmark",
     "ReadBook",
     "KoboReadingState",      # + KoboBookmark/KoboStatistics children
@@ -267,9 +270,15 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
                                   > _READ_RANK.get(existing.read_status, 0))
             if replace_status:
                 existing.read_status = rb.read_status
+                existing.read_finished_at = (
+                    (rb.read_finished_at or rb.last_modified)
+                    if rb.read_status == ub.ReadBook.STATUS_FINISHED else None)
                 if has_paused:
                     chosen_clock = rb.last_modified
                     existing.read_status_choice_at = rb.read_status_choice_at
+            elif (existing.read_status == rb.read_status == ub.ReadBook.STATUS_FINISHED
+                    and _newer(rb.read_finished_at, existing.read_finished_at)):
+                existing.read_finished_at = rb.read_finished_at
             if not has_paused and _newer(rb.read_status_choice_at, existing.read_status_choice_at):
                 existing.read_status_choice_at = rb.read_status_choice_at
             existing.times_started_reading = \

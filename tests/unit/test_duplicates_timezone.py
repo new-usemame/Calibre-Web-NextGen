@@ -119,15 +119,15 @@ def _load_duplicates_module():
     return module
 
 
-def _book(ts):
-    return SimpleNamespace(timestamp=ts, data=[], tags=[], series=None, ratings=[], comments=[], publishers=[], pubdate=None, identifiers=[])
+def _book(ts, id=1):
+    return SimpleNamespace(id=id, timestamp=ts, data=[], tags=[], series=None, ratings=[], comments=[], publishers=[], pubdate=None, identifiers=[])
 
 
 def test_select_book_to_keep_handles_naive_and_aware():
     duplicates = _load_duplicates_module()
     naive = datetime(2024, 1, 1, 12, 0, 0)
     aware = datetime(2024, 1, 2, 12, 0, 0, tzinfo=timezone.utc)
-    books = [_book(naive), _book(aware)]
+    books = [_book(naive, 1), _book(aware, 2)]
 
     keep = duplicates.select_book_to_keep(books, "newest")
     assert keep.timestamp == aware

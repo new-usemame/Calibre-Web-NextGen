@@ -151,7 +151,10 @@ def _is_provider_enabled_for_user(provider) -> bool:
     except Exception:
         global_enabled = {}
     user_settings = current_user.view_settings.get("metadata", {}) if current_user else {}
-    return bool(global_enabled.get(provider.__id__, True)) and bool(user_settings.get(provider.__id__, True))
+    from .metadata_constants import ORDER_OPT_IN_METADATA_PROVIDERS
+    return bool(global_enabled.get(provider.__id__, True)) and bool(user_settings.get(
+        provider.__id__, provider.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS
+    ))
 
 
 @cover_picker.route("/book/<int:book_id>/cover", methods=["GET"])

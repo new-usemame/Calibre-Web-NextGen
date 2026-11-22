@@ -172,7 +172,11 @@ jobs:
   # --------------------------------------------------------------------------------
   build-amd64:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # ci-time-budget: keep the 30-minute cap for cold Docker builds.
+    # On 2026-11-19 the runtime apt layer took 17m46s and the successful
+    # job took 19m36s (run 44479897685, job 135409682143).
+    # ci-time-budget 2026-11-20: shorten 60 -> 30 min; p50 1.7, p95 8.0, max 19.6 min over 40 main runs; p95 8.0 min is 13% of the 60-min limit.
+    timeout-minutes: 30
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
@@ -325,7 +329,8 @@ jobs:
     # repo is also a meaningful attack surface (any PR can execute on
     # operator hardware), so GitHub-hosted is the safer default.
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+    # ci-time-budget 2026-11-21: shorten 15 -> 10 min; p50 3.7, p95 5.2, max 5.5 min over 36 main runs; p95 5.2 min is 34% of the 15-min limit.
+    timeout-minutes: 10
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
@@ -489,7 +494,8 @@ jobs:
   # --------------------------------------------------------------------------------
   merge:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # ci-time-budget 2026-11-20: shorten 10 -> 5 min; p50 0.3, p95 0.6, max 0.7 min over 39 main runs; p95 0.6 min is 6% of the 10-min limit.
+    timeout-minutes: 5
     needs: [classify, alias-image-neutral-commit, build-amd64, build-arm]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
@@ -634,9 +640,9 @@ jobs:
   alias-image-neutral-commit:
     name: Prepare immutable subject image
     runs-on: ubuntu-latest
-    # The source producer may legitimately consume its full 95-minute
-    # classify+mirror+architecture+merge budget. The script stops sooner when
-    # that exact run/job fails and never substitutes the floating :dev tag.
+    # Retain the 95-minute polling window for an image-neutral commit's
+    # source image, including a producer started under the earlier job limits.
+    # The script stops when the exact run/job fails and never substitutes :dev.
     # ci-time-budget: keep a wait budget for the producer run, not this job's own work
     timeout-minutes: 100
     needs: classify

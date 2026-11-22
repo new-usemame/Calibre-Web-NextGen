@@ -16,6 +16,97 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.73] - 2026-11-22
+
+### Fixed
+
+- **Kobo sync could fail after a token refresh with the store proxy turned off.** Calibre-Web-NextGen now answers the device's UserStorage metadata read locally, so Kobo can't reject it with a 401. Thanks to @JohanSF for testing the response on a Kobo Libra Colour. ([#2958](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2958))
+
+- **KOReader sync can now identify a possible damaged checksum index when a book lookup fails.** When an indexed lookup misses a row that a table scan can find, the log names the affected book and suggests running `PRAGMA integrity_check` on a consistent copy of the library database. Thanks to @sgreadly and @FormelLMS (#2960).
+
+- **Kobos on a nondefault port can renew their token with "Proxy unknown requests to Kobo Store" off.** The OAuth URLs (`oauth_host` and the OpenID discovery document) were built from the request's `Host`, so a direct HTTP client that sends no port in `Host` was sent to port 80 for OAuth while its sync URLs used the external port. When port 80 was a reverse proxy it answered 404, and the device gave up with "sync failed" whenever it needed a new token. They now use the external port like the rest (#2975).
+
+- **Your Library** starts with the newest books when you switch back from Recent, even after loading more rows in both views. [#3012](https://github.com/new-usemame/Calibre-Web-NextGen/issues/3012)
+
+## [v4.1.72] - 2026-11-20
+
+### Added
+
+- **Restore covers that exist on disk but never show.** A new admin page, "Restore missing covers", in both the classic and the new interface, finds books with a `cover.jpg` in their folder that the library marks as having no cover, lists them, and restores the cover for the books you select. A select-all control handles large lists. Nothing changes until you confirm, and covers you removed on purpose stay removed unless you select them. Works with split libraries; not available for Google Drive libraries. Reported and contributed by @sgreadly (#2678, #2695).
+
+- **Sort the Read list by when you finished a book.** With the Read filter on, the sort menu now offers "Date read, newest first" and "Date read, oldest first", so a book you finished today appears at the top even if it was added to the library long ago. Books finished before the date was recorded use their last-changed date, preserved at upgrade. On the Read list, "Newest" and "Oldest" are now labelled "Added, newest first" and "Added, oldest first" (#2800, thanks @sgreadly).
+
+- **Edit custom column values in both interfaces.** Rename, merge, delete, move, create and reorder tag-like custom column values in the Classic interface and the New UI. Renaming or moving a branch carries its books and sub-values; merges require confirmation, and deleting a value keeps its books. Curated sibling order survives renames, including implicit parent categories. Enumeration columns keep Calibre's allowed values. Thanks to @Rol3333. (#2600)
+
+- **Choose how a custom column is displayed.** UI Configuration now offers Automatic, Always a hierarchy and Never a hierarchy for each browsable column. Automatic follows Calibre's hierarchy preference, with value-based detection for older libraries. The explicit modes apply consistently to the sidebar, book details, Classic, New UI and OPDS. Thanks to @Rol3333. (#2600)
+
+- **Custom column values can be chosen from a list while editing a book.** Editing
+  a text custom column — a genre, a Dewey or LCC number — meant typing the value
+  from memory, and a dotted hierarchy meant reproducing its exact spelling or
+  quietly creating a new, near-duplicate one. Supported text custom columns have a
+  list button beside its field that opens a searchable checklist of the values
+  already in the library, and applying it fills the field for you. The list is
+  shaped to match how the column is stored and browsed: a hierarchical column
+  such as `Genre` is drawn as an indented tree where nesting is dot depth, while
+  a flat column is drawn as a plain list, so `778.3` stays one entry rather than
+  a `778` with a `3` underneath it. Values already on the book arrive ticked, you
+  can add a new dotted value from the same dialog, and typing by hand still works
+  exactly as before. Single-value columns allow one choice, filtering keeps your
+  selections, and existing spelling is preserved when you apply it. Choices
+  respect your access to books, independently of personal browse visibility.
+  Available in both the new and the classic interface. Thanks @Rol3333 (#2434).
+
+- **Automatic metadata fetch retries Databáze knih by ISBN.** When a book's
+  title does not find it — for example a Czech title stored without
+  diacritics — and the book has an ISBN, the fetch searches again by that
+  ISBN when Databáze knih is in the automatic provider order. The result
+  must still match the book before anything is applied. Contributed by @misko903.
+
+- **Czech and Slovak books can pull metadata from Databáze knih.** A new
+  `Databáze knih` (databazeknih.cz) source appears in metadata search and in
+  the provider list. It finds editions by ISBN or title, prefers the Slovak or
+  Czech edition that matches the query, and fills in the full description,
+  series and index, year, publisher, language, genres and tags, rating, cover,
+  ISBN, original title, translator and page count. Turn it on in manual
+  metadata search or check it in the automatic provider order in NextGen
+  settings. Contributed by @misko903.
+
+- **Admins can browse books without a Hardcover ID by review status, allow
+  rejected books to be tried again, and re-run matching over pending reviews.**
+  The list is paginated and translated into French and Dutch. Thanks @lguerard (#2503).
+
+- **New opt-in setting for each Kobo: align its percentage with CrossPoint.** A Kobo reports only whole percents, measured on its own copy of the book. On the Devices page, each Kobo now has **Align this Kobo's percentage with CrossPoint**. With it on, and the Kobo holding the library's current KEPUB, the server works out the percentage CrossPoint would show at the Kobo's place and shares that instead, so the readers agree and a move within one percent still reaches the other devices. Hardcover gets the same percentage, so the page it shows changes, and the book page shows it while that Kobo's report is the latest place. The Kobo itself keeps the value it reported. The setting is off by default, and with it off nothing changes. Credit: @wolffshots (#2887).
+
+- **Clean up tags across the library from one page.** Admin > Metadata clean-up keeps a map of tag rules: rename a tag, split it into several, or drop it, matched regardless of case and accents. The page lists every book the rules would change, old tags next to new, and changes nothing until you apply. Each book is reported as changed, skipped (left out, or edited since the preview) or failed, the book files are updated when metadata enforcement is on, and an applied run can be undone from History. The map exports to JSON and imports back, so a cleanup can be shared or run again (Discussion #2481, #2438; thanks @splitsec2).
+
+- **Wikidata as an opt-in metadata source, mainly for series and series order.** It needs no key and returns a book's title, authors, first publication date, series and position, including positions like 24.5, from Wikidata's catalogue of works. Turn on Wikidata in manual metadata search, or enable it in the metadata provider settings and save it in the automatic provider order. Only then can it supply missing series metadata; existing installations do not contact this new service by default. Contributed by @splitsec2.
+
+### Changed
+
+- **CI: the E2E browser install step gets 20 minutes, not 10.** When the Ubuntu package mirror is slow, installing the browsers' system packages takes 4 to 14 minutes. On 2026-11-19, 7 of 25 E2E runs failed at the old 10-minute limit while packages were still downloading.
+
+- **Hardcover auto-fetch uses ISBNs, alternative titles, subtitles and accents
+  to find translated and subtitled books, and breaks equal scores by popularity.**
+  Invalid ISBNs and conflicting subtitles cannot bypass those comparisons.
+  Thanks @lguerard (#2503).
+
+### Fixed
+
+- **The new UI's email settings now show whether mail is configured, can switch from Gmail OAuth to standard SMTP, and can send a test email.** A server left on the Gmail (OAuth) type with no token ignored every SMTP field saved in the new UI, so mail stayed off and "Send to e-reader" silently never appeared. The form now shows whether mail is configured, offers "Use standard SMTP instead" when Gmail OAuth is selected, and has a "Save and send test email" button that queues a test to your own address, like the classic page. A working Gmail OAuth setup is not switched unless you choose it; unsupported mail server types are rejected before saving. Thanks @sgreadly (#2771, #2772).
+
+- **Kobo's reading-changes check stops returning unauthorized when "Proxy unknown requests to Kobo Store" is off.** With the proxy off, the device's token is one CWNG issued, and Kobo rejected every forwarded `checkforchanges` call with 401. CWNG now answers that call itself with the "nothing changed" reply that is measured safe for on-device highlights. Reported by @fabdrol, reproduced by @sgreadly.
+
+- **"Keep the oldest copy" no longer keeps the same book as "Keep the newest copy" when two copies were added at the same moment.** Books imported in one batch can share a timestamp; the book added first now counts as the oldest and the one added last as the newest. Follow-up to #2752, thanks @sgreadly.
+
+- **Reading progress can reach Hardcover when a matched book has no edition
+  selected.** Sync chooses an edition with pages, preferring the book's own
+  identifier, Hardcover's defaults, then popular e-books. Works with more
+  than 100 editions. Thanks @lguerard (#2503).
+
+- **Tests check the French Discover subtitle the page actually shows.** The new-UI catalog test now asserts "A few random picks from your Discover source", so main stays green after the translation catalog dropped the old wording.
+
+- **A Kobo with "Align this Kobo's percentage with CrossPoint" on no longer shares a percentage far from its own.** If CrossPoint's percentage at the Kobo's reading place is more than 5 points from the Kobo's own, the Kobo's own value is shared with KOReader, CrossPoint and Hardcover instead, so a wrong match can no longer hold other readers ahead. Follow-up to #2887.
+
 ## [v4.1.71] - 2026-11-19
 
 ### Added

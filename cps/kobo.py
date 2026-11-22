@@ -6042,13 +6042,31 @@ def HandleAuthRequest():
 
 
 
+def _kobo_direct_origin():
+    """Use the configured external port when there is no reverse proxy."""
+    host = request.host
+    if ':' in host and not host.endswith(']'):
+        host = host.rsplit(':', 1)[0]
+    return f"{request.scheme}://{host}:{config.config_external_port}"
+
+
+def _kobo_oauth_base_url():
+    # Some Kobos omit the port in Host. With the store proxy off, the local
+    # OAuth URLs need the same external port as the rest of the sync URLs.
+    use_request_origin = config.config_kobo_proxy or current_app.wsgi_app.is_proxied
+    oauth_url = url_for("kobo.HandleOauthRequest",
+                        auth_token=kobo_auth.get_auth_token(),
+                        _external=use_request_origin)
+    if not use_request_origin:
+        oauth_url = _kobo_direct_origin() + oauth_url
+    return oauth_url.rsplit("/oauth", 1)[0]
+
+
 @csrf.exempt
 @kobo.route('/oauth/.well-known/openid-configuration', methods=['GET', 'POST'])
 @requires_kobo_auth
 def HandleOidcDiscovery():
-    base_url = url_for("kobo.HandleOauthRequest",
-                       auth_token=get_auth_token(),
-                       _external=True).rsplit("/oauth", 1)[0]
+    base_url = _kobo_oauth_base_url()
     payload = {
         'issuer': base_url,
         'authorization_endpoint': base_url + '/oauth/authorize',
@@ -6120,15 +6138,7 @@ def HandleInitRequest():
 
     if not current_app.wsgi_app.is_proxied:
         log.debug('Kobo: Received unproxied request, changed request port to external server port')
-        if ':' in request.host and not request.host.endswith(']'):
-            host = "".join(request.host.split(':')[:-1])
-        else:
-            host = request.host
-        calibre_web_url = "{url_scheme}://{url_base}:{url_port}".format(
-            url_scheme=request.scheme,
-            url_base=host,
-            url_port=config.config_external_port
-        )
+        calibre_web_url = _kobo_direct_origin()
         log.debug('Kobo: Received unproxied request, changed request url to %s', calibre_web_url)
         kobo_resources["image_host"] = calibre_web_url
         kobo_resources["image_url_quality_template"] = unquote(calibre_web_url +
@@ -6190,13 +6200,9 @@ def HandleInitRequest():
                                                   _external=True)
         kobo_resources["rating"] = _rating_resource_url()
 
-    # When not proxying Kobo Store requests, point oauth_host to CWA and
-    # serve dummy OAuth responses for unregistered devices.
+    # Point devices at local OAuth when they aren't using the Kobo Store.
     if not config.config_kobo_proxy:
-        oauth_token_url = url_for("kobo.HandleOauthRequest",
-                                  auth_token=kobo_auth.get_auth_token(),
-                                  _external=True)
-        kobo_resources["oauth_host"] = oauth_token_url.rsplit("/oauth", 1)[0] + "/oauth"
+        kobo_resources["oauth_host"] = _kobo_oauth_base_url() + "/oauth"
 
     response = make_response(jsonify({"Resources": kobo_resources}))
     response.headers["x-kobo-apitoken"] = "e30="

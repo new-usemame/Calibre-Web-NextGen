@@ -132,7 +132,8 @@ class Served:
         self.status, self.headers, self.body, self.complete = status, headers, body, complete
 
 
-def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serve=None):
+def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serve=None,
+              application=None):
     """The Kobo downloads through CWNG's production server, gevent's pywsgi
     with ``cps.gevent_wsgi.MyWSGIHandler`` on a real local socket. The server
     is chosen here by what actually serves the request, not by a flag."""
@@ -141,7 +142,8 @@ def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serv
     from gevent.pywsgi import WSGIServer
     from cps.gevent_wsgi import MyWSGIHandler
 
-    application = _install_download(monkeypatch, sw, broken=broken, serve=serve)
+    if application is None:
+        application = _install_download(monkeypatch, sw, broken=broken, serve=serve)
     server = WSGIServer(("127.0.0.1", 0), application, handler_class=MyWSGIHandler,
                         log=None, error_log=None)
     server.start()
@@ -256,6 +258,58 @@ def test_a_full_download_read_to_the_end_delivers_the_exact_span(monkeypatch, st
     assert bookmark.get("ProgressPercent") == pytest.approx(sw.exact_percent, abs=0.01)
     assert location_of(bookmark) == sw.exact
     assert sw.synced_location(sw.checked) == sw.exact
+
+
+def test_a_full_download_after_on_demand_conversion_records_file_proof(monkeypatch, sw):
+    """A worker publishes KEPUB after the request loaded the book's formats."""
+    from pathlib import Path
+
+    from sqlalchemy.orm import Session
+
+    from cps import db, helper, ub
+    from cps.services import kobo_place_gate
+    from cps.tasks import kepub_backfill
+
+    sw.checked = sw.kobo_device("Kobo Checked", checked=True)
+    kepub_path = Path(sw.kepub)
+    expected_file = kepub_path.read_bytes()
+    kepub_path.unlink()
+    book_id = sw.book.id
+    format_row = sw.session.query(db.Data).filter_by(book=book_id, format="KEPUB").one()
+    filename = format_row.name
+    sw.session.delete(format_row)
+    sw.session.commit()
+
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "/test/kepubify", raising=False)
+    monkeypatch.setattr(helper.config, "config_kobo_prefer_kepub", True, raising=False)
+    monkeypatch.setattr(kepub_backfill, "is_kepub_backfill_pending", lambda: False)
+
+    def convert(book_id, _path, source, destination, _user_id, *, blocking, timeout):
+        assert (source, destination, blocking) == ("EPUB", "KEPUB", True)
+        kepub_path.write_bytes(expected_file)
+        with Session(sw.engine) as worker:
+            worker.add(db.Data(name=filename, book_format=destination, book=book_id,
+                               uncompressed_size=len(expected_file)))
+            worker.commit()
+
+    monkeypatch.setattr(helper, "convert_book_format", convert)
+    with Session(sw.engine) as request_session:
+        # Keep the request's identity map separate from the app-data commits.
+        book = request_session.query(db.Books).filter_by(id=book_id).one()
+        assert [data.format for data in book.data] == ["EPUB"]
+        monkeypatch.setattr(helper.calibre_db, "get_book", lambda _id: book)
+        monkeypatch.setattr(helper.calibre_db, "get_filtered_book", lambda *_a, **_kw: book)
+        monkeypatch.setattr(helper.calibre_db, "get_book_format", lambda bid, fmt:
+                            request_session.query(db.Data).filter_by(book=bid, format=fmt).one_or_none())
+        served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete and served.body == expected_file
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=book_id).one()
+    assert download.completed_at is not None
+    assert download.kepub_file_identity == kobo_place_gate.completed_kepub_identity(
+        sw.checked.id, sw.book)
 
 
 # == Byte count: proof needs the declared length actually yielded ============

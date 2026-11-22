@@ -3740,6 +3740,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         abort(404)
 
     download_proof = None
+    kepub_path = None
     if client == "kobo":
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
@@ -3756,11 +3757,21 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 device_id = tagged_download_device(
                     getattr(current_user, "id", None),
                     request.args.get(DOWNLOAD_DEVICE_PARAM))
+            # The conversion worker can add KEPUB after this request loaded
+            # book.data. Use the format row this response will actually serve.
+            if book_format == "kepub" and data1.name:
+                try:
+                    candidate = os.path.join(config.get_book_path(), book.path, data1.name + ".kepub")
+                    if os.path.isfile(candidate):
+                        kepub_path = candidate
+                except (OSError, TypeError, AttributeError):
+                    # Missing file proof must not block annotation restoration.
+                    log.debug("Could not resolve Kobo download file for book %s", book_id, exc_info=True)
             download = record_download(
                 device_id=device_id,
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
-                completed=False,
+                completed=False, kepub_path=kepub_path,
             )
             # A row already completed is proof kept from an earlier download,
             # not an attempt this response can confirm.
@@ -3831,8 +3842,6 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             # chunk-by-chunk writes make exhaustion completion evidence.
             and request.environ.get("SERVER_SOFTWARE", "").startswith("gevent/")):
         try:
-            from .services.kobo_place_gate import _book_paths
-            _epub, kepub_path = _book_paths(book)
             # Streaming runs after Flask has popped the request context. Keep
             # only scalar proof inputs, the app, and the thread-safe DB bind.
             response.response = completed_download_body(

@@ -151,8 +151,10 @@ def test_fr_reporter_residual_spa_strings_are_served():
     """
     body, _ = _call_view("fr")
     catalog = body["catalog"]
-    assert catalog.get("A few random picks from your library") == (
-        "Une sélection aléatoire de votre bibliothèque"
+    # The Discover subtitle was reworded when Discover gained a shelf source
+    # (#2421); this is the literal DiscoverSection.tsx renders today.
+    assert catalog.get("A few random picks from your Discover source") == (
+        "Quelques suggestions aléatoires de votre source de découverte"
     )
     assert catalog.get("Favorites") == "Favoris"
     assert catalog.get("Hot") == "Populaires"

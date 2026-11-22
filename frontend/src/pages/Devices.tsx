@@ -97,6 +97,8 @@ export function Devices() {
   const [preflightPending, setPreflightPending] = useState(false);
   const [sharePending, setSharePending] = useState<ReadonlySet<string>>(() => new Set());
   const [shareError, setShareError] = useState<string | null>(null);
+  const [alignPending, setAlignPending] = useState<ReadonlySet<string>>(() => new Set());
+  const [alignError, setAlignError] = useState<string | null>(null);
   const preflightRef = useRef(false);
   const undoRef = useRef<HTMLButtonElement>(null);
   const focusedUndoRef = useRef<Device | null>(null);
@@ -187,6 +189,31 @@ export function Devices() {
       setShareError(id);
     } finally {
       setSharePending((prev) => { const rest = new Set(prev); rest.delete(id); return rest; });
+    }
+  };
+
+  // Align percentage (Kobo only): the same flow as Share my place.
+  const setCachedAlignPercent = (id: string, value: boolean) => {
+    queryClient.setQueryData<DevicePage>(['annotation-devices', deviceOffset], (old) => old && {
+      ...old,
+      devices: old.devices.map(item => (item.public_id === id ? { ...item, align_percent: value } : item)),
+    });
+  };
+  const toggleAlignPercent = async (device: Device, next: boolean) => {
+    const id = device.public_id;
+    if (alignPending.has(id)) return;
+    setAlignError(null);
+    setAlignPending(prev => new Set(prev).add(id));
+    await queryClient.cancelQueries({ queryKey: ['annotation-devices'] });
+    setCachedAlignPercent(id, next);
+    try {
+      const updated = await apiPatch<Partial<Device>>(`/api/annotations/devices/${id}`, { align_percent: next });
+      setCachedAlignPercent(id, typeof updated?.align_percent === 'boolean' ? updated.align_percent : next);
+    } catch {
+      setCachedAlignPercent(id, !next);
+      setAlignError(id);
+    } finally {
+      setAlignPending((prev) => { const rest = new Set(prev); rest.delete(id); return rest; });
     }
   };
 
@@ -377,6 +404,26 @@ export function Devices() {
               )}
               {sharePlaceGates && device.place_control === 'always_shared' && (
                 <p className={styles.sharePlaceNote}>{t('Always shares its place. Install or update the NextGen Sync plugin on this device to choose.')}</p>
+              )}
+              {device.kind === 'kobo' && (
+                <div className={styles.sharePlace}>
+                  <label className={styles.sharePlaceLabel}>
+                    <input type="checkbox" checked={device.align_percent === true}
+                      disabled={alignPending.has(device.public_id)}
+                      aria-labelledby={`align-percent-${device.public_id} device-name-${device.public_id}`}
+                      aria-describedby={alignError === device.public_id
+                        ? `align-percent-error-${device.public_id} align-percent-help-${device.public_id}`
+                        : `align-percent-help-${device.public_id}`}
+                      onChange={event => void toggleAlignPercent(device, event.currentTarget.checked)} />
+                    <span id={`align-percent-${device.public_id}`}>{t("Align this Kobo's percentage with CrossPoint")}</span>
+                  </label>
+                  <span id={`align-percent-error-${device.public_id}`} role="alert" className={styles.sharePlaceError}>
+                    {alignError === device.public_id ? t('Could not save the percentage setting. Try again.') : ''}
+                  </span>
+                  <p id={`align-percent-help-${device.public_id}`} className={styles.sharePlaceNote}>
+                    {t("Off by default. When on, and this Kobo holds the current KEPUB, its place is shared as the percentage CrossPoint shows there, not the whole number the Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that percentage, so the page Hardcover shows changes. The Kobo keeps its own value.")}
+                  </p>
+                </div>
               )}
               {(device.kind === 'koreader' || device.kind === 'kobo') && device.book_scope && (
                 <DeviceBookScope key={JSON.stringify(device.book_scope)} id={device.public_id}

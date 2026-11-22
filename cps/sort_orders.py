@@ -88,6 +88,10 @@ DEFAULT_SORT = "new"
 #: docstring and :func:`recent_sort_order`.
 RECENT_SORT = "recent"
 
+#: "Date read", newest and oldest first (#2800). Per-user like ``recent``, so
+#: also not a key of :data:`BOOK_SORT_ORDERS`; see :func:`read_date_order`.
+READ_DATE_SORTS = frozenset(("readnew", "readold"))
+
 #: Stand-in clock for reading activity whose own timestamp is missing. Both
 #: clocks arrived as ``ALTER TABLE … ADD COLUMN`` with no default —
 #: ``kobo_bookmark.created_at`` (``ub.py``, ``migrate_kobo_bookmark_created_at``)
@@ -255,6 +259,36 @@ def recent_sort_order(user_id):
     ]
 
 
+def read_date_order(user_id, descending=True):
+    """"Date read": when this user finished each book.
+
+    The moment is ``book_read_link.read_finished_at`` -- stamped on transition
+    into finished, from the book page, the API or a device -- falling back to
+    the row's ``last_modified`` for an unknown historical finish. The upgrade
+    snapshots that fallback once so later activity cannot move it. Only a
+    *finished* row counts, so on a list that mixes statuses the books this user
+    has not finished sit together after the finished ones, in date-added order,
+    rather than being ranked by an unrelated reading clock. Ends on ``Books.id``
+    so the order is total and the pages line up (#1331).
+
+    A shared Calibre read column has per-user dates only for finishes recorded
+    through this app. Books without one follow in date-added order.
+    """
+    read = aliased(ub.ReadBook)
+    finished_at = (select(coalesce(read.read_finished_at, read.last_modified))
+                   .where(read.user_id == int(user_id),
+                          read.book_id == db.Books.id,
+                          read.read_status == ub.ReadBook.STATUS_FINISHED)
+                   .correlate(db.Books)
+                   .scalar_subquery())
+    return [
+        finished_at.is_not(None).desc(),
+        finished_at.desc() if descending else finished_at.asc(),
+        db.Books.timestamp.desc(),
+        db.Books.id.desc(),
+    ]
+
+
 def viewer_id(user):
     """The signed-in reader behind this request, or ``None``.
 
@@ -287,6 +321,8 @@ def book_sort_order(sort_param, user_id=None):
     if sort_param in ('ratingdesc', 'ratingasc') and user_id is not None:
         from .personal_ratings import personal_rating_order
         return personal_rating_order(user_id, descending=sort_param == 'ratingdesc')
+    if sort_param in READ_DATE_SORTS and user_id is not None:
+        return read_date_order(user_id, descending=sort_param == "readnew")
     if sort_param == RECENT_SORT and user_id is not None:
         return recent_sort_order(user_id)
     if sort_param in ('abc', 'zyx', 'authaz', 'authza'):

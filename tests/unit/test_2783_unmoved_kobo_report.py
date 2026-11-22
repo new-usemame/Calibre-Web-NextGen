@@ -22,6 +22,7 @@ from datetime import timedelta
 
 import pytest
 
+from cps.services import kepub_alignment
 from tests.unit.share_place_span_world import (  # noqa: F401  (fixture)
     _now, after_now, span_location, span_rows, sw,
 )
@@ -54,6 +55,16 @@ def _setup(sw, rows):
     return kobo
 
 
+def _assert_koreader_place_served(sw, kobo, rows):
+    """The shared KOReader percentage stays 40, while Kobo receives its own
+    percentage together with the exact span."""
+    place = rows["koreader"]
+    bookmark = sw.get(kobo)["CurrentBookmark"]
+    assert bookmark["Location"] == span_location(place["source"], place["span"])
+    assert bookmark["ProgressPercent"] == pytest.approx(
+        kepub_alignment.kobo_progress_percent(sw.kepub, place["source"], place["span"]), abs=0.01)
+
+
 def test_unmoved_kobo_report_keeps_the_newer_place(sw, rows):
     kobo = _setup(sw, rows)
     place = rows["kobo"]
@@ -65,7 +76,7 @@ def test_unmoved_kobo_report_keeps_the_newer_place(sw, rows):
     assert progress == rows["koreader"]["xpointer"]
     assert percent == pytest.approx(40, abs=0.01)
     # And the Kobo itself is offered KOReader's place, not its own old one.
-    assert sw.get(kobo)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(40, abs=0.01)
+    _assert_koreader_place_served(sw, kobo, rows)
     assert sw.synced_location(kobo) != span_location(place["source"], place["span"])
 
 
@@ -125,7 +136,7 @@ def _served_setup(sw, rows):
     sw.put(kobo, place["source"], place["span"], 10.0, _now() - timedelta(hours=1))
     sw.settle(kobo)
     sw.push(rows["koreader"]["xpointer"], 40, client_at=_now() - timedelta(seconds=30))
-    assert sw.get(kobo)["CurrentBookmark"]["ProgressPercent"] == pytest.approx(40, abs=0.01)
+    _assert_koreader_place_served(sw, kobo, rows)
     return kobo
 
 

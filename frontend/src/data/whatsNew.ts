@@ -56,6 +56,183 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.73',
+    date: '2026-11-22',
+    items: [
+      {
+        title: 'Start with the newest books every time',
+        body: 'Switching from Recent back to Newest in Your Library puts the latest additions first, even after you have loaded more rows in both sorts.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Keep Kobo sync working with the store proxy off',
+        body: 'Calibre-Web NextGen now answers the Kobo’s UserStorage metadata check locally. The device can finish syncing after it renews its token.',
+        category: 'Sync',
+      },
+      {
+        title: 'Renew Kobo tokens on a custom port',
+        body: 'If your Kobo connects directly to a custom port with store proxying off, it now uses that port to renew its token too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Find the reason for a failed KOReader book match',
+        body: 'The server log now names the affected book when a lookup suggests the library’s checksum index might be damaged.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.72',
+    date: '2026-11-20',
+    items: [
+      {
+        title: 'Find books you finished recently',
+        body: 'Open the Read list and choose Date read to put recently finished books at the top, even if you added them years ago. The date-added sorts are still there.',
+        category: 'Reading',
+      },
+      {
+        title: 'Clean up tags across your library',
+        body: 'In Admin, open Metadata clean-up to set rules that rename, split, or remove tags. Preview the affected books before you apply and use History to undo an applied run.',
+        category: 'Admin',
+        link: { to: '/admin/metadata-cleanup', label: 'Metadata clean-up' },
+      },
+      {
+        title: 'Choose existing custom values when editing a book',
+        body: 'Use the list button beside a supported custom field to choose a value already in your library. Hierarchical columns show a tree, so you can see where a value belongs before applying it.',
+        category: 'Library',
+      },
+      {
+        title: 'Edit custom column categories in one place',
+        body: 'Rename, combine, move, or reorder browsable custom values. UI Configuration also lets you choose which columns display as a hierarchy.',
+        category: 'Library',
+      },
+      {
+        title: 'Restore covers that are already on disk',
+        body: 'In Admin, open Restore missing covers to find books whose cover file exists but is hidden by a missing-cover flag. Choose which covers to restore before you confirm.',
+        category: 'Admin',
+      },
+      {
+        title: 'Check mail settings and send yourself a test',
+        body: 'The mail settings show whether email is configured and let you send a test to your own address. If you are moving away from Gmail sign-in, choose Use standard SMTP instead.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Admin' },
+      },
+      {
+        title: 'Kobo reading changes are checked locally when the Store proxy is off',
+        body: 'When the Store proxy is off, CWNG handles the Kobo reading-changes check locally. This avoids the unauthorized response that interrupted the device check while preserving on-device highlights.',
+        category: 'Sync',
+      },
+      {
+        title: 'Share a Kobo percentage that matches CrossPoint',
+        body: "On the Devices page, opt in for an individual Kobo to share CrossPoint's percentage for the same spot. If the two percentages differ by more than five points, the Kobo's own percentage is shared.",
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Find metadata for Czech and Slovak editions',
+        body: 'Enable Databáze knih in metadata search or add it to your automatic provider order. When a title search misses and the book has an ISBN, automatic fetch can retry by ISBN.',
+        category: 'Library',
+      },
+      {
+        title: 'Fill in series and series order with Wikidata',
+        body: 'Enable Wikidata in metadata search or add it to the automatic provider order. It can supply series names and positions, including fractional positions.',
+        category: 'Library',
+      },
+      {
+        title: 'Find better Hardcover matches',
+        body: 'Matching uses ISBNs, subtitles, and alternate titles to find the right book. Admins can review unmatched books, and reading progress can sync when Hardcover has a suitable edition with a page count.',
+        category: 'Library',
+      },
+      {
+        title: 'Keep the intended copy when imports share a timestamp',
+        body: 'When two copies were added at the same time, duplicate cleanup now uses the order they were added to distinguish the oldest and newest copies.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.71',
+    date: '2026-11-19',
+    items: [
+      {
+        title: 'New uploads show up in the library on their own',
+        body: 'The library used to refresh the moment an upload finished, before the import had run, so a new book only appeared after reloading the page. The app now follows the import and adds books to the library as they arrive, whether you uploaded one file or a few hundred.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload books' },
+      },
+      {
+        title: 'Pick which e-reader addresses to send to',
+        body: 'With several e-reader addresses saved, Send to e-reader put them all in one field, so sending to just one meant deleting the rest by hand. Each saved address now has its own tickbox, all ticked to start, and the free-text field is still there for one-off recipients.',
+        category: 'Reading',
+      },
+      {
+        title: 'A Kobo shelf shows the right percentage for a shared place',
+        body: 'The web reader and a Kobo measure a book differently, so the same place could read 26% in one and 16% on the Kobo shelf. A place sent to a Kobo now carries the percentage the Kobo itself would show for that page.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'KOReader: one swipe turns one library page',
+        body: 'With a plugin such as Simple UI installed, every swipe in the CWNG Sync library skipped two pages. It now turns one. A KOReader setup copied onto a different kind of e-reader also shows up as its own device instead of sharing the first one\'s place. Update the plugin from KOReader\'s Updates Manager to get both.',
+        category: 'Sync',
+      },
+      {
+        title: 'CrossPoint readers can sync clippings',
+        body: 'A CrossPoint reader such as an Xteink with Sync Clippings turned on got an error from CWNG and stopped syncing progress too. CWNG now accepts those clippings, keeps each one as a highlight on the book, shows it in the web reader, and gives it back to the same reader after a fresh download. It needs a CrossPoint build that sends its login on clipping requests.',
+        category: 'Sync',
+      },
+      {
+        title: 'The Devices page says when smart shelves add nothing',
+        body: 'When the server\'s smart-shelf sync setting is off, a smart shelf picked for an e-reader added no books, and nothing said so. Those choices are now disabled with a note explaining the setting.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'See your password as you type it',
+        body: 'Password fields now have a show and hide button, and the new-user, profile and change-password forms list the password rules before you type instead of after a rejected save.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Start a new user\'s My Library empty',
+        body: 'Switching an account to My Library used to fill it with every book it could see. An administrator can now choose "Start My Library empty" so the user builds their own shelf from the global library.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Admin' },
+      },
+      {
+        title: 'Better metadata matches by ISBN',
+        body: 'Automatic metadata fetch now checks an ISBN\'s check digit before using it, matches an ISBN-10 to the same edition\'s ISBN-13, and no longer writes a provider\'s invalid ISBN to your book. The Google Scholar source also loads again on fresh installs.',
+        category: 'Library',
+      },
+      {
+        title: 'Security updates and more ways to run it',
+        body: 'Images are now read with Pillow 13, which fixes critical decoder advisories, and the web reader\'s bundled XML parser is updated. NextGen can also run on NixOS without Docker, retained originals can live on another disk with CWA_PROCESSED_BOOKS_DIR, and Windows installs start cleanly.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Resolve duplicates automatically in the new UI',
+        body: 'The Duplicates page now has a Resolve automatically panel for administrators, as the classic view does. Pick a strategy such as newest, best format or most complete metadata, preview which books are kept and deleted, then confirm. Nothing is deleted until you confirm.',
+        category: 'Library',
+      },
+      {
+        title: 'Metadata edits reach a Kobo without a new download',
+        body: 'When only a book\'s metadata changed since the Kobo last synced it, the next sync updates its entry in My Books in place instead of downloading the book again. Publication-date-only edits in the classic editor now reach the next sync too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Hardcover journal entries name the right reader and page',
+        body: 'Every highlight sent to the Hardcover journal was tagged Kobo, and many showed page 0 or a page near the start of the book. Entries now name the reader they came from, and Hardcover shows the page where you made the highlight.',
+        category: 'Sync',
+      },
+      {
+        title: 'Account changes made elsewhere apply right away',
+        body: 'A password or role changed by an admin script or another process used to wait for a restart. It now takes effect on the next request, including for OPDS and reverse-proxy logins.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.70',
     date: '2026-11-15',
     items: [

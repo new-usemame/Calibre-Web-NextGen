@@ -75,6 +75,7 @@ msgid "Error starting Hardcover auto-fetch task: %(error)s"
 msgstr "启动 Hardcover 自动获取任务出错：%(error)s"
 
 #: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
 msgstr "审查 Hardcover 匹配"
 
@@ -100,6 +101,53 @@ msgstr "没有待拒绝的匹配"
 #, python-format
 msgid "Rejected %(count)s match(es)"
 msgstr "已拒绝 %(count)s 个匹配"
+
+#: cps/admin.py
+msgid "Waiting for review"
+msgstr ""
+
+#: cps/admin.py
+msgid "Rejected"
+msgstr ""
+
+#: cps/admin.py
+msgid "Skipped"
+msgstr ""
+
+#: cps/admin.py
+msgid "Not matched yet"
+msgstr ""
+
+#: cps/admin.py cps/templates/admin.html
+#: cps/templates/hardcover_missing_ids.html
+#: cps/templates/hardcover_review_matches.html
+msgid "Books without a Hardcover ID"
+msgstr ""
+
+#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
+#: cps/templates/index.html cps/templates/list.html
+msgid "All"
+msgstr "全部"
+
+#: cps/admin.py
+#, python-format
+msgid "Error listing books without a Hardcover ID: %(error)s"
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"Hardcover matching started for every book without a Hardcover ID. Check "
+"Tasks for progress."
+msgstr ""
+
+#: cps/admin.py
+msgid "The next Hardcover auto-fetch will search this book again."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "Error: %(error)s"
+msgstr ""
 
 #: cps/admin.py
 #, python-brace-format
@@ -140,11 +188,6 @@ msgstr "自定义列号：%(column)d 在 Calibre 数据库中不存在"
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
 msgstr "管理用户"
-
-#: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/index.html cps/templates/list.html
-msgid "All"
-msgstr "全部"
 
 #: cps/admin.py
 msgid "User not found"
@@ -211,6 +254,12 @@ msgstr "参数未找到"
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
 msgstr "设置数据库不可写"
+
+#: cps/admin.py
+#, python-brace-format
+msgid ""
+"Could not save the custom column hierarchy setting for {count} column(s)."
+msgstr ""
 
 #: cps/admin.py
 #, python-format
@@ -396,6 +445,31 @@ msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
 msgstr "所选书籍与此预览不匹配。请重新上传设备数据库。"
+
+#: cps/admin.py cps/spa_strings.py cps/templates/admin.html
+#: cps/templates/cover_flag_repair.html
+msgid "Restore missing covers"
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "This is not available for Google Drive libraries."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "This preview is invalid or expired. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Select at least one book to restore."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "The selected books do not match this preview. Scan the library again."
+msgstr ""
+
+#: cps/admin.py cps/spa_strings.py
+msgid "Could not update the library database. No covers were changed."
+msgstr ""
 
 #: cps/admin.py
 msgid "Boolean restrictions must be Yes, No, or Undefined."
@@ -1446,8 +1520,17 @@ msgid "Duplicate scan completed (fallback)"
 msgstr "重复扫描已完成（回退模式）"
 
 #: cps/duplicates.py
+msgid "Invalid resolution request"
+msgstr ""
+
+#: cps/duplicates.py
 msgid "Invalid resolution strategy"
 msgstr "处理策略无效"
+
+#: cps/duplicates.py
+msgid ""
+"Duplicate groups have changed. Preview the resolution again before deleting."
+msgstr ""
 
 #: cps/editbooks.py
 msgid ""
@@ -2181,6 +2264,7 @@ msgstr "未读书籍"
 
 #: cps/opds.py cps/render_template.py cps/spa_strings.py
 #: cps/templates/book_table.html cps/templates/cwa_settings.html
+#: cps/templates/hardcover_missing_ids.html
 #: cps/templates/hardcover_review_matches.html
 msgid "Authors"
 msgstr "作者"
@@ -2882,11 +2966,11 @@ msgstr "无法重命名标签"
 msgid "Tag renamed to {name}"
 msgstr "标签重命名为 {name}"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You must be signed in"
 msgstr "您必须登录"
 
-#: cps/api/browse.py cps/spa_strings.py
+#: cps/api/browse.py cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "You are not allowed to edit metadata"
 msgstr "您无权限编辑元数据"
 
@@ -2915,8 +2999,8 @@ msgid "Page not found"
 msgstr "找不到页面"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/email_edit.html cps/templates/shelf.html
-#: cps/templates/user_table.html
+#: cps/templates/custom_column_modal.html cps/templates/email_edit.html
+#: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Add"
 msgstr "添加"
 
@@ -3145,7 +3229,7 @@ msgstr "从我的书库中移除"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {title} from my library"
-msgstr "从我的书库中移除 {title}"
+msgstr "从我的书库中移除 「{title}」"
 
 #: cps/spa_strings.py
 msgid "Removed from your library"
@@ -3706,9 +3790,10 @@ msgstr "深色主题"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/admin.html cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/duplicates.html
-#: cps/templates/modal_dialogs.html cps/templates/read.html
-#: cps/templates/user_edit.html cps/templates/user_table.html
+#: cps/templates/book_table.html cps/templates/cc_value_editor.html
+#: cps/templates/duplicates.html cps/templates/modal_dialogs.html
+#: cps/templates/read.html cps/templates/user_edit.html
+#: cps/templates/user_table.html
 msgid "Delete"
 msgstr "删除数据"
 
@@ -3757,7 +3842,7 @@ msgstr "简介包含"
 msgid "Deselect {title}"
 msgstr "取消选择 {title}"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Edit metadata"
 msgstr "编辑元数据"
 
@@ -3867,7 +3952,7 @@ msgid "Mark unread"
 msgstr "标记未读"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/duplicates.html
+#: cps/templates/cc_value_editor.html cps/templates/duplicates.html
 msgid "Merge"
 msgstr "合并"
 
@@ -4092,7 +4177,8 @@ msgid "Tags (comma separated)"
 msgstr "标签（以逗号分隔）"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
+#: cps/templates/config_view_edit.html cps/templates/cover_flag_repair.html
+#: cps/templates/cwa_settings.html cps/templates/hardcover_missing_ids.html
 #: cps/templates/shelf_edit.html cps/templates/tasks.html
 msgid "Title"
 msgstr "标题"
@@ -4374,6 +4460,7 @@ msgid "Customize navigation"
 msgstr "自定义导航栏"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
+#: cps/templates/cc_value_editor.html
 msgid "Done"
 msgstr "完成"
 
@@ -4928,6 +5015,23 @@ msgstr ""
 "始终共享阅读位置。请在此设备上安装或更新 NextGen Sync 插件，以便自行选择。"
 
 #: cps/spa_strings.py
+msgid "Align this Kobo's percentage with CrossPoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save the percentage setting. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. When on, and this Kobo holds the current KEPUB, its place is "
+"shared as the percentage CrossPoint shows there, not the whole number the "
+"Kobo reports. KOReader, CrossPoint, Hardcover and the book page get that "
+"percentage, so the page Hardcover shows changes. The Kobo keeps its own "
+"value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books on this device"
 msgstr "此设备上的书籍"
 
@@ -4949,6 +5053,8 @@ msgid ""
 "ticked here adds no books. An administrator can turn on Sync smart shelves "
 "in the settings."
 msgstr ""
+"此服务器未启用智能书架同步，因此在此勾选智能书架不会向设备添加任何书籍。"
+"管理员可以在设置中开启智能书架同步。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -4981,7 +5087,7 @@ msgstr "无法保存书籍选择。请重试。"
 
 #: cps/spa_strings.py
 msgid "Clear reading position"
-msgstr ""
+msgstr "清除阅读位置"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4990,14 +5096,16 @@ msgid ""
 "Kobo and in KOReader? Your read status is not changed. A device that still "
 "holds its own position can send it back the next time it syncs."
 msgstr ""
+"要清除您在网页阅读器、Kobo 和 KOReader 中保存的「{title}」阅读位置吗？"
+"您的阅读状态不会改变。仍保留该位置的设备可能会在下次同步时将其重新上传到服务器。"
 
 #: cps/spa_strings.py
 msgid "Reading position cleared."
-msgstr ""
+msgstr "阅读位置已清除"
 
 #: cps/spa_strings.py
 msgid "Could not clear the reading position."
-msgstr ""
+msgstr "无法清除阅读位置"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -5018,6 +5126,10 @@ msgstr "1 条批注已分配给此来源"
 #: cps/spa_strings.py
 msgid "1 annotation from this source"
 msgstr "来自此来源的 1 条批注"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "1 level"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "1 selected."
@@ -5053,8 +5165,8 @@ msgid ""
 msgstr "重复书籍扫描正在进行。完成后此列表将自动更新。"
 
 #: cps/spa_strings.py
-msgid "A few random picks from your library"
-msgstr "从您的书库中随机挑选"
+msgid "A few random picks from your Discover source"
+msgstr "从您的发现页来源中随机推荐几本书"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5070,6 +5182,20 @@ msgid ""
 "A one-time full duplicate scan is needed. Use “Scan for duplicates” above to "
 "run it."
 msgstr "需要先进行一次完整的重复书籍扫描。请使用上方的“扫描重复书籍”运行扫描。"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into itself"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "A value cannot be pasted into one of its own sub-values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid ""
+"A value created beside another stays on the same level, so its name cannot "
+"contain a dot. Use the Create new button for a sub-value."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "API endpoint"
@@ -5102,12 +5228,29 @@ msgid ""
 msgstr "目前无法获取书籍。请让管理员检查其状态。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "{title} 的操作"
+
+#: cps/spa_strings.py
 msgid "Active"
 msgstr "活跃"
 
 #: cps/spa_strings.py
 msgid "Add a connection"
 msgstr "添加连接"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Add a review"
+msgstr "添加书评"
+
+#: cps/spa_strings.py
+msgid "Add books"
+msgstr "添加书籍"
+
+#: cps/spa_strings.py
+msgid "Add books to shelf"
+msgstr "向书架添加书籍"
 
 #: cps/spa_strings.py
 msgid "Add connection"
@@ -5120,6 +5263,14 @@ msgstr "添加分组"
 #: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "添加标识符"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"将导入子文件夹名称添加为书籍标签，或写入现有自定义列。现有值会保留；导入根目"
+"录中的文件不会添加标签。"
 
 #: cps/spa_strings.py
 msgid "Add link"
@@ -5134,6 +5285,10 @@ msgid "Add or replace this line in the [OneStoreServices] section:"
 msgstr "在 [OneStoreServices] 区段中添加或替换此行："
 
 #: cps/spa_strings.py
+msgid "Add selected"
+msgstr "添加选中项"
+
+#: cps/spa_strings.py
 msgid "Add to existing"
 msgstr "加入现有"
 
@@ -5144,6 +5299,11 @@ msgstr "添加到收藏"
 #: cps/spa_strings.py
 msgid "Add to library"
 msgstr "添加到书库"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to a shelf"
+msgstr "将 {title} 添加到书架"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
@@ -5203,9 +5363,21 @@ msgstr "所有登录您账户的浏览器和计算机共用一个“浏览器”
 msgid "All catalogs"
 msgstr "所有目录"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "All levels"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "All shelves"
 msgstr "全部书架"
+
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "All tags"
+msgstr "所有标签"
+
+#: cps/spa_strings.py
+msgid "Allow completed DRM-free MOBI 6 books"
+msgstr "允许下载完成的无 DRM MOBI 6 书籍"
 
 #: cps/spa_strings.py
 msgid "Allow remote (magic-link) login"
@@ -5226,6 +5398,14 @@ msgstr "允许的组（以逗号分隔）"
 #: cps/spa_strings.py
 msgid "Allowed torrent tracker origins"
 msgstr "允许的种子 Tracker 源"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already first at this level"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Already last at this level"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Also add the book to My Library"
@@ -5273,6 +5453,19 @@ msgstr "任何丛书"
 msgid "Any tags"
 msgstr "任何标签"
 
+#: cps/spa_strings.py
+msgid "Applied on device"
+msgstr "已在设备上应用"
+
+#: cps/spa_strings.py
+msgid ""
+"Applies only to this download client. The server upload-format setting must "
+"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
+"can be downloaded but cannot be opened in the web reader."
+msgstr ""
+"仅适用于此下载客户端。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适"
+"用；未经转换的 MOBI 可以下载，但无法在网页阅读器中打开。"
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_api_stats.html cps/templates/cwa_library_stats.html
 msgid "Apply"
@@ -5316,6 +5509,10 @@ msgstr "归档"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "归档"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Arial"
+msgstr "Arial"
 
 #: cps/spa_strings.py
 msgid "Arrangement"
@@ -5383,6 +5580,14 @@ msgstr "自动创建用户"
 msgid "Auto-create users on first login"
 msgstr "首次登录时自动创建用户"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Automatic"
+msgstr "自动"
+
+#: cps/spa_strings.py
+msgid "Automatic fills the screen when only a thin edge would be cut off."
+msgstr "只会裁掉细边时，自动模式将填满屏幕。"
+
 #: cps/spa_strings.py
 msgid "Available to users"
 msgstr "向用户开放"
@@ -5423,6 +5628,14 @@ msgid "Basic settings"
 msgstr "基本设置"
 
 #: cps/spa_strings.py
+msgid "Becomes"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Becomes (comma-separated to split)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Beta"
 msgstr "测试版"
 
@@ -5443,6 +5656,10 @@ msgid "Bold"
 msgstr "粗体"
 
 #: cps/spa_strings.py
+msgid "Book added to your activity."
+msgstr "书籍已添加到您的活动记录。"
+
+#: cps/spa_strings.py
 msgid "Book category ID"
 msgstr "书籍分类 ID"
 
@@ -5461,6 +5678,10 @@ msgstr "已开始下载书籍列表。"
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "书籍排序"
+
+#: cps/spa_strings.py
+msgid "Book requested. An administrator has to approve it."
+msgstr "书籍请求已提交，需由管理员批准。"
 
 #: cps/spa_strings.py
 msgid "Book sources"
@@ -5572,6 +5793,10 @@ msgid "Bulleted list"
 msgstr "项目符号清单"
 
 #: cps/spa_strings.py
+msgid "By name"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "CA certificate path"
 msgstr "CA 证书路径"
 
@@ -5609,6 +5834,7 @@ msgstr "可以上传书籍"
 #: cps/templates/book_review.html cps/templates/book_table.html
 #: cps/templates/config_db.html cps/templates/config_edit.html
 #: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/custom_column_modal.html
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
 #: cps/templates/duplicates.html cps/templates/layout.html
@@ -5661,10 +5887,6 @@ msgid "Catalogs and download clients"
 msgstr "目录与下载客户端"
 
 #: cps/spa_strings.py
-msgid "Categories"
-msgstr "分类"
-
-#: cps/spa_strings.py
 msgid "Center"
 msgstr "居中"
 
@@ -5679,6 +5901,20 @@ msgstr "证书路径"
 #: cps/spa_strings.py
 msgid "Change"
 msgstr "更改"
+
+#: cps/spa_strings.py
+msgid "Change Discover source"
+msgstr "更改发现页来源"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Change {n} books now?"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Changed {n} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -5698,6 +5934,10 @@ msgid "Checking…"
 msgstr "正在检查…"
 
 #: cps/spa_strings.py
+msgid "Choose a book from this download"
+msgstr "从此下载中选择一本书"
+
+#: cps/spa_strings.py
 msgid "Choose a cover"
 msgstr "选择封面"
 
@@ -5709,9 +5949,21 @@ msgstr "选择要上传的封面图片"
 msgid "Choose a download client connection"
 msgstr "选择下载客户端连接"
 
+#: cps/spa_strings.py cps/templates/tag_tree.html
+msgid "Choose a tag group to browse books from it and its subtags."
+msgstr "选择一个标签组，浏览该组及其子标签中的书籍。"
+
+#: cps/spa_strings.py
+msgid "Choose an image"
+msgstr "选择图片"
+
 #: cps/spa_strings.py
 msgid "Choose an image…"
 msgstr "选择图片…"
+
+#: cps/spa_strings.py
+msgid "Choose another book"
+msgstr "选择其他书籍"
 
 #: cps/spa_strings.py
 msgid "Choose another place"
@@ -5720,6 +5972,14 @@ msgstr "选择其他位置"
 #: cps/spa_strings.py
 msgid "Choose fields"
 msgstr "选择字段"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files stay "
+"in the configuration volume across upgrades."
+msgstr ""
+"请选择您有权与此服务器读者分享的字体。字体文件保存在配置卷中，升级后仍会保"
+"留。"
 
 #: cps/spa_strings.py
 msgid "Choose visible columns"
@@ -5830,6 +6090,10 @@ msgid ""
 msgstr "将此账户连接到电子阅读器，然后同步一次，确认设备已连接到您的书库。"
 
 #: cps/spa_strings.py
+msgid "Connect this device and use Sync now in KOReader."
+msgstr "连接此设备，并在 KOReader 中使用“立即同步”。"
+
+#: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "连接已发生更改。请重新加载设置后再保存。"
 
@@ -5894,8 +6158,28 @@ msgid "Copy sync URL"
 msgstr "复制同步 URL"
 
 #: cps/spa_strings.py
+msgid "Correct the minimum books value to see results."
+msgstr "请修正最少书籍数以查看结果。"
+
+#: cps/spa_strings.py
+msgid "Could not add books to the shelf. Please try again."
+msgstr "无法向书架添加书籍。请重试。"
+
+#: cps/spa_strings.py
+msgid "Could not add the selected books. Please try again."
+msgstr "无法添加选中的书籍。请重试。"
+
+#: cps/spa_strings.py
+msgid "Could not apply sleep screen"
+msgstr "无法应用休眠画面"
+
+#: cps/spa_strings.py
 msgid "Could not assign."
 msgstr "无法指派。"
+
+#: cps/spa_strings.py
+msgid "Could not change image fit. Try again."
+msgstr "无法更改图像适配。请重试。"
 
 #: cps/spa_strings.py
 msgid "Could not complete the action."
@@ -5906,12 +6190,24 @@ msgid "Could not copy. Select the address and copy it manually."
 msgstr "无法复制。请选取地址并手动复制。"
 
 #: cps/spa_strings.py
+msgid "Could not create"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr "无法创建书架。"
 
 #: cps/spa_strings.py
 msgid "Could not create the shelf."
 msgstr "无法创建书架。"
+
+#: cps/spa_strings.py
+msgid "Could not delete"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not delete review."
+msgstr "无法删除书评。"
 
 #: cps/spa_strings.py
 msgid "Could not delete shelf."
@@ -5930,8 +6226,16 @@ msgid "Could not export the book list. Please try again."
 msgstr "无法导出书籍列表。请重试。"
 
 #: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "无法加载发现页来源。"
+
+#: cps/spa_strings.py
 msgid "Could not load books"
 msgstr "无法加载书籍"
+
+#: cps/spa_strings.py
+msgid "Could not load books."
+msgstr "无法加载书籍。"
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -5962,8 +6266,16 @@ msgid "Could not load highlights and notes."
 msgstr "无法加载高亮和笔记。"
 
 #: cps/spa_strings.py
+msgid "Could not load ingest folder settings."
+msgstr "无法加载导入文件夹设置。"
+
+#: cps/spa_strings.py
 msgid "Could not load pairing details."
 msgstr "无法加载配对详情。"
+
+#: cps/spa_strings.py
+msgid "Could not load reader fonts."
+msgstr "无法加载阅读器字体。"
 
 #: cps/spa_strings.py
 msgid "Could not load reading places."
@@ -5982,12 +6294,20 @@ msgid "Could not load stats."
 msgstr "无法加载统计数据。"
 
 #: cps/spa_strings.py
+msgid "Could not load tags. Please try again."
+msgstr "无法加载标签。请重试。"
+
+#: cps/spa_strings.py
 msgid "Could not load tasks."
 msgstr "无法加载任务。"
 
 #: cps/spa_strings.py
 msgid "Could not load the device board."
 msgstr "无法加载设备面板。"
+
+#: cps/spa_strings.py
+msgid "Could not load the map."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load this device library."
@@ -6001,9 +6321,29 @@ msgstr "无法加载此文本文件。"
 msgid "Could not load users."
 msgstr "无法加载用户。"
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not load your rating."
+msgstr "无法加载您的评分。"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not load your review."
+msgstr "无法加载您的书评。"
+
 #: cps/spa_strings.py
 msgid "Could not look up who asked"
 msgstr "无法查询请求者"
+
+#: cps/spa_strings.py
+msgid "Could not merge"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not merge these books."
+msgstr "无法合并这些书籍。"
+
+#: cps/spa_strings.py
+msgid "Could not move"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
@@ -6022,12 +6362,25 @@ msgid "Could not open the synced position."
 msgstr "无法打开已同步的阅读位置。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Could not read that file: {error}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not preview the resolution."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "无法读取此漫画压缩包。"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not reload metadata"
 msgstr "无法重新加载元数据"
+
+#: cps/spa_strings.py
+msgid "Could not remove font."
+msgstr "无法移除字体。"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not remove this book from Currently Reading."
@@ -6036,6 +6389,10 @@ msgstr "无法将此书从“正在阅读”中移除。"
 #: cps/spa_strings.py
 msgid "Could not remove this source. Try again."
 msgstr "无法移除此来源。请重试。"
+
+#: cps/spa_strings.py
+msgid "Could not rename"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not rename shelf."
@@ -6058,8 +6415,20 @@ msgid "Could not reset password."
 msgstr "无法重置密码。"
 
 #: cps/spa_strings.py
+msgid "Could not resolve duplicates."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not restore this source. Try again."
 msgstr "无法恢复此来源。请重试。"
+
+#: cps/spa_strings.py cps/web.py
+msgid "Could not save Discover source. Please try again."
+msgstr "无法保存发现页来源。请重试。"
+
+#: cps/spa_strings.py
+msgid "Could not save ingest folder settings."
+msgstr "无法保存导入文件夹设置。"
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -6068,6 +6437,14 @@ msgstr "无法保存排序。"
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "无法保存阅读器设置。"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not save review."
+msgstr "无法保存书评。"
+
+#: cps/spa_strings.py
+msgid "Could not save sleep screen. Try again."
+msgstr "无法保存休眠画面。请重试。"
 
 #: cps/spa_strings.py
 msgid "Could not save that highlight."
@@ -6093,6 +6470,10 @@ msgstr "无法保存书架。"
 msgid "Could not save title."
 msgstr "无法保存标题。"
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Could not save your rating."
+msgstr "无法保存您的评分。"
+
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "无法保存您的阅读位置。"
@@ -6117,13 +6498,25 @@ msgstr "无法启动重复扫描。"
 msgid "Could not update pairing details."
 msgstr "无法更新配对详情。"
 
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "无法更新阅读状态。请重试。"
+
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "无法更新书架。"
 
 #: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr "无法更新此书。请重试。"
+
+#: cps/spa_strings.py
 msgid "Could not update your account setting."
 msgstr "无法更新您的账户设置。"
+
+#: cps/spa_strings.py
+msgid "Could not upload font."
+msgstr "无法上传字体。"
 
 #: cps/spa_strings.py
 msgid "Couldn’t start a magic link. Please try again."
@@ -6158,6 +6551,19 @@ msgstr ""
 msgid "Cover updated from the selected result."
 msgstr "封面已从选取的结果更新。"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Create a value just below this one"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Create a value just below {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Covered by a rule"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Create account"
 msgstr "创建账户"
@@ -6170,6 +6576,10 @@ msgstr "创建账户"
 msgid "Create failed."
 msgstr "创建失败。"
 
+#: cps/spa_strings.py cps/templates/cc_list.html
+msgid "Create new"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Create shelf"
 msgstr "创建书架"
@@ -6181,6 +6591,20 @@ msgstr "创建书架并加入书籍"
 #: cps/spa_strings.py
 msgid "Create user"
 msgstr "创建用户"
+
+#: cps/spa_strings.py
+msgid "Create value"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Created {name} just below {anchor}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6196,6 +6620,10 @@ msgstr "正在创建…"
 msgid "Crop to fill — no border, trims the edges"
 msgstr "填满——无边框，会裁切边缘"
 
+#: cps/spa_strings.py
+msgid "CrossPoint"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
 msgstr "目前"
@@ -6203,6 +6631,10 @@ msgstr "目前"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current cover"
 msgstr "目前封面"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Current library"
+msgstr "当前书库"
 
 #: cps/spa_strings.py
 msgid "Current password"
@@ -6233,6 +6665,27 @@ msgstr "自定义颜色"
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "自定义列"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+"自定义列必须已存在，且像标签一样使用逗号分隔文本。请先在 Calibre 桌面版中创"
+"建。"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Cut a value first, then choose where it should go"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Cut {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Data hoarder? This will help users organize their accounts!"
@@ -6284,12 +6737,20 @@ msgid "Delete books"
 msgstr "删除书籍"
 
 #: cps/spa_strings.py
+msgid "Delete duplicates"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Delete failed."
 msgstr "删除失败。"
 
 #: cps/spa_strings.py
 msgid "Delete from device"
 msgstr "从设备中删除"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete review"
+msgstr "删除书评"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6333,6 +6794,14 @@ msgid "Delete user \"{name}\"? Their shelves and reading data are removed too."
 msgstr "删除用户「{name}」？其书架和阅读数据也将被移除。"
 
 #: cps/spa_strings.py
+msgid "Delete values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete your review?"
+msgstr "删除您的书评吗？"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Delete {name}"
 msgstr "删除 {name}"
@@ -6355,6 +6824,11 @@ msgstr "已删除设备"
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "已删除 {name} 标签"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Deleted {count} values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6441,6 +6915,10 @@ msgid ""
 msgstr "设备会在首次同步后显示。浏览器会在保存阅读进度或批注后显示。"
 
 #: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr "“放弃阅读”和“暂停阅读”会保留您的阅读位置。"
+
+#: cps/spa_strings.py
 msgid "Different edition"
 msgstr "不同版本"
 
@@ -6448,13 +6926,29 @@ msgstr "不同版本"
 msgid "Disable standard password login"
 msgstr "禁用标准密码登录"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Disabled"
+msgstr "已禁用"
+
 #: cps/spa_strings.py
 msgid "Disabled books"
 msgstr "已禁用的书籍"
 
 #: cps/spa_strings.py
+msgid "Discard"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Discover picks updated."
 msgstr "发现页推荐已更新。"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Discover source"
+msgstr "发现页书籍来源"
+
+#: cps/spa_strings.py cps/web.py
+msgid "Discover source saved."
+msgstr "发现页来源已保存。"
 
 #: cps/spa_strings.py
 msgid "Discover — Random Picks"
@@ -6476,6 +6970,10 @@ msgstr "忽略此重复书籍组"
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Display"
 msgstr "显示"
+
+#: cps/spa_strings.py
+msgid "Display name (optional)"
+msgstr "显示名称（可选）"
 
 #: cps/spa_strings.py
 msgid "Documentation"
@@ -6529,12 +7027,24 @@ msgid "Downloading"
 msgstr "正在下载"
 
 #: cps/spa_strings.py
+msgid "Drag to a shelf, or choose a shelf"
+msgstr "拖到书架上，或选择一个书架"
+
+#: cps/spa_strings.py
 msgid "Drawing the cover…"
 msgstr "正在绘制封面…"
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
 msgstr "将文件拖放至此处，或点击选择"
+
+#: cps/spa_strings.py
+msgid "Drop this value"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dropped"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Duplicate"
@@ -6626,6 +7136,10 @@ msgstr "编辑笔记"
 msgid "Edit public shelves"
 msgstr "编辑公开书架"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Edit review"
+msgstr "编辑书评"
+
 #: cps/spa_strings.py
 msgid "Edit shared library cover"
 msgstr "编辑共享书库封面"
@@ -6638,6 +7152,11 @@ msgstr "编辑智能书架"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "编辑 {title} 的标题"
+
+#: cps/spa_strings.py cps/templates/cc_list.html
+#: cps/templates/cc_value_editor.html
+msgid "Edit values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6680,6 +7199,47 @@ msgstr "电子邮件服务器"
 msgid "Email settings saved."
 msgstr "电子邮件设置已保存。"
 
+#: cps/spa_strings.py
+msgid "Mail is configured and ready to send."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Mail is not configured yet. Enter an SMTP server and save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
+"standard SMTP below, or authorise Gmail in the classic settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Mail currently sends through Gmail (OAuth), which is set up in the classic "
+"settings. The SMTP settings below are not used."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use standard SMTP instead"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Standard SMTP will be used once you save."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save and send test email"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Test email queued for {email}. Check Tasks for the result."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not send the test email."
+msgstr ""
+
 #: cps/api/search.py cps/spa_strings.py cps/templates/search_form.html
 msgid "Empty"
 msgstr "空"
@@ -6701,6 +7261,10 @@ msgid "Encryption"
 msgstr "加密"
 
 #: cps/spa_strings.py
+msgid "Enter a whole number of at least 1."
+msgstr "请输入不小于 1 的整数。"
+
+#: cps/spa_strings.py
 msgid "Enter at least 2 characters"
 msgstr "请输入至少 2 个字符"
 
@@ -6718,6 +7282,27 @@ msgstr "输入电子阅读器显示的代码，或用手机扫描其二维码。
 
 #: cps/spa_strings.py
 msgid ""
+"Every action is on the row it applies to. Renaming renames everything below "
+"the value. To move a value, tick it and press Cut, then tick the value it "
+"should go under and press Paste."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Every action is on the row it applies to. To merge, tick two or more values, "
+"then use Merge on the one that should survive."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter the value to match."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enter what it becomes, or choose Drop."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr "每本书准备就绪后都会同步。您可以在下方排除个别书籍。"
 
@@ -6726,8 +7311,16 @@ msgid "Every filled field will replace each book's existing values."
 msgstr "每个填入的字段都会替换每本书的现有值。"
 
 #: cps/spa_strings.py
+msgid "Every value is covered by a rule."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Exact place"
 msgstr "精确位置"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "示例："
 
 #: cps/spa_strings.py
 msgid "Excluded"
@@ -6779,6 +7372,10 @@ msgstr "失败"
 msgid "Failed to load."
 msgstr "加载失败。"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Favorite"
+msgstr "收藏"
+
 #: cps/spa_strings.py
 msgid "Feature"
 msgstr "功能"
@@ -6786,6 +7383,14 @@ msgstr "功能"
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
 msgstr "从网络获取元数据"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "文件名模板字段与示例"
+
+#: cps/spa_strings.py
+msgid "Field"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Files"
@@ -6807,12 +7412,20 @@ msgid "Fill style"
 msgstr "填充样式"
 
 #: cps/spa_strings.py
+msgid "Fill the screen"
+msgstr "填满屏幕"
+
+#: cps/spa_strings.py
 msgid "Filter"
 msgstr "筛选"
 
 #: cps/spa_strings.py
 msgid "Filter by device"
 msgstr "依设备筛选"
+
+#: cps/spa_strings.py
+msgid "Filter values"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6840,6 +7453,15 @@ msgstr "查找书籍功能不可用"
 msgid "Finish or cancel outstanding requests before editing this connection."
 msgstr "请先完成或取消尚未处理完毕的请求，再编辑此连接。"
 
+#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
+#: cps/templates/search_form.html
+msgid "Finished"
+msgstr "已完成"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "首字符："
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Follow link: {label}"
@@ -6852,6 +7474,22 @@ msgstr "字体"
 #: cps/spa_strings.py
 msgid "Font family"
 msgstr "字体"
+
+#: cps/spa_strings.py
+msgid "Font file"
+msgstr "字体文件"
+
+#: cps/spa_strings.py
+msgid "Font file is too large."
+msgstr "字体文件过大。"
+
+#: cps/spa_strings.py
+msgid "Font is available in both EPUB readers."
+msgstr "两个 EPUB 阅读器均可使用此字体。"
+
+#: cps/spa_strings.py
+msgid "Font removed."
+msgstr "字体已移除。"
 
 #: cps/spa_strings.py
 msgid "Font size"
@@ -6868,6 +7506,14 @@ msgid ""
 msgstr ""
 "适用于可连接到此计算机的电子阅读器。插件已配置好服务器和账户，无需在阅读器上"
 "输入。"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+"例如，ingest/James/scifi 默认添加 James 标签。启用包含嵌套文件夹后，也会添加 "
+"scifi。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Force full kobo sync"
@@ -6901,6 +7547,11 @@ msgstr "格式 — 包含"
 #: cps/spa_strings.py
 msgid "Formatting is kept where the book page supports it."
 msgstr "在书籍页面支持的情况下，格式会被保留。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Found {count} available books."
+msgstr "找到 {count} 本可用书籍。"
 
 #: cps/spa_strings.py
 msgid "From address"
@@ -7039,6 +7690,10 @@ msgid "Hide Discover section"
 msgstr "隐藏发现区块"
 
 #: cps/spa_strings.py
+msgid "Hide available books"
+msgstr "隐藏可用书籍"
+
+#: cps/spa_strings.py
 msgid "Hide device details"
 msgstr "隐藏设备详情"
 
@@ -7081,12 +7736,24 @@ msgid "Highlights and notes"
 msgstr "高亮和笔记"
 
 #: cps/spa_strings.py
+msgid "History"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hot"
 msgstr "热门"
 
 #: cps/spa_strings.py
 msgid "Hot — Most Downloaded"
 msgstr "热门—最多下载"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Household average"
+msgstr "家庭平均评分"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "How many levels of values to show"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
@@ -7143,6 +7810,10 @@ msgstr ""
 "间以逗号分隔。凭据仍仅用于其原始源。"
 
 #: cps/spa_strings.py
+msgid "Image fit"
+msgstr "图像适配"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "来自 {source} 的图片"
@@ -7155,6 +7826,15 @@ msgstr "导入"
 msgid "Import and export"
 msgstr "导入与导出"
 
+#: cps/spa_strings.py
+msgid "Import this book"
+msgstr "导入此书"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Import this book: {filename}"
+msgstr "导入此书：{filename}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "导入为"
@@ -7166,6 +7846,10 @@ msgstr "已导入书库"
 #: cps/spa_strings.py
 msgid "Importing"
 msgstr "正在导入"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr "在 KOReader 中，为 OPDS 目录启用“使用服务器文件名”。"
 
 #: cps/spa_strings.py
 msgid "In your book"
@@ -7181,13 +7865,29 @@ msgstr "浏览器内阅读目前支持 EPUB。其他格式请下载或使用经�
 msgid "Inactive"
 msgstr "不活跃"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Include nested folders"
+msgstr "包含嵌套文件夹"
+
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "已包含"
 
 #: cps/spa_strings.py
+msgid "Incoming value"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Indexer preset"
 msgstr "索引器预设"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Ingest folder labels"
+msgstr "导入文件夹标签"
+
+#: cps/spa_strings.py
+msgid "Ingest folder settings saved."
+msgstr "导入文件夹设置已保存。"
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
@@ -7227,9 +7927,41 @@ msgstr "KOReader 进度"
 msgid "KOReader sync is not enabled on this server."
 msgstr "此服务器未启用 KOReader 同步。"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "KaiTi"
+msgstr "KaiTi"
+
 #: cps/spa_strings.py
 msgid "Keep connection"
 msgstr "保留连接"
+
+#: cps/spa_strings.py
+msgid "Keep this copy"
+msgstr "保留此副本"
+
+#: cps/spa_strings.py
+msgid "Keep your thoughts about this book here."
+msgstr "在这里记录您对这本书的想法。"
+
+#: cps/spa_strings.py
+msgid "Keep the best format"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the largest files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the most complete metadata"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep the oldest copy"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -7324,6 +8056,26 @@ msgstr "上次同步"
 msgid "Leave a field empty to use its default."
 msgstr "将字段留空可使用其默认值。"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr "留空可保留当前使用书名和第一作者的文件名。请勿包含文件扩展名。"
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Leave blank to keep the existing filename. Example: {series} #{series_index} "
+"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
+"the file extension is added automatically."
+msgstr ""
+"留空可保留现有文件名。示例：{series} #{series_index} - {title}。可用字段包括 "
+"{title}、{authors}、{series} 和 {series_index}；文件扩展名会自动添加。"
+
+#: cps/spa_strings.py
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr "留空可显示任意数量的书籍。结果包含恰好达到最少数量的项目。"
+
 #: cps/spa_strings.py
 msgid ""
 "Leave the credential blank to keep it. Saving switches the connection off "
@@ -7365,6 +8117,11 @@ msgstr ""
 msgid "Lettering"
 msgstr "字体样式"
 
+#: cps/spa_strings.py cps/templates/detail.html
+#: cps/templates/library_rating.html
+msgid "Library rating"
+msgstr "书库评分"
+
 #: cps/spa_strings.py
 msgid "Library settings"
 msgstr "书库设置"
@@ -7399,6 +8156,10 @@ msgstr "加载更多"
 #: cps/templates/read.html
 msgid "Loading"
 msgstr "加载中"
+
+#: cps/spa_strings.py
+msgid "Loading available books…"
+msgstr "正在加载可用书籍…"
 
 #: cps/spa_strings.py
 msgid "Loading device annotations…"
@@ -7552,9 +8313,52 @@ msgid "Member user filter"
 msgstr "成员用户筛选"
 
 #: cps/spa_strings.py
+msgid "Merge and rename"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge into the kept copy"
+msgstr "合并到保留的副本"
+
+#: cps/spa_strings.py
+msgid "Merge formats into the newest copy"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Merge into {name}"
 msgstr "合并至 {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
+"copy is deleted."
+msgstr ""
+"将一个副本合并到「{title}」吗？它缺失的格式会被复制过去，然后该副本将被删除。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merge the other selected values into {name}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Merge the selected values into {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Merge this copy"
+msgstr "合并此副本"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
+"those copies are deleted."
+msgstr ""
+"将 {n} 个副本合并到「{title}」吗？它们缺失的格式会被复制过去，然后这些副本将"
+"被删除。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7562,8 +8366,30 @@ msgid "Merged into {name}"
 msgstr "已合并至 {name}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged into “{title}”."
+msgstr "已合并到「{title}」。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Merged {count} values into {name}, moving {books} book(s)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "元数据网址（OIDC 自动发现）"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr "微软雅黑"
+
+#: cps/spa_strings.py
+msgid "Metadata clean-up"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Metadata enforcement is off, so the book files keep their old metadata."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Min"
@@ -7574,8 +8400,20 @@ msgid "Mine"
 msgstr "我的"
 
 #: cps/spa_strings.py
+msgid "Minimum books"
+msgstr "最少书籍数"
+
+#: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "最低评分"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"缺失的元数据会替换为空文本。书名和丛书使用其排序名称。斜杠会替换为下划线，不"
+"会创建文件夹。"
 
 #: cps/spa_strings.py
 msgid "Mixed lettering — set per line in Advanced."
@@ -7595,10 +8433,14 @@ msgid "More actions for {name}"
 msgstr "{name} 更多操作"
 
 #: cps/spa_strings.py
+msgid "Most books first"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move down"
 msgstr "下移"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Move up"
 msgstr "上移"
 
@@ -7607,10 +8449,30 @@ msgstr "上移"
 msgid "Move {name} down"
 msgstr "下移 {name}"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} down one place"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Move {name} up"
 msgstr "上移 {name}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Move {name} up one place"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} to the top level"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Moved {name} under {parent}"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7662,11 +8524,24 @@ msgstr "新功能！"
 
 #: cps/spa_strings.py
 msgid ""
+"New accounts sync only selected shelves. If no books arrive, add books to a "
+"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
+"library."
+msgstr ""
+"新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的电"
+"子阅读器同步标记。取消勾选此项可同步整个书库。"
+
+#: cps/spa_strings.py
+msgid ""
 "New authors, tags, publishers, and languages will be added after each book's "
 "existing values. Filled single-value fields will be replaced."
 msgstr ""
 "新的作者、标签、出版社和语言将追加到每本书的现有值之后。已填写的单值字段会被"
 "替换。"
+
+#: cps/spa_strings.py
+msgid "New name"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "New password"
@@ -7688,9 +8563,29 @@ msgstr "新智能书架"
 msgid "New user"
 msgstr "新用户"
 
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "New value"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/index.html
 msgid "New: My Library"
 msgstr "新功能：我的书库"
+
+#: cps/spa_strings.py
+msgid "Added, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Added, oldest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, newest first"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Date read, oldest first"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Newest"
@@ -7705,7 +8600,8 @@ msgid "Newznab / Torznab indexer"
 msgstr "Newznab / Torznab 索引器"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-#: cps/templates/feed.xml cps/templates/layout.html
+#: cps/templates/feed.xml cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Next"
 msgstr "下一个"
 
@@ -7724,6 +8620,14 @@ msgstr "允许上传的格式中不包含 EPUB 或 PDF。"
 #: cps/spa_strings.py
 msgid "No approval needed"
 msgstr "无需批准"
+
+#: cps/spa_strings.py
+msgid "No books are available in this download."
+msgstr "此下载中没有可用书籍。"
+
+#: cps/spa_strings.py
+msgid "No book would change with the saved rules."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
@@ -7798,8 +8702,8 @@ msgstr "在此书中找不到符合项目。"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "No matching {items} for \"{query}\"."
-msgstr "找不到符合「{query}」的 {items}。"
+msgid "No matching {items} for the selected filters."
+msgstr "没有符合所选筛选条件的{items}。"
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
@@ -7820,6 +8724,10 @@ msgstr "此设备还没有阅读位置记录。"
 #: cps/spa_strings.py
 msgid "No registered devices."
 msgstr "无已注册设备。"
+
+#: cps/spa_strings.py
+msgid "No rules yet. Add one above, or import a JSON map."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No saved reading places yet."
@@ -7849,6 +8757,14 @@ msgstr "没有可扫描的受支持书籍文件。"
 msgid "No tasks running."
 msgstr "没有正在运行的任务。"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "No unread books in this Discover source."
+msgstr "此发现页来源中没有未读书籍。"
+
+#: cps/spa_strings.py
+msgid "No uploaded fonts yet."
+msgstr "还没有上传的字体。"
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "No valid ISBN found in the scanned text."
 msgstr "在扫描的文本中未找到有效 ISBN。"
@@ -7856,6 +8772,10 @@ msgstr "在扫描的文本中未找到有效 ISBN。"
 #: cps/spa_strings.py
 msgid "No values in this column yet"
 msgstr "此列还没有值"
+
+#: cps/spa_strings.py
+msgid "No values match."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7916,6 +8836,10 @@ msgid "Notes"
 msgstr "笔记"
 
 #: cps/spa_strings.py
+msgid "Nothing applied yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
@@ -7947,6 +8871,10 @@ msgid "Nothing requested yet."
 msgstr "还没有请求。"
 
 #: cps/spa_strings.py
+msgid "Nothing to delete with this strategy."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "尚无可预览的内容。"
 
@@ -7958,11 +8886,24 @@ msgstr "编号清单"
 msgid "OPDS catalog"
 msgstr "OPDS 目录"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "OPDS 下载文件名模板"
+
 #: cps/spa_strings.py
 msgid ""
 "Off by default. Nothing is fetched and no permission changes until you turn "
 "this on."
 msgstr "默认关闭。开启前不会获取任何内容，也不会更改权限。"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Off by default. Only opted-in ratings count, and names are never shown. If "
+"you are the only person sharing a rating for a book, the average is your "
+"score."
+msgstr ""
+"默认关闭。只统计选择分享的评分，且不显示姓名。如果只有您分享了某本书的评分，"
+"平均分就是您的评分。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7985,6 +8926,10 @@ msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
 msgstr "请使用另一台已登录的设备扫描此二维码，或打开下方链接，为此设备授权。"
+
+#: cps/spa_strings.py
+msgid "On shelf"
+msgstr "已在书架上"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8015,6 +8960,10 @@ msgstr "在此设备上"
 msgid "One column"
 msgstr "单栏"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Only Discover picks change; books remain in your library."
+msgstr "仅更改发现页的推荐范围，书籍仍保留在您的书库中。"
+
 #: cps/spa_strings.py
 msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
@@ -8022,6 +8971,22 @@ msgid ""
 msgstr ""
 "只同步您在下方选中的书籍。切换到此模式后，初始没有选中任何书籍，需要您逐本选"
 "择。"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Only values without sub-values can be deleted. Move or rename it first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"One map per field. A rule turns a value into another (rename), several "
+"(split) or none (drop), matching regardless of case and accents. Values no "
+"rule covers stay as they are. Nothing changes in the library until you apply "
+"the preview."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Only values without a rule"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -8135,6 +9100,10 @@ msgstr "其他用户的电子阅读器："
 msgid "PDF reader"
 msgstr "PDF 阅读器"
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "补零的丛书序号："
+
 #: cps/spa_strings.py
 msgid "Page margins"
 msgstr "页面边距"
@@ -8153,7 +9122,7 @@ msgstr "第 {number} 页"
 msgid "Page {page} of {pages}"
 msgstr "第 {page} 页，共 {pages} 页"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
 msgid "Pagination"
 msgstr "分页"
 
@@ -8181,6 +9150,23 @@ msgstr "密码"
 #: cps/spa_strings.py
 msgid "Password (leave blank to keep)"
 msgstr "密码（留空以保留）"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Paste"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Paste at top level"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Paste cancelled."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Paste under {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
@@ -8255,8 +9241,8 @@ msgstr "预设名称"
 msgid "Preset saved."
 msgstr "预设已保存。"
 
-#: cps/spa_strings.py cps/templates/duplicates.html
-#: cps/templates/kobo_reconcile.html
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "预览"
 
@@ -8283,13 +9269,26 @@ msgstr "预览此位置"
 msgid "Previewing {source}. Its saved position will not change."
 msgstr "正在预览 {source}。其保存的阅读位置不会改变。"
 
-#: cps/spa_strings.py cps/templates/layout.html
+#: cps/spa_strings.py
+msgid "Previewing…"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/layout.html
 msgid "Previous"
 msgstr "上一个"
 
 #: cps/spa_strings.py
 msgid "Previous page"
 msgstr "上一页"
+
+#: cps/spa_strings.py
+msgid "Previous settings restored"
+msgstr "已恢复之前的设置"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Private to your account. This does not change the shared Description."
+msgstr "仅您的账户可见，不会更改共享的“简介”。"
 
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
@@ -8325,10 +9324,6 @@ msgid "Rating"
 msgstr "评分"
 
 #: cps/spa_strings.py
-msgid "Rating (stars)"
-msgstr "评分 (星数)"
-
-#: cps/spa_strings.py
 msgid ""
 "Re-enter the credential when changing the connection to a different server."
 msgstr "将连接更改为其他服务器时，请重新输入凭据。"
@@ -8346,8 +9341,17 @@ msgid "Read status filter"
 msgstr "阅读状态筛选"
 
 #: cps/spa_strings.py
+msgid "Reader fonts"
+msgstr "阅读器字体"
+
+#: cps/spa_strings.py
 msgid "Reader settings saved."
 msgstr "阅读器设置已保存。"
+
+#: cps/spa_strings.py
+msgid ""
+"Readers using this font return to Book default when they next open a book."
+msgstr "使用此字体的读者下次打开书籍时，将恢复使用书籍默认字体。"
 
 #: cps/spa_strings.py
 msgid "Reading app"
@@ -8375,6 +9379,14 @@ msgstr "阅读位置"
 msgid "Reading positions"
 msgstr "阅读位置"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Reading status"
+msgstr "阅读状态"
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "阅读状态已更新"
+
 #: cps/spa_strings.py
 msgid "Ready to run requests."
 msgstr "已准备好执行请求。"
@@ -8393,7 +9405,7 @@ msgstr "收件人"
 
 #: cps/spa_strings.py
 msgid "Saved e-reader addresses:"
-msgstr ""
+msgstr "已保存的电子阅读器邮箱地址："
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
@@ -8442,8 +9454,21 @@ msgid "Remember me"
 msgstr "记住我"
 
 #: cps/spa_strings.py
+msgid "Removal waiting for sync"
+msgstr "等待同步后移除"
+
+#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
+msgid "Remove"
+msgstr "移除"
+
+#: cps/spa_strings.py
 msgid "Remove device"
 msgstr "移除设备"
+
+#: cps/spa_strings.py
+msgid "Remove font"
+msgstr "移除字体"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from Currently Reading"
@@ -8482,13 +9507,28 @@ msgid "Remove rule"
 msgstr "移除规则"
 
 #: cps/spa_strings.py
+msgid "Remove sleep screen"
+msgstr "移除休眠画面"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag \"{tag}\""
 msgstr "移除标签“{tag}”"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove the rule for {value}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove these"
 msgstr "移除这些项目"
+
+#: cps/spa_strings.py
+msgid ""
+"Remove this image? Your previous KOReader sleep-screen settings will return "
+"after the next sync."
+msgstr "移除此图片吗？下次同步后将恢复您之前的 KOReader 休眠画面设置。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8504,13 +9544,36 @@ msgid "Removed from Currently Reading."
 msgstr "已从“正在阅读”中移除。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed {n} values no book uses now."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Rename"
 msgstr "重命名"
 
 #: cps/spa_strings.py
+msgid "Rename value"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Rename {name}"
 msgstr "重命名 {name}"
+
+#: cps/spa_strings.py
+msgid "Rename, merge, delete, move or create values"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed and merged {count} values"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Renamed {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reorder"
@@ -8569,9 +9632,22 @@ msgid "Request release"
 msgstr "请求此发布资源"
 
 #: cps/spa_strings.py
+msgid "Request this book"
+msgstr "请求此书"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request this book: {filename}"
+msgstr "请求此书：{filename}"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
 msgstr "请求 {format}"
+
+#: cps/spa_strings.py
+msgid "Requested"
+msgstr "已请求"
 
 #: cps/spa_strings.py
 msgid "Requested by a removed account"
@@ -8589,6 +9665,10 @@ msgstr "请求已提交，需由管理员批准。"
 #: cps/spa_strings.py
 msgid "Requests are paused"
 msgstr "请求已暂停"
+
+#: cps/spa_strings.py
+msgid "Requests are paused. You can still view the available books."
+msgstr "请求已暂停，您仍可查看可用书籍。"
 
 #: cps/spa_strings.py
 msgid "Requests cannot run yet:"
@@ -8615,6 +9695,15 @@ msgid "Reset to defaults"
 msgstr "恢复默认设置"
 
 #: cps/spa_strings.py
+msgid "Resolve automatically"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resolved {groups} groups and deleted {deleted} books."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid "Restore"
 msgstr "恢复"
 
@@ -8627,6 +9716,11 @@ msgstr "恢复 {name}"
 #, python-brace-format
 msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "已为 {accounts} 个账户还原之前的书库模式。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored {n} books."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Restoring…"
@@ -8663,6 +9757,18 @@ msgstr "正在重试。"
 msgid "Reverse-proxy header login"
 msgstr "反向代理标头登录"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review deleted."
+msgstr "书评已删除。"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review or note"
+msgstr "书评或笔记"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review saved."
+msgstr "书评已保存。"
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
@@ -8683,6 +9789,14 @@ msgstr "每次加载行数"
 #: cps/spa_strings.py
 msgid "Rule group"
 msgstr "规则组"
+
+#: cps/spa_strings.py
+msgid "Rules"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rules saved. The preview below is up to date."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -8717,6 +9831,10 @@ msgstr "CWNG 中对应的已完成下载文件夹"
 msgid "Save"
 msgstr "保存"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Save Discover source"
+msgstr "保存发现页来源"
+
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "另存为预设"
@@ -8734,6 +9852,10 @@ msgid "Save for the whole library"
 msgstr "为整个书库保存"
 
 #: cps/spa_strings.py
+msgid "Save ingest folder settings"
+msgstr "保存导入文件夹设置"
+
+#: cps/spa_strings.py
 msgid "Save name"
 msgstr "保存名称"
 
@@ -8744,6 +9866,18 @@ msgstr "保存笔记"
 #: cps/spa_strings.py
 msgid "Save preset"
 msgstr "保存预设"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Save rating"
+msgstr "保存评分"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Save review"
+msgstr "保存书评"
+
+#: cps/spa_strings.py
+msgid "Save rules"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save security settings"
@@ -8756,6 +9890,10 @@ msgstr "保存设置"
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "保存文件，安全弹出 Kobo，然后重启设备。"
+
+#: cps/spa_strings.py
+msgid "Save the rules to update the preview."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8802,6 +9940,10 @@ msgid "Search inside book"
 msgstr "搜索书中内容"
 
 #: cps/spa_strings.py
+msgid "Search library"
+msgstr "搜索书库"
+
+#: cps/spa_strings.py
 msgid "Search remaining catalogs"
 msgstr "搜索其余目录"
 
@@ -8820,6 +9962,10 @@ msgstr "搜索此书"
 #: cps/spa_strings.py
 msgid "Search this catalog"
 msgstr "搜索此目录"
+
+#: cps/spa_strings.py
+msgid "Search title, author, series…"
+msgstr "搜索书名、作者、丛书…"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -9032,6 +10178,10 @@ msgstr "{name} 的设置"
 msgid "Settings saved."
 msgstr "设置已保存。"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Share my ratings in the household average"
+msgstr "将我的评分计入家庭平均评分"
+
 #: cps/spa_strings.py
 msgid "Share with everyone"
 msgstr "与所有人分享"
@@ -9064,7 +10214,13 @@ msgstr "书架设置"
 msgid "Shelf visibility saved."
 msgstr "书架可见性已保存。"
 
-#: cps/spa_strings.py cps/templates/readcbr.html
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Shelf: {name}"
+msgstr "书架：{name}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#: cps/templates/readcbr.html
 msgid "Show"
 msgstr "显示"
 
@@ -9110,6 +10266,10 @@ msgstr "显示设备详情"
 msgid "Show e-reader previews on each candidate"
 msgstr "在每个候选项目上显示电子阅读器预览"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Show every value again"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Show fewer tags"
 msgstr "显示较少标签"
@@ -9126,21 +10286,30 @@ msgstr "在我的 OPDS 订阅源中显示"
 msgid "Show less"
 msgstr "收起"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show library rating"
+msgstr "显示书库评分"
+
 #: cps/spa_strings.py
 msgid "Show more"
 msgstr "展开更多"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "Show only {name} and its sub-values"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Show password"
 msgstr "显示密码"
 
 #: cps/spa_strings.py
-msgid "Show shelf tags"
-msgstr "显示书架标签"
-
-#: cps/spa_strings.py
 msgid "Show shelf drag handles"
 msgstr "显示书架拖动手柄"
+
+#: cps/spa_strings.py
+msgid "Show shelf tags"
+msgstr "显示书架标签"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9150,6 +10319,14 @@ msgid ""
 msgstr ""
 "重新显示全局书库吗？您的选书列表将完整保留，随时切换回来仍可使用。电子阅读器"
 "将在下次更新时同步全局书库。"
+
+#: cps/spa_strings.py
+msgid "Show the labelled Calibre score alongside your own rating."
+msgstr "在个人评分旁显示 Calibre 评分，并标明来源。"
+
+#: cps/spa_strings.py
+msgid "Show the whole image"
+msgstr "显示完整图像"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9181,30 +10358,13 @@ msgid "Showing {shown} of {total} books from the latest device inventory."
 msgstr "显示最新设备清单中 {total} 本书中的 {shown} 本。"
 
 #: cps/spa_strings.py
-msgid "Minimum books"
-msgstr "最少书籍数"
-
-#: cps/spa_strings.py
-msgid "Leave blank to show any number of books. The minimum is inclusive."
-msgstr "留空可显示任意数量的书籍。结果包含恰好达到最少数量的项目。"
-
-#: cps/spa_strings.py
-msgid "Enter a whole number of at least 1."
-msgstr "请输入不小于 1 的整数。"
-
-#: cps/spa_strings.py
-msgid "Correct the minimum books value to see results."
-msgstr "请修正最少书籍数以查看结果。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "No matching {items} for the selected filters."
-msgstr "没有符合所选筛选条件的{items}。"
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} {items}."
 msgstr "正在显示 {shown} 项，共 {total} 项{items}。"
+
+#: cps/spa_strings.py
+msgid "Shown when this device sleeps in KOReader."
+msgstr "此设备在 KOReader 中休眠时显示。"
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -9234,6 +10394,10 @@ msgstr "登录"
 msgid "Signing in…"
 msgstr "登录中..."
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "SimSun"
+msgstr "宋体"
+
 #: cps/spa_strings.py
 msgid "Site title"
 msgstr "网站标题"
@@ -9243,12 +10407,31 @@ msgid "Size (pt)"
 msgstr "字号（磅）"
 
 #: cps/spa_strings.py
+msgid "Sleep screen"
+msgstr "休眠画面"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen for {name}"
+msgstr "{name} 的休眠画面"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sleep screen preview for {name}"
+msgstr "{name} 的休眠画面预览"
+
+#: cps/spa_strings.py
 msgid "Smart shelf"
 msgstr "智能书架"
 
 #: cps/api/magicshelves.py cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "找不到智能书架。"
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Smart shelf: {name}"
+msgstr "智能书架：{name}"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9274,6 +10457,10 @@ msgid "Some sources need a key for better covers"
 msgstr "某些来源需要密钥以获得更好的封面"
 
 #: cps/spa_strings.py
+msgid "Something is already there. Move it first."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Something went wrong"
 msgstr "发生错误"
 
@@ -9284,6 +10471,10 @@ msgstr "发生错误，请再试一次。"
 #: cps/spa_strings.py
 msgid "Sort order"
 msgstr "排序方式"
+
+#: cps/spa_strings.py
+msgid "Sort values"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Source details"
@@ -9314,7 +10505,8 @@ msgstr "开始阅读"
 msgid "Starting scan…"
 msgstr "开始扫描..."
 
-#: cps/spa_strings.py cps/templates/tasks.html
+#: cps/spa_strings.py cps/templates/hardcover_missing_ids.html
+#: cps/templates/tasks.html
 msgid "Status"
 msgstr "任务状态"
 
@@ -9329,6 +10521,10 @@ msgstr "原厂 Kobo 同步 URL"
 #: cps/spa_strings.py
 msgid "Storyteller is configured but could not be reached."
 msgstr "Storyteller 已配置，但无法连接。"
+
+#: cps/spa_strings.py
+msgid "Strategy"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -9389,6 +10585,11 @@ msgstr "同步到 Kobo"
 #: cps/spa_strings.py
 msgid "Sync to e-readers"
 msgstr "同步到电子阅读器"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr "TTF、OTF、WOFF 或 WOFF2，每个文件最多 {n} MiB。"
 
 #: cps/spa_strings.py
 msgid "Table view"
@@ -9466,12 +10667,28 @@ msgstr ""
 "无法通过局域网访问该地址。不允许使用回环地址、链路本地地址或云元数据地址。"
 
 #: cps/spa_strings.py
+msgid "That book choice was out of date. Refreshing the list…"
+msgstr "该书籍选择已过期。正在刷新列表…"
+
+#: cps/spa_strings.py
+msgid "That book choice was out of date. The list was refreshed; choose again."
+msgstr "该书籍选择已过期。列表已刷新，请重新选择。"
+
+#: cps/spa_strings.py
+msgid "That book could not be requested. Try again."
+msgstr "无法请求该书。请重试。"
+
+#: cps/spa_strings.py
 msgid "That catalog no longer exists."
 msgstr "该目录已不存在。"
 
 #: cps/spa_strings.py
 msgid "That choice expired. Refresh the page and pick the file again."
 msgstr "该选择已过期。请刷新页面并重新选择文件。"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "That name cannot be used"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "That page expired. Go back to the top and try again."
@@ -9498,6 +10715,14 @@ msgstr "该请求的当前状态不允许重试。"
 #: cps/spa_strings.py
 msgid "That request is no longer waiting."
 msgstr "该请求已不再等待处理。"
+
+#: cps/spa_strings.py
+msgid "That value is already at the bottom of its level."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "That value is already at the top of its level."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The Calibre library folder could not be found."
@@ -9539,12 +10764,26 @@ msgstr ""
 "保持不变。"
 
 #: cps/spa_strings.py
+msgid "The available books could not be loaded. Try again."
+msgstr "无法加载可用书籍。请重试。"
+
+#: cps/spa_strings.py
 msgid "The background scheduler is not running."
 msgstr "后台调度器未运行。"
 
 #: cps/spa_strings.py
+msgid "The book files are being updated too."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The book is still opening. Try again in a moment."
 msgstr "书籍仍在打开中。请稍后重试。"
+
+#: cps/spa_strings.py
+msgid ""
+"The book or completed download changed. Restore its original files before "
+"trying again."
+msgstr "书籍或已完成的下载已发生更改。请恢复原始文件后重试。"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
@@ -9569,6 +10808,18 @@ msgstr "无法加载目录。"
 
 #: cps/spa_strings.py
 msgid ""
+"The choice was out of date and the available books could not be refreshed. "
+"Try again."
+msgstr "该选择已过期，且无法刷新可用书籍。请重试。"
+
+#: cps/spa_strings.py
+msgid ""
+"The chosen book is no longer in the completed download. Restore its original "
+"file before trying again."
+msgstr "所选书籍已不在已完成的下载中。请恢复其原始文件后重试。"
+
+#: cps/spa_strings.py
+msgid ""
 "The completed download contains multiple books. A single-book release is "
 "required."
 msgstr "已完成的下载包含多本书。需要仅包含一本书的发布资源。"
@@ -9576,6 +10827,12 @@ msgstr "已完成的下载包含多本书。需要仅包含一本书的发布资
 #: cps/spa_strings.py
 msgid "The completed download contains no usable EPUB or PDF."
 msgstr "已完成的下载不包含可用的 EPUB 或 PDF。"
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download exceeds the safe file limits. Choose a smaller "
+"release."
+msgstr "已完成的下载超出了安全文件限制。请选择较小的发布资源。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9672,6 +10929,10 @@ msgid "The list of people could not be loaded."
 msgstr "无法加载用户列表。"
 
 #: cps/spa_strings.py
+msgid "The native Kindle lock screen is unchanged."
+msgstr "Kindle 原生锁屏画面保持不变。"
+
+#: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "预设更改失败。请重试。"
 
@@ -9698,6 +10959,19 @@ msgstr "无法停止请求。"
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "The scan reached its limit. More ISBNs may be present in the file."
 msgstr "扫描已达到上限。文件中可能还有更多 ISBN。"
+
+#: cps/spa_strings.py
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr "所选列不可用。导入前请选择其他目标，或禁用文件夹标签。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"The selected values are removed from {count} book(s). The books are kept — "
+"they simply lose the value. There is no undo."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -9773,6 +11047,10 @@ msgid "There are no other accounts on this server yet."
 msgstr "此服务器上还没有其他账户。"
 
 #: cps/spa_strings.py
+msgid "There is already a rule for this value."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "These results could not be refreshed and may be out of date."
 msgstr "无法刷新这些结果，显示内容可能已过期。"
 
@@ -9786,6 +11064,17 @@ msgstr "无法加载这些设置，目前无法确认此页面上内容的准确
 msgid ""
 "These settings could not be refreshed, so what is shown may be out of date."
 msgstr "无法刷新这些设置，显示内容可能已过期。"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"These values are folded into {name}. Their books keep a value, but the "
+"values themselves are gone. There is no undo."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html cps/web.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr "此发现页来源不可用。请选择其他来源。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -9853,6 +11142,10 @@ msgid ""
 "This database carries permissions from the old experimental Store. They need "
 "review before book sources can be switched on."
 msgstr "此数据库保留了旧版实验性商店的权限。开启书源之前，需要先检查这些权限。"
+
+#: cps/spa_strings.py
+msgid "This device cannot show a custom KOReader sleep screen."
+msgstr "此设备无法显示自定义 KOReader 休眠画面。"
 
 #: cps/spa_strings.py
 msgid "This device has not reported its inventory yet."
@@ -9938,8 +11231,18 @@ msgid ""
 msgstr "此页面遇到错误，无法显示。您的书库没有问题，重新加载通常即可解决。"
 
 #: cps/spa_strings.py
+msgid ""
+"This permanently removes the extra copies from your library. It cannot be "
+"undone."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This release’s download address is not trusted by this connection."
 msgstr "此连接不信任该资源的下载地址。"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "This removes your private review or note for this book."
+msgstr "这会删除您对此书的私人书评或笔记。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -9952,6 +11255,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
 msgstr "此请求需要管理员重新批准。"
+
+#: cps/spa_strings.py
+msgid "This rule cannot be edited here. It will be kept unless you remove it."
+msgstr "无法在此编辑这条规则。除非您将其移除，否则会继续保留。"
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -9968,6 +11275,46 @@ msgstr ""
 msgid ""
 "This torrent uses a tracker outside the origins allowed by the administrator."
 msgstr "此种子使用了不在管理员允许范围内的 Tracker 源。"
+
+#: cps/spa_strings.py
+msgid "This value has sub-values, so they are renamed too."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will be created at the same level as {name}, just below it."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. There is no undo."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick another value to merge into this one"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Tick the value it should go under, then press Paste on that row. The valid "
+"rows are highlighted."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before cutting it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value before moving it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to merge the others into it"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Tick this value to paste into it"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -10048,7 +11395,8 @@ msgstr "信任身份验证标头"
 msgid "Try My Library"
 msgstr "试试「我的书库」"
 
-#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+#: cps/templates/cwng_feedback_popup.html
 msgid "Try again"
 msgstr "再试一次"
 
@@ -10097,10 +11445,19 @@ msgstr "输入上方地址，然后输入此账户的用户名，以及账户密
 msgid "Unarchive"
 msgstr "取消归档"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+#, python-brace-format
+msgid "Unavailable column: {name}"
+msgstr "不可用的列：{name}"
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #, python-brace-format
 msgid "Unavailable files: {formats}"
 msgstr "不可用的文件：{formats}"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Unavailable source"
+msgstr "来源不可用"
 
 #: cps/spa_strings.py
 msgid "Undo"
@@ -10109,6 +11466,10 @@ msgstr "撤销"
 #: cps/spa_strings.py
 msgid "Undoing…"
 msgstr "正在撤销…"
+
+#: cps/spa_strings.py
+msgid "Undone"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unhide"
@@ -10142,9 +11503,22 @@ msgstr "解锁封面以变更"
 msgid "Unpin sidebar"
 msgstr "取消固定侧边栏"
 
+#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
+#: cps/web.py
+msgid "Unrated"
+msgstr "未评分"
+
+#: cps/spa_strings.py
+msgid "Unsaved changes to the rules."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Unseeded books"
 msgstr "同步数据未初始化的书籍"
+
+#: cps/spa_strings.py
+msgid "Unsupported rule"
+msgstr "不支持的规则"
 
 #: cps/spa_strings.py
 msgid "Untitled"
@@ -10171,6 +11545,14 @@ msgid "Update failed."
 msgstr "更新失败。"
 
 #: cps/spa_strings.py
+msgid "Update the CWNG plugin"
+msgstr "更新 CWNG 插件"
+
+#: cps/spa_strings.py
+msgid "Update the CWNG plugin on this device, then sync."
+msgstr "请在此设备上更新 CWNG 插件，然后同步。"
+
+#: cps/spa_strings.py
 msgid "Upload a book"
 msgstr "上传一本书"
 
@@ -10183,6 +11565,20 @@ msgid "Upload books"
 msgstr "上传书籍"
 
 #: cps/spa_strings.py
+msgid "Upload font"
+msgstr "上传字体"
+
+#: cps/spa_strings.py
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font choices "
+"stay available."
+msgstr "上传一次字体，即可供所有 EPUB 阅读器用户使用。原有字体选项仍会保留。"
+
+#: cps/spa_strings.py
+msgid "Uploaded reader fonts"
+msgstr "已上传的阅读器字体"
+
+#: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "此服务器上您的账户不支持上传。"
 
@@ -10190,6 +11586,10 @@ msgstr "此服务器上您的账户不支持上传。"
 #, python-brace-format
 msgid "Use ISBN {isbn}"
 msgstr "使用 ISBN {isbn}"
+
+#: cps/spa_strings.py
+msgid "Use a JPEG or PNG image up to 10 MiB."
+msgstr "请使用不超过 10 MiB 的 JPEG 或 PNG 图片。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10217,6 +11617,12 @@ msgstr "使用此封面"
 #: cps/spa_strings.py
 msgid "Use this design"
 msgstr "使用此设计"
+
+#: cps/spa_strings.py cps/templates/email_edit.html
+#, python-brace-format
+msgid ""
+"Use {series:|(|) }{title} to omit the series prefix when no series is set."
+msgstr "使用 {series:|(|) }{title} 可在未设置丛书时省略丛书前缀。"
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
@@ -10266,6 +11672,14 @@ msgstr "使用候选值只会替换此表单中的 ISBN 标识符。请保存更
 msgid "Using the image behind that Google link"
 msgstr "正在使用该 Google 链接指向的图片"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "Value not found"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Values in your library"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Versions"
 msgstr "版本"
@@ -10293,7 +11707,7 @@ msgstr "视图设置"
 
 #: cps/spa_strings.py
 msgid "Viewer"
-msgstr "查看器"
+msgstr "允许在线阅读"
 
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
@@ -10304,8 +11718,20 @@ msgid "Waiting for approval"
 msgstr "等待批准"
 
 #: cps/spa_strings.py
+msgid "Waiting for device details"
+msgstr "等待设备详情"
+
+#: cps/spa_strings.py
+msgid "Waiting for next sync"
+msgstr "等待下次同步"
+
+#: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
 msgstr "正在等待您的授权…"
+
+#: cps/spa_strings.py
+msgid "Waiting for you to choose a book"
+msgstr "等待您选择书籍"
 
 #: cps/spa_strings.py
 msgid ""
@@ -10388,6 +11814,10 @@ msgstr "撰写笔记"
 msgid "Write a note…"
 msgstr "撰写笔记…"
 
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Write subfolder names to"
+msgstr "将子文件夹名称写入"
+
 #: cps/spa_strings.py
 msgid "You are not allowed to edit this shelf"
 msgstr "您无权编辑此书架"
@@ -10466,6 +11896,22 @@ msgstr ""
 msgid "Your personal digital library"
 msgstr "您的个人数字书库"
 
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating"
+msgstr "您的评分"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid "Your rating saved."
+msgstr "您的评分已保存。"
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, highest first"
+msgstr "个人评分，从高到低"
+
+#: cps/spa_strings.py cps/templates/_book_organizer.html
+msgid "Your rating, lowest first"
+msgstr "个人评分，从低到高"
+
 #: cps/spa_strings.py
 msgid "Your requests"
 msgstr "您的请求"
@@ -10474,9 +11920,20 @@ msgstr "您的请求"
 msgid "Your requests could not be loaded. They have not been lost."
 msgstr "无法加载您的请求，但请求并未丢失。"
 
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Your review"
+msgstr "您的书评"
+
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr "显示您保存的电子阅读器地址—仅限此次发送时变更。"
+
+#: cps/spa_strings.py cps/templates/personal_rating.html
+msgid ""
+"Your score does not change the Calibre library rating. Sharing is off unless "
+"you opt in in your account."
+msgstr ""
+"您的评分不会更改 Calibre 书库评分。除非您在账户中主动开启，否则不会分享评分。"
 
 #: cps/spa_strings.py
 msgid "all rules"
@@ -10515,9 +11972,17 @@ msgstr "电子阅读器"
 msgid "e.g. Unread sci-fi"
 msgstr "例如：未读科幻小说"
 
+#: cps/spa_strings.py cps/templates/email_edit.html
+msgid "eReader attachment filename template"
+msgstr "电子阅读器附件文件名模板"
+
 #: cps/spa_strings.py
 msgid "eReader email subject"
 msgstr "电子阅读器电子邮件主题"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+msgid "has sub-values"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "just now"
@@ -10569,13 +12034,10 @@ msgstr "还有 {count} 个目录尚未搜索。"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{count} column"
-msgstr "{count} 列"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{count} columns"
-msgstr "{count} 列"
+msgid ""
+"{count} existing value(s) will be merged into this one. You will be asked to "
+"confirm."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10597,6 +12059,11 @@ msgstr "{count} 个文件已加入导入队列"
 msgid "{count} files rejected"
 msgstr "{count} 个文件被拒绝"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} levels"
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} matches"
@@ -10617,10 +12084,25 @@ msgstr "{count} 个结果"
 msgid "{count} results for \"{query}\""
 msgstr "「{query}」的 {count} 个结果"
 
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "{count} value(s) hidden by the filters above"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{deleted} books in {groups} groups would be deleted."
+msgstr ""
+
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{done} of {total}"
 msgstr "{done} / {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{failed} of {total} books could not be added. They remain selected."
+msgstr "{total} 本书中有 {failed} 本无法添加，仍保持选中状态。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10636,6 +12118,21 @@ msgstr "{free} 可用，共 {total}"
 #, python-brace-format
 msgid "{name} hex value"
 msgstr "{name} 的十六进制值"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} is ready to paste. Choose where it should go."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved down one place."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} moved up one place."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -10686,6 +12183,21 @@ msgstr "{n} 个已指派到 {name}。"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} book(s) added to {shelf}."
+msgstr "已将 {n} 本书添加到 {shelf}。"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books could not be changed: {list}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "最新清单中有 {n} 本书"
 
@@ -10711,6 +12223,16 @@ msgstr "{n} 条高亮和笔记"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} of {max} characters"
+msgstr "{n} / {max} 个字符"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} skipped because they changed since the preview or were left out."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
 msgstr "{ok} / {total} 个已指派到 {name}。"
 
@@ -10726,13 +12248,39 @@ msgstr "已读 {percent}%"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{rating} out of 5"
+msgstr "{rating} / 5"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{seeded} of {total} books seeded"
 msgstr "已初始化 {seeded} 本书的同步数据，共 {total} 本"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{size} bytes"
+msgstr "{size} 字节"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
+"for retry."
+msgstr ""
+"已将 {succeeded} 本书添加到 {shelf}；{failed} 本失败。失败的书籍仍保持选中状"
+"态，便于重试。"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
+
+#: cps/spa_strings.py cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"“{name}” has sub-values, so it cannot be merged away. Move or rename it "
+"instead."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -10750,736 +12298,74 @@ msgstr "← 返回登录"
 msgid "← Library"
 msgstr "← 书库"
 
-#: cps/spa_strings.py
-msgid "Add books"
-msgstr "添加书籍"
-
-#: cps/spa_strings.py
-msgid "Add books to shelf"
-msgstr "向书架添加书籍"
-
-#: cps/spa_strings.py
-msgid "Add selected"
-msgstr "添加选中项"
-
-#: cps/spa_strings.py
-msgid "Could not add the selected books. Please try again."
-msgstr "无法添加选中的书籍。请重试。"
-
-#: cps/spa_strings.py
-msgid "Could not load books."
-msgstr "无法加载书籍。"
-
-#: cps/spa_strings.py
-msgid "On shelf"
-msgstr "已在书架上"
-
-#: cps/spa_strings.py
-msgid "Search library"
-msgstr "搜索书库"
-
-#: cps/spa_strings.py
-msgid "Search title, author, series…"
-msgstr "搜索书名、作者、丛书…"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{failed} of {total} books could not be added. They remain selected."
-msgstr "{total} 本书中有 {failed} 本无法添加，仍保持选中状态。"
-
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Password requirements:"
-msgstr ""
+msgstr "密码要求："
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a letter"
-msgstr ""
+msgstr "1个字母"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a lowercase letter"
-msgstr ""
+msgstr "1个小写字母"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a number"
-msgstr ""
+msgstr "1个数字"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a special character"
-msgstr ""
+msgstr "1个特殊字符"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "an uppercase letter"
-msgstr ""
+msgstr "1个大写字母"
 
 #: cps/spa_strings.py
 msgid "at least 1 character"
-msgstr ""
+msgstr "至少1个字符"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "at least {count} characters"
-msgstr ""
+msgstr "至少 {count} 个字符"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "including {rules}"
+msgstr "包含 {rules}"
+
+#: cps/spa_strings.py
+msgid "Keep"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"New accounts sync only selected shelves. If no books arrive, add books to a "
-"shelf and enable its e-reader sync mark. Uncheck this to sync your whole "
-"library."
+"Keeps one book in every group and deletes the other copies, using the "
+"strategy you choose."
 msgstr ""
-"新账户仅同步选定书架。如果没有收到书籍，请将书籍添加到书架，并开启该书架的电"
-"子阅读器同步标记。取消勾选此项可同步整个书库。"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Actions for {title}"
-msgstr "{title} 的操作"
-
-#: cps/spa_strings.py
-msgid "Could not update this book. Try again."
-msgstr "无法更新此书。请重试。"
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "收藏"
-
-#: cps/spa_strings.py
-msgid ""
-"Choose fonts you are allowed to share with this server’s readers. Files stay "
-"in the configuration volume across upgrades."
+msgid "Delete {count} duplicate books?"
 msgstr ""
-"请选择您有权与此服务器读者分享的字体。字体文件保存在配置卷中，升级后仍会保"
-"留。"
-
-#: cps/spa_strings.py
-msgid "Could not load reader fonts."
-msgstr "无法加载阅读器字体。"
-
-#: cps/spa_strings.py
-msgid "Could not remove font."
-msgstr "无法移除字体。"
-
-#: cps/spa_strings.py
-msgid "Could not upload font."
-msgstr "无法上传字体。"
-
-#: cps/spa_strings.py
-msgid "Display name (optional)"
-msgstr "显示名称（可选）"
-
-#: cps/spa_strings.py
-msgid "Font file"
-msgstr "字体文件"
-
-#: cps/spa_strings.py
-msgid "Font file is too large."
-msgstr "字体文件过大。"
-
-#: cps/spa_strings.py
-msgid "Font is available in both EPUB readers."
-msgstr "两个 EPUB 阅读器均可使用此字体。"
-
-#: cps/spa_strings.py
-msgid "Font removed."
-msgstr "字体已移除。"
-
-#: cps/spa_strings.py
-msgid "No uploaded fonts yet."
-msgstr "还没有上传的字体。"
-
-#: cps/spa_strings.py
-msgid "Reader fonts"
-msgstr "阅读器字体"
-
-#: cps/spa_strings.py
-msgid ""
-"Readers using this font return to Book default when they next open a book."
-msgstr "使用此字体的读者下次打开书籍时，将恢复使用书籍默认字体。"
-
-#: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
-#: cps/templates/user_table.html
-msgid "Remove"
-msgstr "移除"
-
-#: cps/spa_strings.py
-msgid "Remove font"
-msgstr "移除字体"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
-msgstr "TTF、OTF、WOFF 或 WOFF2，每个文件最多 {n} MiB。"
-
-#: cps/spa_strings.py
-msgid "Upload font"
-msgstr "上传字体"
-
-#: cps/spa_strings.py
-msgid ""
-"Upload fonts once for everyone using the EPUB readers. Existing font choices "
-"stay available."
-msgstr "上传一次字体，即可供所有 EPUB 阅读器用户使用。原有字体选项仍会保留。"
-
-#: cps/spa_strings.py
-msgid "Uploaded reader fonts"
-msgstr "已上传的阅读器字体"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "Arial"
-msgstr "Arial"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "KaiTi"
-msgstr "KaiTi"
-
-#: cps/spa_strings.py
-msgid "Microsoft YaHei"
-msgstr "微软雅黑"
-
-#: cps/spa_strings.py cps/templates/read.html
-msgid "SimSun"
-msgstr "宋体"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Your review"
-msgstr "您的书评"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Private to your account. This does not change the shared Description."
-msgstr "仅您的账户可见，不会更改共享的“简介”。"
-
-#: cps/spa_strings.py
-msgid "Keep your thoughts about this book here."
-msgstr "在这里记录您对这本书的想法。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review or note"
-msgstr "书评或笔记"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Add a review"
-msgstr "添加书评"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Edit review"
-msgstr "编辑书评"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Save review"
-msgstr "保存书评"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete review"
-msgstr "删除书评"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Delete your review?"
-msgstr "删除您的书评吗？"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "This removes your private review or note for this book."
-msgstr "这会删除您对此书的私人书评或笔记。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review saved."
-msgstr "书评已保存。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Review deleted."
-msgstr "书评已删除。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not load your review."
-msgstr "无法加载您的书评。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not save review."
-msgstr "无法保存书评。"
-
-#: cps/spa_strings.py cps/templates/book_review.html
-msgid "Could not delete review."
-msgstr "无法删除书评。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} of {max} characters"
-msgstr "{n} / {max} 个字符"
 
 #: cps/spa_strings.py cps/templates/book_review.html
 msgid "Review text exceeds 10000 characters"
 msgstr "书评超过 10000 个字符"
 
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Disabled"
-msgstr "已禁用"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Ingest folder labels"
-msgstr "导入文件夹标签"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Add ingest subfolder names to book tags or an existing custom column. "
-"Existing values are kept; files in the ingest root add no labels."
-msgstr ""
-"将导入子文件夹名称添加为书籍标签，或写入现有自定义列。现有值会保留；导入根目"
-"录中的文件不会添加标签。"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"For example, ingest/James/scifi adds James by default. Include nested "
-"folders to add scifi too."
-msgstr ""
-"例如，ingest/James/scifi 默认添加 James 标签。启用包含嵌套文件夹后，也会添加 "
-"scifi。"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Write subfolder names to"
-msgstr "将子文件夹名称写入"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid "Include nested folders"
-msgstr "包含嵌套文件夹"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-msgid ""
-"Custom columns must already exist and use comma-separated text, like tags. "
-"Create them in Calibre desktop first."
-msgstr ""
-"自定义列必须已存在，且像标签一样使用逗号分隔文本。请先在 Calibre 桌面版中创"
-"建。"
-
-#: cps/spa_strings.py cps/templates/cwa_settings.html
-#, python-brace-format
-msgid "Unavailable column: {name}"
-msgstr "不可用的列：{name}"
-
-#: cps/spa_strings.py
-msgid ""
-"The selected column is unavailable. Choose another target or disable folder "
-"labels before importing."
-msgstr "所选列不可用。导入前请选择其他目标，或禁用文件夹标签。"
-
-#: cps/spa_strings.py
-msgid "Could not load ingest folder settings."
-msgstr "无法加载导入文件夹设置。"
-
-#: cps/spa_strings.py
-msgid "Could not save ingest folder settings."
-msgstr "无法保存导入文件夹设置。"
-
-#: cps/spa_strings.py
-msgid "Ingest folder settings saved."
-msgstr "导入文件夹设置已保存。"
-
-#: cps/spa_strings.py
-msgid "Save ingest folder settings"
-msgstr "保存导入文件夹设置"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Discover source"
-msgstr "发现页书籍来源"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Current library"
-msgstr "当前书库"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Shelf: {name}"
-msgstr "书架：{name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-#, python-brace-format
-msgid "Smart shelf: {name}"
-msgstr "智能书架：{name}"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Unavailable source"
-msgstr "来源不可用"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Save Discover source"
-msgstr "保存发现页来源"
-
-#: cps/spa_strings.py
-msgid "Change Discover source"
-msgstr "更改发现页来源"
-
-#: cps/spa_strings.py cps/web.py
-msgid "Discover source saved."
-msgstr "发现页来源已保存。"
-
-#: cps/spa_strings.py
-msgid "Could not load Discover sources."
-msgstr "无法加载发现页来源。"
-
-#: cps/spa_strings.py cps/web.py
-msgid "Could not save Discover source. Please try again."
-msgstr "无法保存发现页来源。请重试。"
-
-#: cps/spa_strings.py cps/templates/index.html cps/web.py
-msgid "This Discover source is unavailable. Choose another source."
-msgstr "此发现页来源不可用。请选择其他来源。"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "No unread books in this Discover source."
-msgstr "此发现页来源中没有未读书籍。"
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid "Only Discover picks change; books remain in your library."
-msgstr "仅更改发现页的推荐范围，书籍仍保留在您的书库中。"
-
-#: cps/spa_strings.py
-msgid "A few random picks from your Discover source"
-msgstr "从您的发现页来源中随机推荐几本书"
-
-#: cps/spa_strings.py cps/templates/detail.html
-msgid "Reading status"
-msgstr "阅读状态"
-
-#: cps/spa_strings.py cps/tasks_status.py cps/templates/detail.html
-#: cps/templates/search_form.html
-msgid "Finished"
-msgstr "已完成"
-
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Update status"
 msgstr "更新状态"
-
-#: cps/spa_strings.py
-msgid "Reading status updated"
-msgstr "阅读状态已更新"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not update reading status."
 msgstr "无法更新阅读状态。"
 
 #: cps/spa_strings.py
-msgid "Could not update reading status. Please try again."
-msgstr "无法更新阅读状态。请重试。"
-
-#: cps/spa_strings.py
-msgid "Did not finish and On hold keep your reading position."
-msgstr "“放弃阅读”和“暂停阅读”会保留您的阅读位置。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Add {title} to a shelf"
-msgstr "将 {title} 添加到书架"
-
-#: cps/spa_strings.py
-msgid "Drag to a shelf, or choose a shelf"
-msgstr "拖到书架上，或选择一个书架"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} book(s) added to {shelf}."
-msgstr "已将 {n} 本书添加到 {shelf}。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{succeeded} added to {shelf}; {failed} failed. Failed books remain selected "
-"for retry."
-msgstr ""
-"已将 {succeeded} 本书添加到 {shelf}；{failed} 本失败。失败的书籍仍保持选中状"
-"态，便于重试。"
-
-#: cps/spa_strings.py
-msgid "Could not add books to the shelf. Please try again."
-msgstr "无法向书架添加书籍。请重试。"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Example:"
-msgstr "示例："
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Filename template fields and examples"
-msgstr "文件名模板字段与示例"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "First character:"
-msgstr "首字符："
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "In KOReader, enable Use server filenames for the OPDS catalog."
-msgstr "在 KOReader 中，为 OPDS 目录启用“使用服务器文件名”。"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Leave blank to keep the current title and first-author filename. Do not "
-"include the file extension."
-msgstr "留空可保留当前使用书名和第一作者的文件名。请勿包含文件扩展名。"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid ""
-"Missing metadata becomes empty text. Title and series use their sort names. "
-"Slashes become underscores, not folders."
-msgstr ""
-"缺失的元数据会替换为空文本。书名和丛书使用其排序名称。斜杠会替换为下划线，不"
-"会创建文件夹。"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "OPDS download filename template"
-msgstr "OPDS 下载文件名模板"
-
-#: cps/spa_strings.py cps/templates/config_view_edit.html
-msgid "Padded series number:"
-msgstr "补零的丛书序号："
-
-#: cps/spa_strings.py
-msgid "Waiting for you to choose a book"
-msgstr "等待您选择书籍"
-
-#: cps/spa_strings.py
-msgid "Book requested. An administrator has to approve it."
-msgstr "书籍请求已提交，需由管理员批准。"
-
-#: cps/spa_strings.py
-msgid "Book added to your activity."
-msgstr "书籍已添加到您的活动记录。"
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. Refreshing the list…"
-msgstr "该书籍选择已过期。正在刷新列表…"
-
-#: cps/spa_strings.py
-msgid "Requests are paused. You can still view the available books."
-msgstr "请求已暂停，您仍可查看可用书籍。"
-
-#: cps/spa_strings.py
-msgid "That book could not be requested. Try again."
-msgstr "无法请求该书。请重试。"
-
-#: cps/spa_strings.py
-msgid ""
-"The choice was out of date and the available books could not be refreshed. "
-"Try again."
-msgstr "该选择已过期，且无法刷新可用书籍。请重试。"
-
-#: cps/spa_strings.py
-msgid "That book choice was out of date. The list was refreshed; choose again."
-msgstr "该书籍选择已过期。列表已刷新，请重新选择。"
-
-#: cps/spa_strings.py
-msgid "The available books could not be loaded. Try again."
-msgstr "无法加载可用书籍。请重试。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Found {count} available books."
-msgstr "找到 {count} 本可用书籍。"
-
-#: cps/spa_strings.py
-msgid "Choose a book from this download"
-msgstr "从此下载中选择一本书"
-
-#: cps/spa_strings.py
-msgid "Hide available books"
-msgstr "隐藏可用书籍"
-
-#: cps/spa_strings.py
-msgid "Choose another book"
-msgstr "选择其他书籍"
-
-#: cps/spa_strings.py
-msgid "Loading available books…"
-msgstr "正在加载可用书籍…"
-
-#: cps/spa_strings.py
-msgid "No books are available in this download."
-msgstr "此下载中没有可用书籍。"
-
-#: cps/spa_strings.py
-msgid "Import this book"
-msgstr "导入此书"
-
-#: cps/spa_strings.py
-msgid "Request this book"
-msgstr "请求此书"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Import this book: {filename}"
-msgstr "导入此书：{filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Request this book: {filename}"
-msgstr "请求此书：{filename}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{size} bytes"
-msgstr "{size} 字节"
-
-#: cps/spa_strings.py
-msgid "Requested"
-msgstr "已请求"
-
-#: cps/spa_strings.py
-msgid ""
-"The chosen book is no longer in the completed download. Restore its original "
-"file before trying again."
-msgstr "所选书籍已不在已完成的下载中。请恢复其原始文件后重试。"
-
-#: cps/spa_strings.py
-msgid ""
-"The book or completed download changed. Restore its original files before "
-"trying again."
-msgstr "书籍或已完成的下载已发生更改。请恢复原始文件后重试。"
-
-#: cps/spa_strings.py
-msgid ""
-"The completed download exceeds the safe file limits. Choose a smaller "
-"release."
-msgstr "已完成的下载超出了安全文件限制。请选择较小的发布资源。"
-
-#: cps/spa_strings.py
-msgid "Unsupported rule"
-msgstr "不支持的规则"
-
-#: cps/spa_strings.py
-msgid "This rule cannot be edited here. It will be kept unless you remove it."
-msgstr "无法在此编辑这条规则。除非您将其移除，否则会继续保留。"
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "All tags"
-msgstr "所有标签"
-
-#: cps/spa_strings.py
-msgid "Could not load tags. Please try again."
-msgstr "无法加载标签。请重试。"
-
-#: cps/spa_strings.py
-msgid "Allow completed DRM-free MOBI 6 books"
-msgstr "允许下载完成的无 DRM MOBI 6 书籍"
-
-#: cps/spa_strings.py
-msgid ""
-"Applies only to this download client. The server upload-format setting must "
-"also allow MOBI. Normal conversion settings apply; without conversion, MOBI "
-"can be downloaded but cannot be opened in the web reader."
-msgstr ""
-"仅适用于此下载客户端。服务器的上传格式设置也必须允许 MOBI。常规转换设置仍然适"
-"用；未经转换的 MOBI 可以下载，但无法在网页阅读器中打开。"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not load your rating."
-msgstr "无法加载您的评分。"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Could not save your rating."
-msgstr "无法保存您的评分。"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Household average"
-msgstr "家庭平均评分"
-
-#: cps/spa_strings.py cps/templates/detail.html
-#: cps/templates/library_rating.html
-msgid "Library rating"
-msgstr "书库评分"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid ""
-"Off by default. Only opted-in ratings count, and names are never shown. If "
-"you are the only person sharing a rating for a book, the average is your "
-"score."
-msgstr ""
-"默认关闭。只统计选择分享的评分，且不显示姓名。如果只有您分享了某本书的评分，"
-"平均分就是您的评分。"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Save rating"
-msgstr "保存评分"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Share my ratings in the household average"
-msgstr "将我的评分计入家庭平均评分"
-
-#: cps/spa_strings.py cps/templates/user_edit.html
-msgid "Show library rating"
-msgstr "显示书库评分"
-
-#: cps/spa_strings.py
-msgid "Show the labelled Calibre score alongside your own rating."
-msgstr "在个人评分旁显示 Calibre 评分，并标明来源。"
-
-#: cps/api/browse.py cps/spa_strings.py cps/templates/personal_rating.html
-#: cps/web.py
-msgid "Unrated"
-msgstr "未评分"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating"
-msgstr "您的评分"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid "Your rating saved."
-msgstr "您的评分已保存。"
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, highest first"
-msgstr "个人评分，从高到低"
-
-#: cps/spa_strings.py cps/templates/_book_organizer.html
-msgid "Your rating, lowest first"
-msgstr "个人评分，从低到高"
-
-#: cps/spa_strings.py cps/templates/personal_rating.html
-msgid ""
-"Your score does not change the Calibre library rating. Sharing is off unless "
-"you opt in in your account."
-msgstr ""
-"您的评分不会更改 Calibre 书库评分。除非您在账户中主动开启，否则不会分享评分。"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{rating} out of 5"
-msgstr "{rating} / 5"
-
-#: cps/spa_strings.py
 msgid "Your rating (stars)"
 msgstr "您的评分（星）"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-msgid "eReader attachment filename template"
-msgstr "电子阅读器附件文件名模板"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Leave blank to keep the existing filename. Example: {series} #{series_index} "
-"- {title}. Fields include {title}, {authors}, {series} and {series_index}; "
-"the file extension is added automatically."
-msgstr ""
-"留空可保留现有文件名。示例：{series} #{series_index} - {title}。可用字段包括 "
-"{title}、{authors}、{series} 和 {series_index}；文件扩展名会自动添加。"
-
-#: cps/spa_strings.py cps/templates/email_edit.html
-#, python-brace-format
-msgid ""
-"Use {series:|(|) }{title} to omit the series prefix when no series is set."
-msgstr "使用 {series:|(|) }{title} 可在未设置丛书时省略丛书前缀。"
-
-#: cps/spa_strings.py cps/templates/tag_tree.html
-msgid "Choose a tag group to browse books from it and its subtags."
-msgstr "选择一个标签组，浏览该组及其子标签中的书籍。"
-
-#: cps/spa_strings.py
-msgid "Sleep screen"
-msgstr "休眠画面"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Sleep screen for {name}"
-msgstr "{name} 的休眠画面"
 
 #: cps/spa_strings.py
 msgid "Set sleep screen"
@@ -11489,104 +12375,74 @@ msgstr "设置休眠画面"
 msgid "Replace image"
 msgstr "替换图片"
 
-#: cps/spa_strings.py
-msgid "Remove sleep screen"
-msgstr "移除休眠画面"
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"Find books that have a cover.jpg in their folder but are marked as having no "
+"cover, so the cover is never shown."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid ""
+"A cover that was removed on purpose in the book editor also looks like this. "
+"Select only the books whose cover you want back."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Scan library"
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Choose an image"
-msgstr "选择图片"
+msgid "Scanning…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not scan the library."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Sleep screen preview for {name}"
-msgstr "{name} 的休眠画面预览"
+msgid "{count} book(s) have a cover file but are marked as having no cover."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Shown when this device sleeps in KOReader."
-msgstr "此设备在 KOReader 中休眠时显示。"
+msgid "No books need their cover restored."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "The native Kindle lock screen is unchanged."
-msgstr "Kindle 原生锁屏画面保持不变。"
+#, python-brace-format
+msgid "{count} cover(s) restored."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Waiting for next sync"
-msgstr "等待下次同步"
+#, python-brace-format
+msgid "{count} book(s) were skipped because they changed since the scan."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Applied on device"
-msgstr "已在设备上应用"
+msgid "Could not restore covers."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Removal waiting for sync"
-msgstr "等待同步后移除"
+#, python-brace-format
+msgid "{selected} of {count} selected"
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Previous settings restored"
-msgstr "已恢复之前的设置"
+msgid "Books with a cover file but no cover"
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Waiting for device details"
-msgstr "等待设备详情"
+#, python-brace-format
+msgid "Restore the cover of {title}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cover_flag_repair.html
+msgid "Restore selected covers"
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Update the CWNG plugin"
-msgstr "更新 CWNG 插件"
-
-#: cps/spa_strings.py
-msgid "Update the CWNG plugin on this device, then sync."
-msgstr "请在此设备上更新 CWNG 插件，然后同步。"
-
-#: cps/spa_strings.py
-msgid "Connect this device and use Sync now in KOReader."
-msgstr "连接此设备，并在 KOReader 中使用“立即同步”。"
-
-#: cps/spa_strings.py
-msgid "This device cannot show a custom KOReader sleep screen."
-msgstr "此设备无法显示自定义 KOReader 休眠画面。"
-
-#: cps/spa_strings.py
-msgid "Use a JPEG or PNG image up to 10 MiB."
-msgstr "请使用不超过 10 MiB 的 JPEG 或 PNG 图片。"
-
-#: cps/spa_strings.py
-msgid "Could not save sleep screen. Try again."
-msgstr "无法保存休眠画面。请重试。"
-
-#: cps/spa_strings.py
-msgid "Could not apply sleep screen"
-msgstr "无法应用休眠画面"
-
-#: cps/spa_strings.py
-msgid ""
-"Remove this image? Your previous KOReader sleep-screen settings will return "
-"after the next sync."
-msgstr "移除此图片吗？下次同步后将恢复您之前的 KOReader 休眠画面设置。"
-
-#: cps/spa_strings.py
-msgid "Image fit"
-msgstr "图像适配"
-
-#: cps/spa_strings.py
-msgid "Automatic"
-msgstr "自动"
-
-#: cps/spa_strings.py
-msgid "Fill the screen"
-msgstr "填满屏幕"
-
-#: cps/spa_strings.py
-msgid "Show the whole image"
-msgstr "显示完整图像"
-
-#: cps/spa_strings.py
-msgid "Automatic fills the screen when only a thin edge would be cut off."
-msgstr "只会裁掉细边时，自动模式将填满屏幕。"
-
-#: cps/spa_strings.py
-msgid "Could not change image fit. Try again."
-msgstr "无法更改图像适配。请重试。"
+msgid "Select all books"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -11594,6 +12450,9 @@ msgid ""
 "library themselves. Not available once an account already syncs books to a "
 "Kobo."
 msgstr ""
+"选择「我的书库」时适用。"
+"用户需要自行从全局书库中添加图书。"
+"如果账号已将图书同步到 Kobo，则无法使用此功能。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -11601,63 +12460,76 @@ msgid ""
 "Give {name} an empty My Library? They start with no books and add what they "
 "want from the global library."
 msgstr ""
+"要为 {name} 创建一个空的「我的书库」吗？"
+"其中不会包含任何图书，用户可以自行从全局书库中添加所需的图书。"
 
 #: cps/spa_strings.py
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
 msgstr ""
+"需要「浏览全局书库」权限，否则用户无法自行添加书籍。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
+msgstr "以空的「我的书库」开始"
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Apply selection"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Keep this copy"
-msgstr "保留此副本"
-
-#: cps/spa_strings.py
-msgid "Merge this copy"
-msgstr "合并此副本"
-
-#: cps/spa_strings.py
-msgid "Merge into the kept copy"
-msgstr "合并到保留的副本"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge one copy into “{title}”? Formats it lacks are copied over, then that "
-"copy is deleted."
+msgid "Choose from stored values"
 msgstr ""
-"将一个副本合并到「{title}」吗？它缺失的格式会被复制过去，然后该副本将被删除。"
 
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"Merge {n} copies into “{title}”? Formats it lacks are copied over, then "
-"those copies are deleted."
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing hierarchy"
 msgstr ""
-"将 {n} 个副本合并到「{title}」吗？它们缺失的格式会被复制过去，然后这些副本将"
-"被删除。"
 
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Merged into “{title}”."
-msgstr "已合并到「{title}」。"
+#: cps/spa_strings.py cps/templates/book_edit.html
+msgid "Choose from the existing values"
+msgstr ""
 
-#: cps/spa_strings.py
-msgid "Could not merge these books."
-msgstr "无法合并这些书籍。"
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Could not load the values for this column."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Enter one value without commas."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Loading values..."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values match the filter."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "No values stored for this column yet. Add one below."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "Search or filter values..."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/custom_column_modal.html
+msgid "e.g. Category.SubCategory.Item"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{done} of {total} imported"
-msgstr ""
+msgstr "已导入 {done}/{total} 本"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No new books have appeared for a while; {count} not imported yet."
-msgstr ""
+msgstr "已有一段时间没有发现新图书，有 {count} 本尚未导入。"
 
 #: cps/tag_hierarchy.py
 msgid "Unnamed tag"
@@ -12077,6 +12949,169 @@ msgstr "无效书籍ID。"
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "无法删除标签"
+
+#: cps/api/cc_values.py
+msgid "Name cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Value cannot be empty"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be moved inside itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "One of the selected values no longer exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Delete those instead."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "“{name}” has sub-values. Move or rename it instead of merging."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into itself"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value cannot be merged into one of its sub-values"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value cannot be changed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a node to rename"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A node name cannot contain a comma"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "This will merge {count} value(s) into existing ones. Continue?"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value name is already in use"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be renamed"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to move"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a direction to move it"
+msgstr ""
+
+#: cps/api/cc_values.py cps/templates/cc_value_editor.html
+msgid "The values for this column could not be loaded."
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "That value is already at the {end} of its level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "top"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "bottom"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be moved"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose the value to merge into"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to merge"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be merged"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Select at least one value to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick valid values to delete"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The values could not be deleted"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "This column is a flat list; values cannot be moved."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Choose where to move it"
+msgstr ""
+
+#: cps/api/cc_values.py
+#, python-brace-format
+msgid "Moving there would merge {count} value(s). Move them one at a time."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "A value with that name is already there"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Name the value to create"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "Pick a value to place the new one after"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid ""
+"A new value can only be placed beside the one it was created from, not in a "
+"different level."
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "That value already exists"
+msgstr ""
+
+#: cps/api/cc_values.py
+msgid "The value could not be created"
+msgstr ""
 
 #: cps/api/magicshelves.py
 msgid "You are not allowed to view this shelf"
@@ -13095,7 +14130,7 @@ msgstr "无搜索结果！请尝试另一个关键字"
 msgid "This Field is Required"
 msgstr "此栏必须填写"
 
-#: cps/templates/book_table.html
+#: cps/templates/book_table.html cps/templates/cover_flag_repair.html
 msgid "Select all"
 msgstr "选择全部"
 
@@ -13304,6 +14339,56 @@ msgstr "全部展开"
 #: cps/templates/cc_list.html
 msgid "Collapse all"
 msgstr "全部收起"
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"{name} is ready to paste. Tick the value it should go under, then press "
+"Paste on that row."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid "New name for {name}"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "New value. Use dots for a hierarchy, e.g. Arts.Mystery."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"New value, placed just below {name}. Same level, so the name cannot contain "
+"a dot."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "This will merge into existing value(s). There is no undo. Continue?"
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+#, python-brace-format
+msgid ""
+"Remove {name}? The books are kept — they simply lose the value. There is no "
+"undo."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"Renaming renames everything below the value. To move one, tick it and press "
+"Cut, then tick the value it should go under and press Paste."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid ""
+"To merge, tick two or more values, then use Merge on the one that should "
+"survive."
+msgstr ""
+
+#: cps/templates/cc_value_editor.html
+msgid "Number of books"
+msgstr ""
 
 #: cps/templates/config_db.html
 msgid "Troubleshooting your DB"
@@ -14540,9 +15625,33 @@ msgstr "可忽略的自定义栏目（正则表达式）"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr "隐藏自定义列不在 UI 中显示的正则表达式模式。"
 
+#: cps/templates/config_view_edit.html
+#, fuzzy
+msgid "Magic Shelves"
+msgstr "同步所选书架到 Kobo"
+
 #: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
 msgid "Sort by"
 msgstr "排序方式"
+
+#: cps/templates/config_view_edit.html
+msgid "Custom column hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid ""
+"Automatic follows the hierarchy preference in Calibre. Older libraries "
+"without that preference infer the hierarchy from their values. Choose an "
+"explicit mode to override it for this website."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Always a hierarchy"
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Never a hierarchy"
+msgstr ""
 
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
@@ -14723,6 +15832,30 @@ msgstr "添加显示或隐藏书籍的标签值"
 msgid "Add Allowed/Denied custom column values"
 msgstr "添加显示或隐藏书籍的自定义栏目值"
 
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d covers were restored."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books were skipped because they changed since the scan."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "%(count)d books have a cover file but are marked as having no cover."
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+#, python-format
+msgid "Restore the cover of %(title)s"
+msgstr ""
+
+#: cps/templates/cover_flag_repair.html
+msgid "Restore the covers of the selected books?"
+msgstr ""
+
 #: cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -14772,6 +15905,14 @@ msgstr "要以此候选项目替换封面吗？"
 #: cps/templates/cover_picker.html
 msgid "Rendering e-reader previews:"
 msgstr "正在产生电子阅读器预览："
+
+#: cps/templates/custom_column_modal.html
+msgid "Select values"
+msgstr ""
+
+#: cps/templates/custom_column_modal.html
+msgid "Add a new value"
+msgstr ""
 
 #: cps/templates/cwa_api_stats.html
 msgid "API Usage Analytics"
@@ -15248,7 +16389,7 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Preserve cover aspect ratio in EPUBs"
-msgstr ""
+msgstr "保留 EPUB 封面图片比例"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -15257,6 +16398,8 @@ msgid ""
 "This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
 "covers written from now on; KEPUB files are not changed."
 msgstr ""
+"封面与元数据写入服务将新封面写入 EPUB 时，封面页会保留图片的原始宽高比，避免拉伸图片来填满屏幕。"
+"此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。仅对之后写入的封面生效，KEPUB 文件不受影响。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -17195,6 +18338,61 @@ msgstr "Kobo Token:"
 msgid "List"
 msgstr "列表"
 
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid ""
+"Reading progress, read status and annotations only reach Hardcover for books "
+"that carry a Hardcover identifier. These %(total)s book(s) have none."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Searches Hardcover again for every book listed here, including those waiting "
+"for review. Rejected books are skipped."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Match again now"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Hardcover sync is disabled. Enable it in Basic Configuration or with "
+"HARDCOVER_SYNC_ENABLED."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
+"configure in Basic Configuration."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html cps/templates/tasks.html
+msgid "Actions"
+msgstr "操作"
+
+#: cps/templates/hardcover_missing_ids.html
+msgid ""
+"Fetch metadata from Hardcover on the edit page to add the identifier by hand."
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Allow retry"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "Nothing to show"
+msgstr ""
+
+#: cps/templates/hardcover_missing_ids.html
+msgid "No book without a Hardcover ID matches this filter."
+msgstr ""
+
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
 msgstr "Hardcover 匹配审核 🔖"
@@ -18367,10 +19565,6 @@ msgid "Run Time"
 msgstr "运行时间"
 
 #: cps/templates/tasks.html
-msgid "Actions"
-msgstr "操作"
-
-#: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"
 msgstr "即将到来的计划发送"
 
@@ -18556,11 +19750,11 @@ msgstr "重置用户密码"
 #, python-format
 msgid "at least %(num)d character"
 msgid_plural "at least %(num)d characters"
-msgstr[0] ""
+msgstr[0] "至少 %(num)d 个字符"
 
 #: cps/templates/user_edit.html
 msgid "including"
-msgstr ""
+msgstr "包含"
 
 #: cps/templates/user_edit.html
 msgid "eReader Configuration"
@@ -18716,6 +19910,9 @@ msgid ""
 "and adds what they want from the global library, so they need the global-"
 "browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
+"仅在上方选择「我的书库」时生效。"
+"用户的书库初始为空，需要自行从全局书库中添加所需书籍，因此必须拥有「浏览全局书库」权限。"
+"已向 Kobo 同步过书籍的账号无法使用此功能。"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -19011,6 +20208,27 @@ msgstr "向 OPDS 开放选定书架"
 msgid "Show Read/Unread Section"
 msgstr "显示已读、未读栏目"
 
+#~ msgid "A few random picks from your library"
+#~ msgstr "从您的书库中随机挑选"
+
+#~ msgid "Categories"
+#~ msgstr "分类"
+
+#, python-brace-format
+#~ msgid "No matching {items} for \"{query}\"."
+#~ msgstr "找不到符合「{query}」的 {items}。"
+
+#~ msgid "Rating (stars)"
+#~ msgstr "评分 (星数)"
+
+#, python-brace-format
+#~ msgid "{count} column"
+#~ msgstr "{count} 列"
+
+#, python-brace-format
+#~ msgid "{count} columns"
+#~ msgstr "{count} 列"
+
 #~ msgid ""
 #~ "When enabled, fetched metadata will only replace existing data if it "
 #~ "appears to be better quality (e.g., longer descriptions, higher "
@@ -19028,10 +20246,6 @@ msgstr "显示已读、未读栏目"
 #, fuzzy
 #~ msgid "Rating cleared"
 #~ msgstr "评分大于"
-
-#, fuzzy
-#~ msgid "Magic Shelves"
-#~ msgstr "同步所选书架到 Kobo"
 
 #, fuzzy
 #~ msgid "Books organized in magic shelves"

@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
-test('a shelf can display books in series order and return to manual order (#2840)', async ({ page }) => {
+test('a shelf can display books in series order and return to manual order (#2840)', async ({ page, secondaryUser }) => {
+  // Keep the project's desktop or touch viewport, while using an account no
+  // other test can change. Hidden and archived books are per-account.
+  await page.context().clearCookies();
+  await page.context().addCookies(await secondaryUser.context.cookies());
   const listing = await page.request.get('/api/v1/books?per_page=100');
   expect(listing.ok(), await listing.text()).toBeTruthy();
   const { items } = await listing.json() as { items: { id: number }[] };

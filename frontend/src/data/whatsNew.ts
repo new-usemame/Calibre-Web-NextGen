@@ -56,6 +56,33 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.73',
+    date: '2026-11-22',
+    items: [
+      {
+        title: 'Start with the newest books every time',
+        body: 'Switching from Recent back to Newest in Your Library puts the latest additions first, even after you have loaded more rows in both sorts.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Keep Kobo sync working with the store proxy off',
+        body: 'Calibre-Web NextGen now answers the Kobo’s UserStorage metadata check locally. The device can finish syncing after it renews its token.',
+        category: 'Sync',
+      },
+      {
+        title: 'Renew Kobo tokens on a custom port',
+        body: 'If your Kobo connects directly to a custom port with store proxying off, it now uses that port to renew its token too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Find the reason for a failed KOReader book match',
+        body: 'The server log now names the affected book when a lookup suggests the library’s checksum index might be damaged.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.72',
     date: '2026-11-20',
     items: [

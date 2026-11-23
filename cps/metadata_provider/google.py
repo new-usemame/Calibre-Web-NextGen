@@ -37,21 +37,18 @@ class Google(Metadata):
                 tokens = [quote(t.encode("utf-8")) for t in title_tokens]
                 query = "+".join(tokens)
             url = Google.SEARCH_URL + query
-            api_key = getattr(config, "config_google_books_api_key", None)
-            if api_key:
-                # Authenticated requests use the project's quota
-                # (default 100k req/day) instead of the per-IP anonymous quota
-                # (1k/day, easily exhausted on shared servers).
-                url += "&key=" + quote(api_key.strip().encode("utf-8"))
+            api_key = (getattr(config, "config_google_books_api_key", None) or "").strip()
+            headers = {"X-Goog-Api-Key": api_key} if api_key else {}
             try:
-                results = requests.get(url, timeout=15)
+                # Requests forwards custom headers when following redirects.
+                results = requests.get(url, headers=headers, timeout=15, allow_redirects=False)
                 results.raise_for_status()
             except requests.HTTPError as exc:
-                # The raw error contains the request URL, including any API key.
-                status = exc.response.status_code if exc.response is not None else None
-                raise self._http_refusal(status, bool(api_key)) from None
+                raise self._http_refusal(exc.response, bool(api_key)) from None
             except requests.RequestException:
                 raise ProviderRefused("error", "Could not connect to Google Books. Try again shortly.") from None
+            if 300 <= results.status_code < 400:
+                raise ProviderRefused("error", "Google Books returned an unexpected redirect.")
             try:
                 payload = results.json()
             except ValueError:
@@ -65,13 +62,14 @@ class Google(Metadata):
         return val
 
     @staticmethod
-    def _http_refusal(status, has_key):
+    def _http_refusal(response, has_key):
+        status = response.status_code if response is not None else None
         if status == 429:
             remedy = "Google Books quota exceeded (HTTP 429)."
             if not has_key:
                 remedy += " Set a Google Books API key in Configuration to get a separate quota."
             return ProviderRefused("rate_limited", remedy)
-        if status in (401, 403):
+        if status in (401, 403) or (has_key and status == 400 and Google._reports_invalid_key(response)):
             if has_key:
                 return ProviderRefused(
                     "missing_key", "Google Books refused the request. Check the configured API key and its restrictions."
@@ -81,6 +79,15 @@ class Google(Metadata):
             return ProviderRefused("blocked", "Google Books is temporarily unavailable. Try again shortly.")
         return ProviderRefused("error", f"Google Books returned HTTP {status}." if status
                                else "Google Books did not return an HTTP status.")
+
+    @staticmethod
+    def _reports_invalid_key(response):
+        try:
+            details = response.json()["error"]["details"]
+            return any(isinstance(detail, dict) and detail.get("reason") == "API_KEY_INVALID"
+                       for detail in details)
+        except (KeyError, TypeError, ValueError):
+            return False
 
     def _parse_search_result(
         self, result: Dict, generic_cover: str, locale: str

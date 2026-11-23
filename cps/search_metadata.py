@@ -397,10 +397,12 @@ def _classify_provider_failure(exc: Exception, provider=None) -> tuple:
         # The provider already knows what happened and what to do about it.
         return (exc.status, str(exc))
     text = str(exc) or exc.__class__.__name__
-    lowered = text.lower()
     pid = getattr(provider, "__id__", None)
     takes_key = pid is None or pid in PROVIDER_KEY_REGISTRY
     code = getattr(getattr(exc, "response", None), "status_code", None)
+    # HTTP error strings contain the request URL, including the search query.
+    # Only use words from the error as hints when there is no HTTP status.
+    lowered = text.lower() if code is None else ""
 
     def is_status(*codes: int) -> bool:
         # Prefer the real status code. str(HTTPError) carries the request URL,

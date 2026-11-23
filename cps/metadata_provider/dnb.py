@@ -138,20 +138,24 @@ class DNB(Metadata):
         for query_str in self._create_query_variations(idn=idn, isbn=isbn, title=title):
             try:
                 records = self._execute_query(query_str)
-                for record in records:
+            except Exception as exc:
+                # A different query variation can still return usable records.
+                last_error = exc
+                continue
+
+            for record in records:
+                try:
                     book_data = self._parse_marc21_record(record)
                     if book_data:
                         match = self._create_meta_record(book_data, generic_cover)
                         if match:
                             matches.append(match)
-            except Exception as exc:
-                # A different query variation can still return usable records.
-                last_error = exc
-                continue
+                except Exception as exc:
+                    last_error = exc
             if matches:
                 return matches
 
-        if not matches and last_error is not None:
+        if last_error is not None:
             raise last_error
         return matches
 

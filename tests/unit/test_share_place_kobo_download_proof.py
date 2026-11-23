@@ -86,23 +86,31 @@ def _bookmark(sw):
     return sw.get(sw.checked).get("CurrentBookmark") or {}
 
 
-def _interrupted_kepub_response(sw, *, raises=False):
+def _kepub_response_with_body(sw, stream):
+    """Vary streaming behavior while preserving the actual opened KEPUB."""
     response = send_file(sw.kepub, conditional=True)
+    original = response.response
 
     class Body:
-        def __init__(self, file):
-            self.file = file
+        file = original.file
 
         def __iter__(self):
-            yield self.file.read(1000)
-            if raises:
-                raise OSError("simulated stream failure")
+            return iter(stream(original))
 
         def close(self):
-            self.file.close()
+            original.close()
 
-    response.response = Body(response.response.file)
+    response.response = Body()
     return response
+
+
+def _interrupted_kepub_response(sw, *, raises=False):
+    def stream(body):
+        yield body.file.read(1000)
+        if raises:
+            raise OSError("simulated stream failure")
+
+    return _kepub_response_with_body(sw, stream)
 
 
 def _install_download(monkeypatch, sw, *, broken=False, serve=None):

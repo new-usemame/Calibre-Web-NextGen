@@ -187,7 +187,8 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             books_with_covers = self.get_cover_sources()
             total = len(books_with_covers)
             started = True
-            self.log.info(
+            log_start = self.log.info if self.book_id == -1 else self.log.debug
+            log_start(
                 "Cover thumbnail generation started: total=%d, per-cover timeout=%.1fs",
                 total,
                 _COVER_TIMEOUT_SECONDS,
@@ -265,7 +266,10 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             self._handleError(
                 "Cover thumbnail generation failed; {}".format(self.message))
         finally:
-            self.log.info(
+            log_finish = self.log.info
+            if self.book_id != -1 and self.stat == STAT_FINISH_SUCCESS:
+                log_finish = self.log.debug
+            log_finish(
                 "Cover thumbnail generation finished: status=%s, total=%d, "
                 "processed=%d, generated=%d, skipped=%d, failed=%d%s",
                 self._terminal_label(self.stat),

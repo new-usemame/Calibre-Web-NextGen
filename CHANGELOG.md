@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.73] - 2026-11-22
+
+### Fixed
+
+- **Kobo sync could fail after a token refresh with the store proxy turned off.** Calibre-Web-NextGen now answers the device's UserStorage metadata read locally, so Kobo can't reject it with a 401. Thanks to @JohanSF for testing the response on a Kobo Libra Colour. ([#2958](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2958))
+
+- **KOReader sync can now identify a possible damaged checksum index when a book lookup fails.** When an indexed lookup misses a row that a table scan can find, the log names the affected book and suggests running `PRAGMA integrity_check` on a consistent copy of the library database. Thanks to @sgreadly and @FormelLMS (#2960).
+
+- **Kobos on a nondefault port can renew their token with "Proxy unknown requests to Kobo Store" off.** The OAuth URLs (`oauth_host` and the OpenID discovery document) were built from the request's `Host`, so a direct HTTP client that sends no port in `Host` was sent to port 80 for OAuth while its sync URLs used the external port. When port 80 was a reverse proxy it answered 404, and the device gave up with "sync failed" whenever it needed a new token. They now use the external port like the rest (#2975).
+
+- **Your Library** starts with the newest books when you switch back from Recent, even after loading more rows in both views. [#3012](https://github.com/new-usemame/Calibre-Web-NextGen/issues/3012)
+
 ## [v4.1.72] - 2026-11-20
 
 ### Added

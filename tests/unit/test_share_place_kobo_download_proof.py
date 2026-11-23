@@ -86,6 +86,25 @@ def _bookmark(sw):
     return sw.get(sw.checked).get("CurrentBookmark") or {}
 
 
+def _interrupted_kepub_response(sw, *, raises=False):
+    response = send_file(sw.kepub, conditional=True)
+
+    class Body:
+        def __init__(self, file):
+            self.file = file
+
+        def __iter__(self):
+            yield self.file.read(1000)
+            if raises:
+                raise OSError("simulated stream failure")
+
+        def close(self):
+            self.file.close()
+
+    response.response = Body(response.response.file)
+    return response
+
+
 def _install_download(monkeypatch, sw, *, broken=False, serve=None):
     """The real ``helper.get_download_link`` as a WSGI app, mounted the way
     Flask runs a view: the request context is pushed for the view and popped
@@ -108,10 +127,7 @@ def _install_download(monkeypatch, sw, *, broken=False, serve=None):
         do_download = serve
     elif broken:
         def do_download(*_a, **_k):
-            def body():
-                yield b"first chunk"
-                raise OSError("simulated stream failure")
-            return Response(body(), status=200)
+            return _interrupted_kepub_response(sw, raises=True)
     else:
         def do_download(*_a, **_k):
             return send_file(sw.kepub, conditional=True)
@@ -236,7 +252,7 @@ def test_a_download_whose_stream_fails_partway_does_not_prove_the_current_kepub(
     sw = stale_kobo
     served = _download(monkeypatch, sw, broken=True)
     assert served.status == 200
-    assert served.body == b"first chunk" and not served.complete
+    assert len(served.body) == 1000 and not served.complete
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -318,7 +334,11 @@ def test_a_full_transfer_of_a_different_kepub_earns_no_proof(monkeypatch, stale_
 
     from cps import ub
 
+    from cps.services.kobo_post_download_restore import RESTORE_PENDING
+
     sw = stale_kobo
+    previous_at = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one().downloaded_at
     original = Path(sw.kepub).read_bytes()
     different = tmp_path / "different.kepub"
     replacement = original[:10] + bytes([original[10] ^ 0x01]) + original[11:]
@@ -329,6 +349,8 @@ def test_a_full_transfer_of_a_different_kepub_earns_no_proof(monkeypatch, stale_
     assert served.status == 200 and served.complete and served.body == replacement
     download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
         device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.downloaded_at > previous_at
+    assert download.restore_state == RESTORE_PENDING
     assert download.completed_at is None
     assert location_of(_bookmark(sw)) == sw.own
 
@@ -369,7 +391,11 @@ def test_drive_delivery_does_not_claim_a_local_kepub(monkeypatch, stale_kobo, tm
     from cps import helper, ub
     from cps.services import user_cover
 
+    from cps.services.kobo_post_download_restore import RESTORE_PENDING
+
     sw = stale_kobo
+    previous_at = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one().downloaded_at
     original_download = helper.do_download_file
     application = _install_download(monkeypatch, sw)
     monkeypatch.setattr(helper, "do_download_file", original_download)
@@ -390,6 +416,8 @@ def test_drive_delivery_does_not_claim_a_local_kepub(monkeypatch, stale_kobo, tm
     assert served.status == 200 and served.complete and served.body == remote
     download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
         device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.downloaded_at > previous_at
+    assert download.restore_state == RESTORE_PENDING
     assert download.completed_at is None
     assert location_of(_bookmark(sw)) == sw.own
 
@@ -459,16 +487,9 @@ def test_a_stream_shorter_than_its_content_length_does_not_prove_the_current_kep
     """The byte-count clause on its own: Content-Length is declared and the
     body ends normally, early."""
     sw = stale_kobo
-    with open(sw.kepub, "rb") as handle:
-        whole = handle.read()
-
-    def serve(*_a, **_k):
-        def body():
-            yield whole[:1000]
-        return Response(body(), status=200,
-                        headers={"Content-Length": str(len(whole))})
-
-    served = _download(monkeypatch, sw, serve=serve)
+    served = _download(
+        monkeypatch, sw, serve=lambda *_a, **_k: _interrupted_kepub_response(sw)
+    )
     assert served.status == 200
     assert len(served.body) == 1000 and not served.complete
 

@@ -80,9 +80,11 @@ def test_google_quota_is_a_rate_limit_refusal_naming_the_key(monkeypatch):
     ("openlibrary", 429, None, "rate_limited"),
     ("openlibrary", 503, None, "blocked"),
     ("openlibrary", 500, None, "error"),
+    ("openlibrary", None, None, "error"),
     ("dnb", 403, None, "blocked"),
     ("dnb", 429, None, "rate_limited"),
     ("dnb", 503, None, "blocked"),
+    ("dnb", None, None, "error"),
 ])
 def test_provider_http_failures_reach_search_status(monkeypatch, caplog, provider_id, status, key, expected):
     from cps.metadata_provider import dnb, google, openlibrary
@@ -95,6 +97,8 @@ def test_provider_http_failures_reach_search_status(monkeypatch, caplog, provide
     provider.active = True
 
     def get(url, **_kwargs):
+        if status is None:
+            raise requests.ConnectionError(f"Connection refused for {url}")
         response = requests.Response()
         response.status_code = status
         response.url = url

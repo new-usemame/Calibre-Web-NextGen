@@ -13,12 +13,9 @@ from datetime import datetime
 
 import requests
 
-from cps import config, logger
+from cps import config
 from cps.isoLanguages import get_lang3, get_language_name
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
-
-log = logger.create()
-
 
 class Google(Metadata):
     __name__ = "Google"
@@ -49,27 +46,41 @@ class Google(Metadata):
             try:
                 results = requests.get(url, timeout=15)
                 results.raise_for_status()
-            except requests.HTTPError as e:
-                if getattr(e.response, "status_code", None) == 429:
-                    remedy = (
-                        "Google Books quota exceeded (HTTP 429). Without a key this install "
-                        "shares the anonymous per-IP quota; set a Google Books API key in "
-                        "Configuration to lift the limit."
-                    )
-                    log.warning(remedy)
-                    raise ProviderRefused("rate_limited", remedy)
-                log.warning(e)
-                return []
-            except Exception as e:
-                log.warning(e)
-                return []
-            for result in results.json().get("items", []):
+            except requests.HTTPError as exc:
+                # The raw error contains the request URL, including any API key.
+                status = exc.response.status_code if exc.response is not None else None
+                raise self._http_refusal(status, bool(api_key)) from None
+            except requests.RequestException:
+                raise ProviderRefused("error", "Could not connect to Google Books. Try again shortly.") from None
+            try:
+                payload = results.json()
+            except ValueError:
+                raise ProviderRefused("error", "Google Books returned an invalid response.") from None
+            for result in payload.get("items", []):
                 mr =self._parse_search_result(
                     result=result, generic_cover=generic_cover, locale=locale
                 )
                 if mr:
                     val.append(mr)
         return val
+
+    @staticmethod
+    def _http_refusal(status, has_key):
+        if status == 429:
+            remedy = "Google Books quota exceeded (HTTP 429)."
+            if not has_key:
+                remedy += " Set a Google Books API key in Configuration to get a separate quota."
+            return ProviderRefused("rate_limited", remedy)
+        if status in (401, 403):
+            if has_key:
+                return ProviderRefused(
+                    "missing_key", "Google Books refused the request. Check the configured API key and its restrictions."
+                )
+            return ProviderRefused("blocked", "Google Books refused the request. Try again shortly.")
+        if status == 503:
+            return ProviderRefused("blocked", "Google Books is temporarily unavailable. Try again shortly.")
+        return ProviderRefused("error", f"Google Books returned HTTP {status}." if status
+                               else "Google Books did not return an HTTP status.")
 
     def _parse_search_result(
         self, result: Dict, generic_cover: str, locale: str

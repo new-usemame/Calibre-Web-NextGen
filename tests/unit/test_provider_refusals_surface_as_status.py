@@ -67,6 +67,99 @@ def test_google_quota_is_a_rate_limit_refusal_naming_the_key(monkeypatch):
     assert "API key" in str(refused.value)
 
 
+@pytest.mark.parametrize(("provider_id", "status", "key", "expected"), [
+    ("google", 403, None, "blocked"),
+    ("google", 403, "fixture-google-key", "missing_key"),
+    ("google", 503, "fixture-google-key", "blocked"),
+    ("google", 500, "fixture-google-key", "error"),
+    ("openlibrary", 403, None, "blocked"),
+    ("openlibrary", 429, None, "rate_limited"),
+    ("openlibrary", 503, None, "blocked"),
+    ("dnb", 403, None, "blocked"),
+    ("dnb", 429, None, "rate_limited"),
+    ("dnb", 503, None, "blocked"),
+])
+def test_provider_http_failures_reach_search_status(monkeypatch, caplog, provider_id, status, key, expected):
+    from cps.metadata_provider import dnb, google, openlibrary
+    from cps.search_metadata import _classify_provider_failure
+    from cps.services.cover_picker import gather_cover_candidates
+
+    provider_class = {"dnb": dnb.DNB, "google": google.Google, "openlibrary": openlibrary.OpenLibrary}
+    monkeypatch.setattr(google, "config", types.SimpleNamespace(config_google_books_api_key=key))
+    provider = provider_class[provider_id]()
+    provider.active = True
+
+    def get(url, **_kwargs):
+        response = requests.Response()
+        response.status_code = status
+        response.url = url
+        return response
+
+    monkeypatch.setattr(requests, "get", get)
+    candidates, statuses = gather_cover_candidates(
+        providers=[provider], query="dune", static_cover="", locale="en",
+        classify_failure=_classify_provider_failure,
+    )
+
+    assert candidates == []
+    assert len(statuses) == 1
+    assert statuses[0].status == expected
+    assert statuses[0].message
+    if key:
+        assert key not in caplog.text
+        assert key not in statuses[0].message
+
+
+def test_open_library_no_results_is_distinct_from_invalid_json(monkeypatch):
+    from cps.metadata_provider.openlibrary import OpenLibrary
+    from cps.search_metadata import _classify_provider_failure
+    from cps.services.cover_picker import gather_cover_candidates
+
+    provider = OpenLibrary()
+    provider.active = True
+    response = requests.Response()
+    response.status_code = 200
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: response)
+
+    def outcome(payload):
+        response._content = payload
+        _, statuses = gather_cover_candidates(
+            providers=[provider], query="dune", static_cover="", locale="en",
+            classify_failure=_classify_provider_failure,
+        )
+        return statuses[0].status
+
+    assert outcome(b'{"docs": []}') == "empty"
+    assert outcome(b"not json") == "error"
+
+
+@pytest.mark.parametrize(("failure", "expected"), [("retries", "error"), ("blocked", "blocked")])
+def test_scholar_failures_reach_search_status(monkeypatch, failure, expected):
+    from cps.metadata_provider import scholar
+    from cps.search_metadata import _classify_provider_failure
+    from cps.services.cover_picker import gather_cover_candidates
+
+    from scholarly import DOSException, MaxTriesExceededException
+
+    error = (DOSException() if failure == "blocked"
+             else MaxTriesExceededException("Cannot Fetch from Google Scholar."))
+    monkeypatch.setattr(scholar, "scholarly", types.SimpleNamespace(
+        set_timeout=lambda _seconds: None,
+        set_retries=lambda _retries: None,
+        search_pubs=_raise(error),
+    ))
+    provider = scholar.google_scholar()
+    provider.active = True
+    candidates, statuses = gather_cover_candidates(
+        providers=[provider], query="dune", static_cover="", locale="en",
+        classify_failure=_classify_provider_failure,
+    )
+
+    assert candidates == []
+    assert len(statuses) == 1
+    assert statuses[0].status == expected
+
+
 @pytest.mark.parametrize("key, status, expected", [
     ("", 420, "rate_limited"),            # shared key throttled
     ("", 429, "rate_limited"),

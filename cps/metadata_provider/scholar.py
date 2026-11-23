@@ -14,14 +14,11 @@ try:
 except (ImportError):
     FakeUserAgentError = BaseException
 try:
-    from scholarly import scholarly
+    from scholarly import DOSException, MaxTriesExceededException, scholarly
 except FakeUserAgentError:
     raise ImportError("No module named 'scholarly'")
 
-from cps import logger
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
-
-log = logger.create()
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 
 
 class google_scholar(Metadata):
@@ -42,15 +39,16 @@ class google_scholar(Metadata):
                 scholarly.set_timeout(20)
                 scholarly.set_retries(2)
                 scholar_gen = itertools.islice(scholarly.search_pubs(query), 10)
-            except Exception as e:
-                log.warning(e)
-                return list()
-            for result in scholar_gen:
-                match = self._parse_search_result(
-                    result=result, generic_cover="", locale=locale
-                )
-                if match:
-                    val.append(match)
+                for result in scholar_gen:
+                    match = self._parse_search_result(
+                        result=result, generic_cover="", locale=locale
+                    )
+                    if match:
+                        val.append(match)
+            except DOSException:
+                raise ProviderRefused("blocked", "Google Scholar blocked the search. Try another source.") from None
+            except MaxTriesExceededException:
+                raise ProviderRefused("error", "Could not fetch results from Google Scholar. Try another source.") from None
         return val
 
     def _parse_search_result(

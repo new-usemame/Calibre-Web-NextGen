@@ -312,6 +312,88 @@ def test_a_full_download_after_on_demand_conversion_records_file_proof(monkeypat
         sw.checked.id, sw.book)
 
 
+def test_a_full_transfer_of_a_different_kepub_earns_no_proof(monkeypatch, stale_kobo, tmp_path):
+    """An unchanged library path cannot prove which file the response opened."""
+    from pathlib import Path
+
+    from cps import ub
+
+    sw = stale_kobo
+    original = Path(sw.kepub).read_bytes()
+    different = tmp_path / "different.kepub"
+    replacement = original[:10] + bytes([original[10] ^ 0x01]) + original[11:]
+    different.write_bytes(replacement)
+
+    served = _download(monkeypatch, sw, serve=lambda *_a, **_kw: send_file(different, conditional=True))
+
+    assert served.status == 200 and served.complete and served.body == replacement
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.completed_at is None
+    assert location_of(_bookmark(sw)) == sw.own
+
+
+def test_local_metadata_rewrite_from_the_verified_kepub_preserves_proof(
+        monkeypatch, stale_kobo, tmp_path):
+    """The default Kobo download can rewrite metadata and still prove its source."""
+    import io
+    import zipfile
+
+    from cps import helper
+
+    sw = stale_kobo
+    original_download = helper.do_download_file
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper, "do_download_file", original_download)
+    monkeypatch.setattr(helper.current_user, "locale", "en", raising=False)
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "/test/kepubify", raising=False)
+    monkeypatch.setattr(helper.config, "config_embed_metadata", True, raising=False)
+    monkeypatch.setattr(helper, "get_temp_dir", lambda: str(tmp_path))
+
+    served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete
+    with zipfile.ZipFile(sw.kepub) as original, zipfile.ZipFile(io.BytesIO(served.body)) as delivered:
+        chapters = [name for name in original.namelist() if name.endswith((".html", ".xhtml"))]
+        assert chapters
+        assert all(delivered.read(chapter) == original.read(chapter) for chapter in chapters)
+        package = next(name for name in original.namelist() if name.endswith(".opf"))
+        assert delivered.read(package) != original.read(package)
+    assert location_of(_bookmark(sw)) == sw.exact
+
+
+def test_drive_delivery_does_not_claim_a_local_kepub(monkeypatch, stale_kobo, tmp_path):
+    """A complete Drive download can differ from a copy still on disk."""
+    from pathlib import Path
+
+    from cps import helper, ub
+    from cps.services import user_cover
+
+    sw = stale_kobo
+    original_download = helper.do_download_file
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper, "do_download_file", original_download)
+    monkeypatch.setattr(helper.config, "config_use_google_drive", True)
+    monkeypatch.setattr(helper.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(helper, "get_temp_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(user_cover, "override_for_user", lambda *_: object())
+    monkeypatch.setattr(user_cover, "materialize_delivery_copy", lambda *_a, **_k: None)
+    monkeypatch.setattr(helper.gd, "getFileFromEbooksFolder", lambda *_: object())
+    original = Path(sw.kepub).read_bytes()
+    remote = original[:10] + bytes([original[10] ^ 0x01]) + original[11:]
+    monkeypatch.setattr(
+        helper.gd, "downloadFile", lambda _path, _name, dest: Path(dest).write_bytes(remote)
+    )
+
+    served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete and served.body == remote
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.completed_at is None
+    assert location_of(_bookmark(sw)) == sw.own
+
+
 # == Byte count: proof needs the declared length actually yielded ============
 
 def test_an_x_sendfile_download_does_not_prove_the_current_kepub(monkeypatch, stale_kobo):

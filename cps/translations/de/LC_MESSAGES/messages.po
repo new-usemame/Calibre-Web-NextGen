@@ -505,7 +505,7 @@ msgstr ""
 
 #: cps/admin.py cps/spa_strings.py
 msgid "Select at least one book to restore."
-msgstr "Wählen Sie mindestens ein Buch zum Wiederherstellen aus."
+msgstr "Wählen Sie mindestens ein Buch aus, dessen Cover Sie wiederherstellen möchten."
 
 #: cps/admin.py cps/spa_strings.py
 msgid "The selected books do not match this preview. Scan the library again."
@@ -1659,7 +1659,7 @@ msgstr "Ungültige Lösungsstrategie"
 msgid ""
 "Duplicate groups have changed. Preview the resolution again before deleting."
 msgstr ""
-"Die Duplikatgruppen haben sich geändert. Erstellen sie die Vorschau der "
+"Die Duplikatgruppen haben sich geändert. Erstellen Sie die Vorschau der "
 "Bereinigung erneut, bevor Sie löschen."
 
 #: cps/editbooks.py
@@ -5384,8 +5384,8 @@ msgid ""
 msgstr ""
 "Intelligente Regale werden auf diesem Server nicht mit E-Readern "
 "synchronisiert, daher fügt ein hier angehaktes intelligentes Regal keine "
-"Bücher hinzu. Ein Administrator kann in den Einstellungen „Intelligente "
-"Regale synchronisieren“ einschalten."
+"Bücher hinzu. Ein Administrator kann in den Einstellungen die "
+"Synchronisierung intelligenter Regale mit E-Readern einschalten."
 
 #: cps/spa_strings.py
 msgid ""
@@ -6005,7 +6005,7 @@ msgstr "Wird zu"
 
 #: cps/spa_strings.py
 msgid "Becomes (comma-separated to split)"
-msgstr "Wird zu (kommagetrennt, um aufzuteilen)"
+msgstr "Zielwerte (durch Kommas trennen)"
 
 #: cps/spa_strings.py
 msgid "Beta"
@@ -7262,7 +7262,7 @@ msgstr "Tag {name} gelöscht"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted {count} values"
-msgstr "{count} Werte löschen"
+msgstr "{count} Werte gelöscht"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7766,7 +7766,7 @@ msgstr "Geben Sie den Wert ein, der zugeordnet werden soll."
 
 #: cps/spa_strings.py
 msgid "Enter what it becomes, or choose Drop."
-msgstr "Geben Sei ein, was daraus werden soll, oder wählen Sie „Verwerfen“."
+msgstr "Geben Sie mindestens einen Zielwert ein oder aktivieren Sie „Diesen Wert verwerfen“."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8855,12 +8855,12 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Merge the other selected values into {name}"
-msgstr "Die anderen ausgewählten Werte mit „{name}“ zusammenführen"
+msgstr "Die anderen ausgewählten Werte in „{name}“ zusammenführen"
 
 #: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Merge the selected values into {name}"
-msgstr "Die ausgewählten Werte mit „{name}“ zusammenführen"
+msgstr "Die ausgewählten Werte in „{name}“ zusammenführen"
 
 #: cps/spa_strings.py
 msgid "Merge this copy"
@@ -8889,7 +8889,7 @@ msgstr "In „{title}“ zusammengeführt."
 #, python-brace-format
 msgid "Merged {count} values into {name}, moving {books} book(s)"
 msgstr ""
-"{count} Werte mit „{name}“ zusammengeführt, {books} Buch/Bücher verschoben"
+"{count} Werte in „{name}“ zusammengeführt, {books} Buch/Bücher verschoben"
 
 #: cps/spa_strings.py
 msgid "Metadata URL (OIDC auto-discovery)"
@@ -10490,7 +10490,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save the rules to update the preview."
-msgstr "Die Regeln speichern um dir Vorschau zu aktualisieren."
+msgstr "Speichern Sie die Regeln, um die Vorschau zu aktualisieren."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -13103,8 +13103,8 @@ msgid ""
 "“{name}” has sub-values, so it cannot be merged away. Move or rename it "
 "instead."
 msgstr ""
-"„{name}“ enthält Unterelemente und kann daher nicht zusammengeführt werden. "
-"Verschieben oder benennen Sie es stattdessen um."
+"„{name}“ enthält Unterwerte und kann daher nicht in einen anderen Wert "
+"überführt werden. Verschieben Sie den Wert oder benennen Sie ihn um."
 
 #: cps/spa_strings.py
 msgid "← Back"
@@ -13128,23 +13128,23 @@ msgstr "Passwort-Anforderungen:"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a letter"
-msgstr "ein Buchstabe"
+msgstr "einem Buchstaben"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a lowercase letter"
-msgstr "ein Kleinbuchstabe"
+msgstr "einem Kleinbuchstaben"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a number"
-msgstr "eine Ziffer"
+msgstr "einer Ziffer"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "a special character"
-msgstr "ein Sonderzeichen"
+msgstr "einem Sonderzeichen"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "an uppercase letter"
-msgstr "ein Großbuchstabe"
+msgstr "einem Großbuchstaben"
 
 #: cps/spa_strings.py
 msgid "at least 1 character"
@@ -13158,7 +13158,7 @@ msgstr "mindestens {count} Zeichen"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "including {rules}"
-msgstr "inklusive {rules}"
+msgstr "mit {rules}"
 
 #: cps/spa_strings.py
 msgid "Keep"
@@ -13233,12 +13233,11 @@ msgstr "Konnte die Bibliothek nicht scannen."
 #, python-brace-format
 msgid "{count} book(s) have a cover file but are marked as having no cover."
 msgstr ""
-"Bei {count} Buch/Büchern ist eine Cover-Datei vorhanden, aber das Buch ist "
-"als „ohne Cover“ markiert."
+"Trotz vorhandener Cover-Datei als „ohne Cover“ markierte Bücher ({count})."
 
 #: cps/spa_strings.py
 msgid "No books need their cover restored."
-msgstr "Bei keinem Buch muss das Cover wiederhergstellt werden."
+msgstr "Bei keinem Buch muss das Cover wiederhergestellt werden."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -13301,7 +13300,7 @@ msgstr ""
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
 msgstr ""
-"Benötigt die Rolle „Globales Durchsuchen“: Ohne sie könnte der Benutzer "
+"Benötigt die Rolle „Globale Bibliothek durchsuchen“: Ohne sie könnte der Benutzer "
 "keine Bücher hinzufügen."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
@@ -13923,7 +13922,7 @@ msgstr "Wählen Sie mindestens einen Wert zum Zusammenführen aus"
 
 #: cps/api/cc_values.py
 msgid "Choose the value to merge into"
-msgstr "Wert auswählen, mit dem zusammengeführt werden soll"
+msgstr "Wählen Sie den Wert aus, in den die anderen zusammengeführt werden sollen"
 
 #: cps/api/cc_values.py
 msgid "Pick valid values to merge"
@@ -13958,8 +13957,8 @@ msgstr "Ziel zum Verschieben wählen"
 #, python-brace-format
 msgid "Moving there would merge {count} value(s). Move them one at a time."
 msgstr ""
-"Beim Verschieben dorthin würden {count} Wert(e) zusammengeführt. Verschiebe "
-"Sie sie einzeln."
+"Beim Verschieben dorthin würden {count} Wert(e) zusammengeführt. Verschieben "
+"Sie die Werte einzeln."
 
 #: cps/api/cc_values.py
 msgid "A value with that name is already there"
@@ -19634,7 +19633,7 @@ msgid ""
 "Reading progress, read status and annotations only reach Hardcover for books "
 "that carry a Hardcover identifier. These %(total)s book(s) have none."
 msgstr ""
-"Lesefortschritt, Lesestatus und Anmerkugnen werden nur für Bücher an "
+"Lesefortschritt, Lesestatus und Anmerkungen werden nur für Bücher an "
 "Hardcover übertragen, die eine Hardcover-Kennung besitzen. Diese %(total)s "
 "Buch/Bücher haben keine."
 
@@ -21132,7 +21131,7 @@ msgstr[1] "mindestens %(num)d Zeichen"
 
 #: cps/templates/user_edit.html
 msgid "including"
-msgstr "inklusive"
+msgstr "mit"
 
 #: cps/templates/user_edit.html
 msgid "eReader Configuration"
@@ -21306,7 +21305,7 @@ msgid ""
 msgstr ""
 "Gilt nur, wenn oben „Meine Bibliothek“ gewählt wird. Der Benutzer startet "
 "ohne Bücher und fügt aus der globalen Bibliothek hinzu, was er möchte, daher "
-"benötigt er die Rolle „Globales Durchsuchen“. Nicht verfügbar für ein Konto, "
+"benötigt er die Rolle „Globale Bibliothek durchsuchen“. Nicht verfügbar für ein Konto, "
 "das bereits Bücher mit einem Kobo synchronisiert."
 
 #: cps/templates/user_edit.html

@@ -16,6 +16,20 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.74] - 2026-11-23
+
+### Added
+
+- **Sort a shelf by series order in the new UI.** Choose Series order or Series order (reverse) to display books by their series number.
+
+### Fixed
+
+- **Fetched publication dates can now be selected in the new metadata editor.** Choose **Published** to apply a date or year supplied by a metadata provider, then save it with the book.
+
+- **Filled 289 missing German translations.** Thanks to @koddistortion.
+
+- **Background tasks keep running after a queued task is cancelled.** Task history cleanup handles cancelled tasks that never started and have no completion time. Backported from [CWA #1584](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1584) by @meska.
+
 ## [v4.1.73] - 2026-11-22
 
 ### Fixed

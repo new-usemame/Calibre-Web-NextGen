@@ -56,6 +56,33 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.74',
+    date: '2026-11-23',
+    items: [
+      {
+        title: 'Read a series in order on a shelf',
+        body: 'Open a shelf in the new interface and choose Series order or Series order (reverse) to sort its books by their volume number.',
+        category: 'Library',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'Use the publication date you find',
+        body: 'When you fetch metadata in the new book editor, choose Published to apply the source’s date or year, then save the book.',
+        category: 'Library',
+      },
+      {
+        title: 'Keep background tasks running after a cancellation',
+        body: 'Cancelling a task before it starts leaves the background queue ready to work through the remaining jobs.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Use more of Calibre-Web NextGen in German',
+        body: 'The German catalog fills 289 translations across areas including library settings, device controls and metadata cleanup.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.73',
     date: '2026-11-22',
     items: [

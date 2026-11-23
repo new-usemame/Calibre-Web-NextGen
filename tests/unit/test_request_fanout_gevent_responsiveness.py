@@ -189,6 +189,26 @@ class TestFanOutKeepsHubResponsive:
         assert out["bad"].exception is boom
         assert out["bad"].value is None
 
+    def test_failing_job_is_reported_without_a_gevent_traceback(self, capsys):
+        """A provider that refuses on purpose (bol.com 403, #303) raises so the
+        search layer can name the failure. The caller gets the exception, but
+        gevent must not also print a traceback and a "failed with HTTPError"
+        line to stderr for every refusal."""
+        refusal = RuntimeError("403 Client Error: Forbidden")
+
+        def _raise():
+            raise refusal
+
+        jobs = [("ok", lambda: "fine"), ("bad", _raise)]
+        out = {key: res for key, res in parallel.fan_out(jobs, max_workers=2)}
+        assert out["bad"].exception is refusal
+        assert out["bad"].elapsed_ms >= 0
+        assert out["ok"].value == "fine"
+
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.err
+        assert "failed with" not in captured.err
+
     def test_fan_out_yields_incrementally_as_jobs_complete(self):
         """Callers time each provider individually (duration_ms in the picker's
         per-provider status), so results must arrive as they finish rather

@@ -221,18 +221,42 @@ def _offload_pool():
     return _OFFLOAD_POOL if _OFFLOAD_POOL_THREAD == threading.get_ident() else None
 
 
+class _JobFailure:
+    """A job's exception, carried out of the worker as a return value.
+
+    A job that RAISES inside a gevent threadpool worker makes gevent print
+    the full traceback and a "<ThreadPoolWorker ...> failed with <Error>" line
+    to stderr, even though ``fan_out`` captures the exception and hands it to
+    the caller. Providers that refuse on purpose (bol.com 403, Goodreads 429,
+    see #303) raise by design so the search layer can name the failure, which
+    left one scary traceback in the log per refusal. Returning the exception
+    instead keeps the contract and removes the noise. The caller still gets the
+    very same exception object on ``FanOutResult.exception``.
+    """
+
+    __slots__ = ("exception", "elapsed_ms")
+
+    def __init__(self, exception: BaseException, elapsed_ms: int) -> None:
+        self.exception = exception
+        self.elapsed_ms = elapsed_ms
+
+
 def _timed(fn, fanout_started):
     """Wrap ``fn`` so the finish time is captured in the worker, the instant
     the job returns — see FanOutResult.elapsed_ms for why the consumer's
-    clock is not good enough."""
+    clock is not good enough.
+
+    An ordinary ``Exception`` is returned as a ``_JobFailure`` rather than
+    raised, so gevent does not log a traceback for it (see ``_JobFailure``).
+    Interpreter-level exits (KeyboardInterrupt, SystemExit, GreenletExit) are
+    not job failures and still propagate."""
     def _run():
         try:
             return fn(), _elapsed_ms(fanout_started)
-        except BaseException as exc:
+        except Exception as exc:
             # Carry the elapsed time out with the failure: callers report a
             # duration for failed providers too.
-            exc._fan_out_elapsed_ms = _elapsed_ms(fanout_started)
-            raise
+            return _JobFailure(exc, _elapsed_ms(fanout_started))
     return _run
 
 
@@ -241,6 +265,8 @@ def _elapsed_ms(since: float) -> int:
 
 
 def _result_from(key, value, exception, fanout_started) -> FanOutResult:
+    if isinstance(value, _JobFailure):
+        return FanOutResult(key=key, exception=value.exception, elapsed_ms=value.elapsed_ms)
     if exception is not None:
         return FanOutResult(
             key=key,

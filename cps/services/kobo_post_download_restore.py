@@ -202,12 +202,13 @@ def arm_pending_restore(*, device_id, book_ids, log):
 
 
 def record_download(*, device_id, book_id, book_format, log, user_id=None,
-                    completed=True):
+                    completed=True, kepub_path=None):
     """Upsert the restore row after a download, or stage it before a response.
 
     The route stages annotation restoration at its historical point, then
     confirms file proof only after a full GET body has streamed to the end.
-    Direct callers record a completed download by default.
+    The route supplies the selected KEPUB path. Direct callers can omit it
+    and record a completed download by default.
     """
     if book_id is None:
         return None
@@ -265,12 +266,14 @@ def record_download(*, device_id, book_id, book_format, log, user_id=None,
             # Best-effort file proof is independent of annotation restoration.
             # Failure to prove it must not prevent the pending row being saved.
             try:
-                from cps import calibre_db
-                from .kobo_place_gate import _book_paths, _readable_kepub_identity
-                book = calibre_db.get_book(int(book_id))
-                if book is not None:
-                    _epub, path = _book_paths(book)
-                    row.kepub_file_identity = _readable_kepub_identity(path)
+                from .kobo_place_gate import _readable_kepub_identity
+                if kepub_path is None and completed:
+                    from cps import calibre_db
+                    from .kobo_place_gate import _book_paths
+                    book = calibre_db.get_book(int(book_id))
+                    if book is not None:
+                        _epub, kepub_path = _book_paths(book)
+                row.kepub_file_identity = _readable_kepub_identity(kepub_path)
             except Exception:
                 log.debug("Could not prove Kobo download file for book %s", book_id,
                           exc_info=True)

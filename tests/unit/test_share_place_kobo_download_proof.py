@@ -86,6 +86,33 @@ def _bookmark(sw):
     return sw.get(sw.checked).get("CurrentBookmark") or {}
 
 
+def _kepub_response_with_body(sw, stream):
+    """Vary streaming behavior while preserving the actual opened KEPUB."""
+    response = send_file(sw.kepub, conditional=True)
+    original = response.response
+
+    class Body:
+        file = original.file
+
+        def __iter__(self):
+            return iter(stream(original))
+
+        def close(self):
+            original.close()
+
+    response.response = Body()
+    return response
+
+
+def _interrupted_kepub_response(sw, *, raises=False):
+    def stream(body):
+        yield body.file.read(1000)
+        if raises:
+            raise OSError("simulated stream failure")
+
+    return _kepub_response_with_body(sw, stream)
+
+
 def _install_download(monkeypatch, sw, *, broken=False, serve=None):
     """The real ``helper.get_download_link`` as a WSGI app, mounted the way
     Flask runs a view: the request context is pushed for the view and popped
@@ -108,10 +135,7 @@ def _install_download(monkeypatch, sw, *, broken=False, serve=None):
         do_download = serve
     elif broken:
         def do_download(*_a, **_k):
-            def body():
-                yield b"first chunk"
-                raise OSError("simulated stream failure")
-            return Response(body(), status=200)
+            return _interrupted_kepub_response(sw, raises=True)
     else:
         def do_download(*_a, **_k):
             return send_file(sw.kepub, conditional=True)
@@ -132,7 +156,8 @@ class Served:
         self.status, self.headers, self.body, self.complete = status, headers, body, complete
 
 
-def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serve=None):
+def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serve=None,
+              application=None):
     """The Kobo downloads through CWNG's production server, gevent's pywsgi
     with ``cps.gevent_wsgi.MyWSGIHandler`` on a real local socket. The server
     is chosen here by what actually serves the request, not by a flag."""
@@ -141,7 +166,8 @@ def _download(monkeypatch, sw, method="GET", headers=None, *, broken=False, serv
     from gevent.pywsgi import WSGIServer
     from cps.gevent_wsgi import MyWSGIHandler
 
-    application = _install_download(monkeypatch, sw, broken=broken, serve=serve)
+    if application is None:
+        application = _install_download(monkeypatch, sw, broken=broken, serve=serve)
     server = WSGIServer(("127.0.0.1", 0), application, handler_class=MyWSGIHandler,
                         log=None, error_log=None)
     server.start()
@@ -234,7 +260,7 @@ def test_a_download_whose_stream_fails_partway_does_not_prove_the_current_kepub(
     sw = stale_kobo
     served = _download(monkeypatch, sw, broken=True)
     assert served.status == 200
-    assert served.body == b"first chunk" and not served.complete
+    assert len(served.body) == 1000 and not served.complete
 
     bookmark = _bookmark(sw)
     assert bookmark.get("ProgressPercent") == pytest.approx(40)
@@ -256,6 +282,152 @@ def test_a_full_download_read_to_the_end_delivers_the_exact_span(monkeypatch, st
     assert bookmark.get("ProgressPercent") == pytest.approx(sw.exact_percent, abs=0.01)
     assert location_of(bookmark) == sw.exact
     assert sw.synced_location(sw.checked) == sw.exact
+
+
+def test_a_full_download_after_on_demand_conversion_records_file_proof(monkeypatch, sw):
+    """A worker publishes KEPUB after the request loaded the book's formats."""
+    from pathlib import Path
+
+    from sqlalchemy.orm import Session
+
+    from cps import db, helper, ub
+    from cps.services import kobo_place_gate
+    from cps.tasks import kepub_backfill
+
+    sw.checked = sw.kobo_device("Kobo Checked", checked=True)
+    kepub_path = Path(sw.kepub)
+    expected_file = kepub_path.read_bytes()
+    kepub_path.unlink()
+    book_id = sw.book.id
+    format_row = sw.session.query(db.Data).filter_by(book=book_id, format="KEPUB").one()
+    filename = format_row.name
+    sw.session.delete(format_row)
+    sw.session.commit()
+
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "/test/kepubify", raising=False)
+    monkeypatch.setattr(helper.config, "config_kobo_prefer_kepub", True, raising=False)
+    monkeypatch.setattr(kepub_backfill, "is_kepub_backfill_pending", lambda: False)
+
+    def convert(book_id, _path, source, destination, _user_id, *, blocking, timeout):
+        assert (source, destination, blocking) == ("EPUB", "KEPUB", True)
+        kepub_path.write_bytes(expected_file)
+        with Session(sw.engine) as worker:
+            worker.add(db.Data(name=filename, book_format=destination, book=book_id,
+                               uncompressed_size=len(expected_file)))
+            worker.commit()
+
+    monkeypatch.setattr(helper, "convert_book_format", convert)
+    with Session(sw.engine) as request_session:
+        # Keep the request's identity map separate from the app-data commits.
+        book = request_session.query(db.Books).filter_by(id=book_id).one()
+        assert [data.format for data in book.data] == ["EPUB"]
+        monkeypatch.setattr(helper.calibre_db, "get_book", lambda _id: book)
+        monkeypatch.setattr(helper.calibre_db, "get_filtered_book", lambda *_a, **_kw: book)
+        monkeypatch.setattr(helper.calibre_db, "get_book_format", lambda bid, fmt:
+                            request_session.query(db.Data).filter_by(book=bid, format=fmt).one_or_none())
+        served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete and served.body == expected_file
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=book_id).one()
+    assert download.completed_at is not None
+    assert download.kepub_file_identity == kobo_place_gate.completed_kepub_identity(
+        sw.checked.id, sw.book)
+
+
+def test_a_full_transfer_of_a_different_kepub_earns_no_proof(monkeypatch, stale_kobo, tmp_path):
+    """An unchanged library path cannot prove which file the response opened."""
+    from pathlib import Path
+
+    from cps import ub
+
+    from cps.services.kobo_post_download_restore import RESTORE_PENDING
+
+    sw = stale_kobo
+    previous_at = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one().downloaded_at
+    original = Path(sw.kepub).read_bytes()
+    different = tmp_path / "different.kepub"
+    replacement = original[:10] + bytes([original[10] ^ 0x01]) + original[11:]
+    different.write_bytes(replacement)
+
+    served = _download(monkeypatch, sw, serve=lambda *_a, **_kw: send_file(different, conditional=True))
+
+    assert served.status == 200 and served.complete and served.body == replacement
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.downloaded_at > previous_at
+    assert download.restore_state == RESTORE_PENDING
+    assert download.completed_at is None
+    assert location_of(_bookmark(sw)) == sw.own
+
+
+def test_local_metadata_rewrite_from_the_verified_kepub_preserves_proof(
+        monkeypatch, stale_kobo, tmp_path):
+    """The default Kobo download can rewrite metadata and still prove its source."""
+    import io
+    import zipfile
+
+    from cps import helper
+
+    sw = stale_kobo
+    original_download = helper.do_download_file
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper, "do_download_file", original_download)
+    monkeypatch.setattr(helper.current_user, "locale", "en", raising=False)
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "/test/kepubify", raising=False)
+    monkeypatch.setattr(helper.config, "config_embed_metadata", True, raising=False)
+    monkeypatch.setattr(helper, "get_temp_dir", lambda: str(tmp_path))
+
+    served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete
+    with zipfile.ZipFile(sw.kepub) as original, zipfile.ZipFile(io.BytesIO(served.body)) as delivered:
+        chapters = [name for name in original.namelist() if name.endswith((".html", ".xhtml"))]
+        assert chapters
+        assert all(delivered.read(chapter) == original.read(chapter) for chapter in chapters)
+        package = next(name for name in original.namelist() if name.endswith(".opf"))
+        assert delivered.read(package) != original.read(package)
+    assert location_of(_bookmark(sw)) == sw.exact
+
+
+def test_drive_delivery_does_not_claim_a_local_kepub(monkeypatch, stale_kobo, tmp_path):
+    """A complete Drive download can differ from a copy still on disk."""
+    from pathlib import Path
+
+    from cps import helper, ub
+    from cps.services import user_cover
+
+    from cps.services.kobo_post_download_restore import RESTORE_PENDING
+
+    sw = stale_kobo
+    previous_at = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one().downloaded_at
+    original_download = helper.do_download_file
+    application = _install_download(monkeypatch, sw)
+    monkeypatch.setattr(helper, "do_download_file", original_download)
+    monkeypatch.setattr(helper.config, "config_use_google_drive", True)
+    monkeypatch.setattr(helper.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(helper, "get_temp_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(user_cover, "override_for_user", lambda *_: object())
+    monkeypatch.setattr(user_cover, "materialize_delivery_copy", lambda *_a, **_k: None)
+    monkeypatch.setattr(helper.gd, "getFileFromEbooksFolder", lambda *_: object())
+    original = Path(sw.kepub).read_bytes()
+    remote = original[:10] + bytes([original[10] ^ 0x01]) + original[11:]
+    monkeypatch.setattr(
+        helper.gd, "downloadFile", lambda _path, _name, dest: Path(dest).write_bytes(remote)
+    )
+
+    served = _download(monkeypatch, sw, application=application)
+
+    assert served.status == 200 and served.complete and served.body == remote
+    download = sw.session.query(ub.KoboDeviceBookDownload).filter_by(
+        device_id=sw.checked.id, book_id=sw.book.id).one()
+    assert download.downloaded_at > previous_at
+    assert download.restore_state == RESTORE_PENDING
+    assert download.completed_at is None
+    assert location_of(_bookmark(sw)) == sw.own
 
 
 # == Byte count: proof needs the declared length actually yielded ============
@@ -323,16 +495,9 @@ def test_a_stream_shorter_than_its_content_length_does_not_prove_the_current_kep
     """The byte-count clause on its own: Content-Length is declared and the
     body ends normally, early."""
     sw = stale_kobo
-    with open(sw.kepub, "rb") as handle:
-        whole = handle.read()
-
-    def serve(*_a, **_k):
-        def body():
-            yield whole[:1000]
-        return Response(body(), status=200,
-                        headers={"Content-Length": str(len(whole))})
-
-    served = _download(monkeypatch, sw, serve=serve)
+    served = _download(
+        monkeypatch, sw, serve=lambda *_a, **_k: _interrupted_kepub_response(sw)
+    )
     assert served.status == 200
     assert len(served.body) == 1000 and not served.complete
 

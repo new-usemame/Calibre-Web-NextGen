@@ -16,11 +16,11 @@ import logging
 import os
 
 import pytest
-from flask import send_file
 
 from tests.unit.share_place_span_world import location_of, sw  # noqa: F401  (fixture)
 from tests.unit.test_share_place_kobo_download_proof import (  # noqa: F401  (fixtures)
-    _bookmark, _download, gates_enforced, rows, stale_kobo,
+    _bookmark, _download, _interrupted_kepub_response, _kepub_response_with_body,
+    gates_enforced, rows, stale_kobo,
 )
 
 pytestmark = pytest.mark.unit
@@ -68,32 +68,33 @@ def test_a_range_download_logs_why_it_proves_nothing_and_the_held_place_says_so(
 
 def test_a_short_stream_logs_how_many_bytes_arrived(monkeypatch, caplog, stale_kobo):
     sw = stale_kobo
-    from flask import Response
-
-    def serve(*_a, **_k):
-        def body():
-            yield b"only part"
-        return Response(body(), status=200, headers={"Content-Length": "100"})
 
     with caplog.at_level(logging.DEBUG, logger="cps"):
-        _download(monkeypatch, sw, serve=serve)
+        served = _download(
+            monkeypatch, sw, serve=lambda *_a, **_k: _interrupted_kepub_response(sw)
+        )
+    assert served.status == 200 and not served.complete
+    assert len(served.body) == 1000
+    declared_size = served.headers["Content-Length"]
     logged = _download_logs(caplog)
-    assert any("completion not recorded" in m and "9 of 100 bytes" in m
+    assert any("completion not recorded" in m and f"1000 of {declared_size} bytes" in m
                for m in logged), logged
 
 
 def test_a_kepub_rewritten_during_the_download_logs_that(monkeypatch, caplog, stale_kobo):
     sw = stale_kobo
 
-    def serve(*_a, **_k):
-        # The library KEPUB is rewritten (here: touched) between the moment
-        # the download was recorded and the end of the transfer.
+    def stream(body):
+        yield from body
+        # Change the file after its opened identity was checked, and before
+        # the iterator reports completion.
         stat = os.stat(sw.kepub)
         os.utime(sw.kepub, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
-        return send_file(sw.kepub, conditional=True)
 
     with caplog.at_level(logging.DEBUG, logger="cps"):
-        served = _download(monkeypatch, sw, serve=serve)
+        served = _download(
+            monkeypatch, sw, serve=lambda *_a, **_k: _kepub_response_with_body(sw, stream)
+        )
     assert served.status == 200 and served.complete
     logged = _download_logs(caplog)
     assert any("completion not recorded" in m
@@ -117,17 +118,14 @@ def test_a_full_download_logs_that_its_completion_was_recorded(
 
 def test_a_transfer_that_stops_partway_logs_how_far_it_got(monkeypatch, caplog, stale_kobo):
     sw = stale_kobo
-    from flask import Response
-
-    def serve(*_a, **_k):
-        def body():
-            yield b"first chunk"
-            raise OSError("simulated stream failure")
-        return Response(body(), status=200, headers={"Content-Length": "100"})
 
     with caplog.at_level(logging.DEBUG, logger="cps"):
-        served = _download(monkeypatch, sw, serve=serve)
-    assert not served.complete
+        served = _download(
+            monkeypatch, sw, serve=lambda *_a, **_k: _interrupted_kepub_response(sw, raises=True)
+        )
+    assert served.status == 200 and not served.complete
+    assert len(served.body) == 1000
+    declared_size = served.headers["Content-Length"]
     logged = _download_logs(caplog)
-    assert any("completion not recorded" in m and "stopped after 11 of 100 bytes" in m
+    assert any("completion not recorded" in m and f"stopped after 1000 of {declared_size} bytes" in m
                for m in logged), logged

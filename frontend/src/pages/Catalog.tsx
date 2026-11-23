@@ -37,7 +37,7 @@ import styles from './Catalog.module.css';
 import { advancedSearchHref } from '../lib/advancedSearchUrl';
 import { canUploadBooks } from '../lib/permissions';
 import {
-  LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
+  LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SERIES_SORT_OPTIONS, SORT_OPTIONS,
   READ_DATE_SORT_VALUES, defaultCatalogSort, readListSortOptions, resolveLibrarySort,
 } from '../lib/bookSortOptions';
 
@@ -48,15 +48,6 @@ const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
   favorites: { label: 'Favorites' },
   archived: { label: 'Archived' },
 };
-
-// Series-order sorts (by metadata series_index). Only offered when viewing a
-// single series, where a numeric position is meaningful — a whole-library
-// series_index sort is not. The ascending option is also the series view's
-// default (see defaultSort below) so a series reads 1, 2, 3… out of the box (#573).
-const SERIES_SORT_OPTIONS = [
-  { label: 'Series order', value: 'seriesasc' },
-  { label: 'Series order (reverse)', value: 'seriesdesc' },
-];
 
 const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },

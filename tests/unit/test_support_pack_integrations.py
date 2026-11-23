@@ -287,6 +287,21 @@ class TestInPack:
     def test_built_archive_carries_clean_sections(self, app_db, tmp_path, monkeypatch, sanitize):
         from cps import debug_info
 
+        private_fields = ("Private Kobo Model", "Private Platform", "Private Firmware", "Private Owner")
+        with sqlite3.connect(app_db) as conn:
+            conn.execute(
+                "UPDATE device SET model=?, platform=?, firmware_version=?, created_by=? WHERE id=2",
+                private_fields,
+            )
+            conn.execute(
+                "INSERT INTO device(public_id, user_id, kind, model) VALUES (?, ?, ?, ?)",
+                ("p4", 7, "Private Device Kind", "Kobo_spaBW"),
+            )
+            conn.execute(
+                "INSERT INTO device(public_id, user_id, kind, model) VALUES (?, ?, ?, ?)",
+                ("p5", 7, "kobo", "Kobo_spaBW"),
+            )
+
         log = tmp_path / "calibre-web.log"
         log.write_text("[2026-11-19 09:00:00]  INFO {cps:1} started\n", encoding="utf-8")
 
@@ -308,8 +323,12 @@ class TestInPack:
             for name in ("state/devices.json", "state/koreader.json", "state/email.json"):
                 text = zf.read(name).decode()
                 json.loads(text)
-                for canary in CANARIES:
+                for canary in (*CANARIES, *private_fields, "Private Device Kind"):
                     assert canary not in text, f"{canary!r} leaked into {name}"
+            devices = json.loads(zf.read("state/devices.json"))["devices"]
+            assert devices[0]["model"] == "Kobo Clara BW"
+            assert devices[0]["firmware_version"] == "4.38.23171"
+            assert devices[4]["model"] == "Kobo_spaBW"
 
     def test_resolver_returns_only_what_it_could_read(self):
         from cps import debug_info

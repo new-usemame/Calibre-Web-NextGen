@@ -141,6 +141,40 @@ class TestHubStaysResponsive:
 
     gevent = pytest.importorskip("gevent", reason="production WSGI server is gevent")
 
+    def test_cancelling_waiter_keeps_both_packs_busy_until_worker_finishes(self, monkeypatch):
+        gevent = self.gevent
+        started, release = threading.Event(), threading.Event()
+        monkeypatch.setattr(debug_info, "_prepare_pack", lambda sanitize: {"sanitize": sanitize})
+
+        class _Zip:
+            def getvalue(self):
+                return b"zip"
+
+        def assemble(prep):
+            if not release.is_set():
+                assert not started.is_set(), "a second build ran before the first worker exited"
+                started.set()
+                assert release.wait(5)
+            return _Zip()
+
+        monkeypatch.setattr(debug_info, "_assemble_pack", assemble)
+        waiting = gevent.spawn(debug_info._get_pack, True)
+        try:
+            with gevent.Timeout(4):
+                while not started.is_set():
+                    gevent.sleep(0.01)
+            waiting.kill()
+            assert debug_info.send_debug_sanitized()[1] == 429
+            assert debug_info.send_debug()[1] == 429
+        finally:
+            release.set()
+            waiting.kill()
+            with gevent.Timeout(4):
+                while debug_info._pack_in_progress:
+                    gevent.sleep(0.01)
+
+        assert debug_info._get_pack(True) == b"zip"
+
     def test_other_requests_are_served_during_the_build(self, monkeypatch):
         gevent = self.gevent
         monkeypatch.setattr(debug_info, "_prepare_pack", lambda sanitize: {"sanitize": sanitize})

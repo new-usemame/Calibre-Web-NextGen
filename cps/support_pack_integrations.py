@@ -18,11 +18,9 @@ to paste into a public issue:
 * **Short hashes, not identifiers.** A device is shown as ``dev_<8 hex>`` and
   an account as ``u1``, ``u2`` (order of first appearance). No tokens, no
   serials, no names, no addresses.
-* **Free-text device fields are charset-checked, and user labels are hashed.**
-  ``platform`` and ``firmware_version`` come from the client; a value outside a
-  conservative character set is replaced with ``(redacted)``. ``model`` is shown
-  only for kinds where the hardware reports it (Kobo, browser reader). For
-  KOReader it is a label someone chose, so only a short hash is shown.
+* **Device fields use known values and firmware uses a version format.**
+  A Kobo's client-supplied model is shown only when it matches recognized
+  hardware. KOReader labels appear as short hashes.
 * **Read-only, tolerant of older schemas.** ``app.db`` is opened read-only,
   columns and tables that do not exist yet are skipped rather than failing,
   and a failing sub-query degrades to that field only.
@@ -46,20 +44,25 @@ MAX_DEVICES_LISTED = 200
 MAX_KOSYNC_DEVICES = 50
 MAX_TASK_CLASSES = 30
 
-# Device kinds whose ``model`` is reported by the hardware or set by the server
-# ("Kobo Clara BW", "CWNG web reader"). For every other kind (KOReader) the
-# model is a label the client or user chose, so it can hold a person's name and
-# is reported as a short hash only.
+_DEVICE_KINDS = frozenset({"kobo", "koreader", "webreader"})
+_DEVICE_PLATFORMS = frozenset({"Kobo", "nickel", "koreader", "web"})
+_DEVICE_ORIGINS = frozenset({"auto", "account-browser"})
 _MODEL_REPORTED_KINDS = frozenset({"kobo", "webreader"})
+_KOBO_MODELS = frozenset({
+    "Kobo Clara 2E", "Kobo Clara BW", "Kobo Clara Colour", "Kobo Clara Color",
+    "Kobo Clara HD", "Kobo Elipsa", "Kobo Elipsa 2E", "Kobo Forma",
+    "Kobo Libra 2", "Kobo Libra Colour", "Kobo Libra Color", "Kobo Libra H2O",
+    "Kobo Nia", "Kobo Sage", "Kobo_spaBW",
+})
+_BROWSER_MODELS = frozenset({"CWNG web reader"})
+_FIRMWARE_VERSION = re.compile(r"[0-9]{1,2}\.[0-9]{1,3}\.[0-9]{1,8}")
+
 
 _DEVICE_COLUMNS = (
     "id", "public_id", "user_id", "kind", "model", "platform", "firmware_version",
     "active", "created_by", "first_seen_at", "last_seen_at", "share_place",
     "align_percent", "cwng_header_seen_at",
 )
-# Conservative: letters, digits, space and a few separators. No "@" (emails),
-# no "/" or "\" (paths).
-_SAFE_TEXT_PATTERN = re.compile(r"^[A-Za-z0-9 ._+():\-]{1,80}$")
 _TIMESTAMP_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})")
 
 # CalibreTask stat codes (cps/services/worker.py).
@@ -75,14 +78,16 @@ def short_ref(prefix: str, value) -> str:
     return f"{prefix}_{digest}"
 
 
-def _safe_text(value):
-    """Client-supplied label if it passes a conservative charset, else a marker."""
+def _known_value(value, allowed):
     if value is None:
         return None
-    text = str(value).strip()
-    if not text:
+    return value if value in allowed else "(redacted)"
+
+
+def _firmware_version(value):
+    if value is None:
         return None
-    return text if _SAFE_TEXT_PATTERN.match(text) else "(redacted)"
+    return value if isinstance(value, str) and _FIRMWARE_VERSION.fullmatch(value) else "(redacted)"
 
 
 def _utc(value):
@@ -148,20 +153,21 @@ def collect_devices(app_db_path) -> dict:
             device_id = row.get("id")
             user_label = user_labels.setdefault(row.get("user_id"), f"u{len(user_labels) + 1}")
             pos = positions.get(device_id, (0, 0))
-            kind = _safe_text(row.get("kind"))
+            kind = _known_value(row.get("kind"), _DEVICE_KINDS)
             model_raw = row.get("model")
             model_reported = kind in _MODEL_REPORTED_KINDS
+            known_models = _KOBO_MODELS if kind == "kobo" else _BROWSER_MODELS
             devices.append({
                 "ref": short_ref("dev", row.get("public_id", device_id)),
                 "user": user_label,
                 "kind": kind,
-                "model": _safe_text(model_raw) if model_reported else None,
+                "model": _known_value(model_raw, known_models) if model_reported else None,
                 "model_ref": (short_ref("mdl", model_raw)
-                              if not model_reported and model_raw else None),
-                "platform": _safe_text(row.get("platform")),
-                "firmware_version": _safe_text(row.get("firmware_version")),
+                              if kind == "koreader" and model_raw else None),
+                "platform": _known_value(row.get("platform"), _DEVICE_PLATFORMS),
+                "firmware_version": _firmware_version(row.get("firmware_version")),
                 "active": bool(row.get("active")) if "active" in row else None,
-                "created_by": _safe_text(row.get("created_by")),
+                "created_by": _known_value(row.get("created_by"), _DEVICE_ORIGINS),
                 "share_place": bool(row.get("share_place")) if "share_place" in row else None,
                 "align_percent": bool(row.get("align_percent")) if "align_percent" in row else None,
                 "cwng_header_seen": bool(row.get("cwng_header_seen_at")) if "cwng_header_seen_at" in row else None,
@@ -179,7 +185,11 @@ def collect_devices(app_db_path) -> dict:
             + ("SUM(CASE WHEN share_place THEN 1 ELSE 0 END)" if "share_place" in present else "NULL") + ", "
             "COUNT(DISTINCT user_id) FROM device"
         ).fetchone()
-        by_kind = _grouped(conn, "SELECT kind, COUNT(*) FROM device GROUP BY kind")
+        grouped_kinds = _grouped(conn, "SELECT kind, COUNT(*) FROM device GROUP BY kind")
+        by_kind = {}
+        for raw_kind, (count,) in grouped_kinds.items():
+            kind = _known_value(raw_kind, _DEVICE_KINDS) or "unknown"
+            by_kind[kind] = by_kind.get(kind, 0) + count
         return {
             "exists": True,
             "summary": {
@@ -187,7 +197,7 @@ def collect_devices(app_db_path) -> dict:
                 "active": int(active) if active is not None else None,
                 "share_place_enabled": int(shared) if shared is not None else None,
                 "users_with_devices": users,
-                "by_kind": {str(_safe_text(k)): v[0] for k, v in sorted(by_kind.items(), key=lambda kv: str(kv[0]))},
+                "by_kind": by_kind,
                 "listed": len(devices),
                 "truncated": truncated,
             },

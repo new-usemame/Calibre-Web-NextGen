@@ -822,12 +822,33 @@ def _get_pack(sanitize: bool) -> bytes:
         if _pack_in_progress:
             raise PackBusy()
         _pack_in_progress = True
+    # Once the native worker starts, it owns the gate. Cancelling the
+    # request stops its wait, but the worker still has to finish the archive.
+    worker_started = False
+    abandoned = False
+
+    def assemble():
+        global _pack_in_progress
+        nonlocal worker_started
+        with _pack_state_lock:
+            if abandoned:
+                return None
+            worker_started = True
+        try:
+            return _assemble_pack(prep).getvalue()
+        finally:
+            with _pack_state_lock:
+                _pack_in_progress = False
+
     try:
         prep = _prepare_pack(sanitize)
-        return parallel.run_blocking(lambda: _assemble_pack(prep).getvalue())
-    finally:
+        return parallel.run_blocking(assemble)
+    except BaseException:
         with _pack_state_lock:
-            _pack_in_progress = False
+            if not worker_started:
+                abandoned = True
+                _pack_in_progress = False
+        raise
 
 
 def _busy_response():

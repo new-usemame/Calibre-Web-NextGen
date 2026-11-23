@@ -791,9 +791,9 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
+| German (`de`) | `████████████████████` 100% | 4429/4429 | 0 |
 | French (`fr`) | `████████████████████` 99% | 4367/4429 | 1 |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `███████████████████░` 94% | 4163/4429 | 1 |
-| German (`de`) | `███████████████████░` 94% | 4140/4429 | 0 |
 | Russian (`ru`) | `██████████████████░░` 92% | 4084/4429 | 0 |
 | ca (`ca`) | `██████████████████░░` 92% | 4084/4429 | 0 |
 | Slovak (`sk`) | `██████████████████░░` 92% | 4080/4429 | 0 |

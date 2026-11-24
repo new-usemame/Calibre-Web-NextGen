@@ -26,10 +26,16 @@ DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON = '["google","openlibrary","ibdb","dnb"
 # Scraper integrations whose upstream markup/anti-bot posture makes them unsuitable
 # as surprise defaults. Users must explicitly opt in through an existing provider
 # toggle; an explicit saved True/False always wins.
-DEFAULT_OFF_METADATA_PROVIDERS = frozenset({"goodreads", "bolcom"})
+# Databáze knih and Wikidata need an explicit opt-in: selecting the provider in the ingest
+# order or turning it on in manual search is required before contacting it.
+ORDER_OPT_IN_METADATA_PROVIDERS = frozenset({"databazeknih", "wikidata"})
+DEFAULT_OFF_METADATA_PROVIDERS = frozenset({"goodreads", "bolcom"}) | ORDER_OPT_IN_METADATA_PROVIDERS
 
 
-def metadata_provider_enabled(provider_id, enabled_map):
+def metadata_provider_enabled(provider_id, enabled_map, configured_order=()):
+    """Honor explicit toggles; ingest may also opt in through its saved order."""
+    default = (provider_id not in DEFAULT_OFF_METADATA_PROVIDERS or
+               (provider_id in ORDER_OPT_IN_METADATA_PROVIDERS and provider_id in configured_order))
     return bool(enabled_map.get(
-        provider_id, provider_id not in DEFAULT_OFF_METADATA_PROVIDERS
+        provider_id, default
     ))

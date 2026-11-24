@@ -10587,7 +10587,8 @@
   "title": "A way to add comments/review underneath read books? ",
   "person": "Maria-AL89",
   "delivered_via": [
-   "PR #2419"
+   "PR #2419",
+   "closed"
   ],
   "outcome": "happy",
   "basis": "reply: fixed",
@@ -11874,8 +11875,8 @@
   "delivered_via": [
    "PR #2731"
   ],
-  "outcome": "no_reply",
-  "basis": "nothing heard",
+  "outcome": "unread",
+  "basis": "reply not judged yet",
   "quote": "",
   "evidence": "",
   "judged_by": "rule",
@@ -12489,8 +12490,8 @@
   "delivered_via": [
    "PR #2910"
   ],
-  "outcome": "happy",
-  "basis": "reply: content",
+  "outcome": "unread",
+  "basis": "reply not judged yet",
   "quote": "Thank you, I really appreciate your hard work on this project!",
   "evidence": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2687#issuecomment-6841101459",
   "judged_by": "deepseek-v4.1-flash",
@@ -13235,6 +13236,66 @@
  },
  {
   "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2520",
+  "title": "[bug] Kobo keeps showing old metadata for a book already on the device after a metadata edit",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2520@2026-11-19T11:40:52Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2771",
+  "title": "[bug] New UI email settings: can't switch to SMTP, no test email, no \"not configured\" feedback",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2771@2026-11-19T15:30:59Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2821",
+  "title": "[bug] Kobo and web reader percentages differ on some books (eg, 16% vs 26% at the same place)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2821@2026-11-19T11:40:50Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/873",
+  "title": "Improve Hardcover token setup/clarity",
+  "person": "KucharczykL",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#873@2026-11-19T07:21:15Z"
+ },
+ {
+  "date": "2026-11-19",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2210",
   "title": "feature: calibre content server",
   "person": "benjitobz",
@@ -13296,6 +13357,83 @@
  },
  {
   "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2742",
+  "title": "Add a manifest and system state to the support pack",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2742@2026-11-19T07:28:32Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2752",
+  "title": "SPA: add Auto-Resolve Duplicates panel to the Duplicates page (#1902)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2752@2026-11-19T09:00:16Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2772",
+  "title": "Email settings: leave Gmail OAuth, send a test email, show mail status (#2771)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2772@2026-11-19T15:30:56Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2822",
+  "title": "feat(kosync): CrossPoint clippings sync",
+  "person": "wolffshots",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "happy",
+  "basis": "reaction",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2822@2026-11-19T05:45:38Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2823",
+  "title": "fix(hardcover): tag a journal entry with the reader it came from, and send its page",
+  "person": "wolffshots",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2823@2026-11-19T08:45:48Z"
+ },
+ {
+  "date": "2026-11-19",
   "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2825",
   "title": "Kobo: send an exact place with the percentage the Kobo works out for it (#2821)",
   "person": "sgreadly",
@@ -13309,5 +13447,308 @@
   "evidence": "",
   "judged_by": "rule",
   "id": "pr#2825@2026-11-19T04:51:09Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2868",
+  "title": "Refresh Kobo book metadata without redownloading",
+  "person": "Andxre",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2868@2026-11-19T08:08:41Z"
+ },
+ {
+  "date": "2026-11-19",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2887",
+  "title": "feat(kobo): opt-in setting on each Kobo to align its percentage with CrossPoint",
+  "person": "wolffshots",
+  "delivered_via": [
+   "merged",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2887@2026-11-19T15:58:06Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2438",
+  "title": "[feat] Tag aliases: map incoming tags to a canonical tag on ingest and metadata fetch",
+  "person": "Godferdom",
+  "delivered_via": [
+   "PR #2668"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2438@2026-11-20T06:57:25Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2687",
+  "title": "[Feature Request] Option to set `preserveAspectRatio=\"xMidYMid meet\"` in cover enforcer",
+  "person": "NeonTink",
+  "delivered_via": [
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2687@2026-11-20T12:44:24Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2800",
+  "title": "New UI: Sort the Read List by Date Read",
+  "person": "HLRobius",
+  "delivered_via": [
+   "PR #2801",
+   "closed"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2800@2026-11-20T06:31:54Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2958",
+  "title": "Reading services are forwarded to Kobo with a CWNG-issued token when the store proxy is off, so every forwarded call returns 401",
+  "person": "fabdrol",
+  "delivered_via": [
+   "PR #2984"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2958@2026-11-20T23:04:59Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2434",
+  "title": "Add book master-data editing",
+  "person": "Rol3333",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2434@2026-11-20T11:41:50Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2503",
+  "title": "Hardcover: fix review buttons in fr/it, match translations and subtitles, list books without an ID",
+  "person": "lguerard",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "unread",
+  "basis": "reply not judged yet",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2503@2026-11-20T06:56:27Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2600",
+  "title": "Edit custom column hierarchy",
+  "person": "Rol3333",
+  "delivered_via": [
+   "merged",
+   "closed"
+  ],
+  "outcome": "unread",
+  "basis": "reply not judged yet",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2600@2026-11-20T09:57:30Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2638",
+  "title": "Add Databáze knih (databazeknih.cz) metadata provider for Czech/Slovak edition",
+  "person": "misko903",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2638@2026-11-20T11:19:39Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2655",
+  "title": "feat(metadata): retry ISBN-capable providers by ISBN in auto-fetch (Databáze knih)",
+  "person": "misko903",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "happy",
+  "basis": "reaction",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2655@2026-11-20T12:05:32Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2668",
+  "title": "Metadata clean-up: a tag map with preview, apply and undo (#2438)",
+  "person": "splitsec2",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2668@2026-11-20T06:57:25Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2691",
+  "title": "feat(metadata): Wikidata provider for series and series order",
+  "person": "splitsec2",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2691@2026-11-20T10:23:11Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2695",
+  "title": "Add an admin action to restore covers that exist on disk but are flagged as missing",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2695@2026-11-20T07:26:46Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2801",
+  "title": "New UI: sort the Read list by date read (#2800)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2801@2026-11-20T06:31:54Z"
+ },
+ {
+  "date": "2026-11-20",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2961",
+  "title": "Update messages.po (PT-PT)",
+  "person": "SLLIM20",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2961@2026-11-20T17:50:54Z"
+ },
+ {
+  "date": "2026-11-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/issues/2960",
+  "title": "[bug] KOReader sync: \"No book found for checksum\" although the exact checksum exists in book_format_checksums",
+  "person": "FormelLMS",
+  "delivered_via": [
+   "PR #2970"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "issue#2960@2026-11-21T12:15:38Z"
+ },
+ {
+  "date": "2026-11-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2963",
+  "title": "Update Simplified Chinese translation",
+  "person": "systemannounce",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2963@2026-11-21T05:43:08Z"
+ },
+ {
+  "date": "2026-11-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2970",
+  "title": "KOReader sync: name a damaged checksum index when a lookup misses (#2960)",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2970@2026-11-21T12:15:38Z"
+ },
+ {
+  "date": "2026-11-21",
+  "thread": "https://github.com/new-usemame/Calibre-Web-NextGen/pull/2976",
+  "title": "Kobo: give the OAuth URLs the external port when the proxy is off",
+  "person": "sgreadly",
+  "delivered_via": [
+   "merged"
+  ],
+  "outcome": "no_reply",
+  "basis": "nothing heard",
+  "quote": "",
+  "evidence": "",
+  "judged_by": "rule",
+  "id": "pr#2976@2026-11-21T06:45:48Z"
  }
 ]

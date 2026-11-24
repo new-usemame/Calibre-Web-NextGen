@@ -652,7 +652,19 @@ def test_build_args_carry_no_comment_lines() -> None:
     )
 
 
-def test_builds_selecting_the_mirror_authenticate_to_ghcr() -> None:
+@pytest.mark.parametrize(
+    ("event_name", "is_fork", "dry_run"),
+    [
+        ("pull_request", True, False),
+        ("pull_request", False, False),
+        ("push", False, False),
+        ("workflow_dispatch", False, False),
+        ("workflow_dispatch", False, True),
+    ],
+)
+def test_builds_selecting_the_mirror_authenticate_to_ghcr(
+    event_name: str, is_fork: bool, dry_run: bool,
+) -> None:
     """A job that pins the mirror must also log in to GHCR.
 
     The package is private, so `PBS_SOURCE=ghcr` without a login fails to pull.
@@ -661,8 +673,36 @@ def test_builds_selecting_the_mirror_authenticate_to_ghcr() -> None:
     """
     import yaml
 
+    def login_runs(step: dict) -> bool:
+        # Evaluate the login decision for each credential context. Skipping
+        # login is valid when the build uses the public upstream source.
+        condition = step.get("if", True)
+        if isinstance(condition, bool):
+            return condition
+        expression = str(condition).strip()
+        expression = expression.removeprefix("${{").removesuffix("}}").strip()
+        values = {
+            "github.event_name": event_name,
+            "github.event.pull_request.head.repo.fork": is_fork,
+            "inputs.dry_run": dry_run,
+            "github.event.inputs.dry_run": str(dry_run).lower(),
+            "true": True,
+            "false": False,
+        }
+        # Substitute whole tokens once, preserving quoted strings and making
+        # unsupported contexts fail visibly instead of assuming a login ran.
+        expression = re.sub(
+            r"'[^']*'|[A-Za-z_][A-Za-z_0-9.]*",
+            lambda match: match[0] if match[0].startswith("'") else repr(values[match[0]]),
+            expression,
+        )
+        expression = expression.replace("&&", " and ").replace("||", " or ")
+        return bool(eval(expression, {"__builtins__": {}}))
+
     offenders: list[str] = []
-    for workflow, job, _step in _image_build_steps():
+    for workflow, job, build in _image_build_steps():
+        if is_fork and _pbs_source_selector(build) == [FORK_AWARE_PBS_SOURCE]:
+            continue  # This context selects upstream and needs no GHCR login.
         data = yaml.safe_load((WORKFLOWS / workflow).read_text()) or {}
         steps = ((data.get("jobs") or {}).get(job) or {}).get("steps") or []
         # `registry:` is usually `${{ env.REGISTRY }}`, so resolve workflow-level
@@ -681,12 +721,13 @@ def test_builds_selecting_the_mirror_authenticate_to_ghcr() -> None:
             and str(s.get("uses", "")).startswith("docker/login-action")
             and _is_ghcr(s)
         ]
-        # A conditional login is what broke dry-runs: the build still selects
-        # the mirror, but the credentials step is skipped.
-        if not logins or all("if" in s for s in logins):
+        # A mirror build needs a successful prior login in this context,
+        # including dry-runs. An upstream fork build does not need one.
+        if not any(login_runs(s) and steps.index(s) < steps.index(build) for s in logins):
             offenders.append(f"{workflow}:{job}")
 
     assert not offenders, (
-        f"These jobs build with PBS_SOURCE=ghcr but have no unconditional GHCR "
-        f"login: {offenders}. The mirror is private, so the pull fails."
+        f"These jobs build with PBS_SOURCE=ghcr but have no prior GHCR login "
+        f"for {event_name=}, {is_fork=}, {dry_run=}: {offenders}. "
+        "The mirror is private, so the pull fails."
     )

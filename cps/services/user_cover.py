@@ -13,6 +13,7 @@ import hashlib
 import io
 import os
 import posixpath
+from typing import BinaryIO
 import uuid
 import zipfile
 
@@ -273,7 +274,7 @@ def remove_file(user_id: int, book_id: int, row=None, *, version=None) -> None:
         log.warning("Could not remove unreferenced personal cover: %s", error)
 
 
-def _cover_member(source_path: str):
+def _cover_member(source_path: str | BinaryIO):
     """Return (member path, extension) for an EPUB/KEPUB manifest cover."""
     with zipfile.ZipFile(source_path, "r") as archive:
         container = archive.read("META-INF/container.xml")
@@ -309,7 +310,7 @@ def _encode_for_member(jpeg_path: str, extension: str) -> bytes | None:
         return output.getvalue()
 
 
-def materialize_delivery_copy(user_id, book_id, source_path: str, book_format: str,
+def materialize_delivery_copy(user_id, book_id, source_path: str | BinaryIO, book_format: str,
                               *, session=None):
     """Return a private EPUB/KEPUB copy with this user's cover embedded.
 

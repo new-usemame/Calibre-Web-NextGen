@@ -222,6 +222,12 @@ class HardcoverClient:
             edition = book.get("edition") or {}
             pages = edition.get("pages") or 0
             if not pages:
+                # Books added by the auto-match, the review page or a shelf
+                # sync carry no edition, so they could never show progress.
+                # Pick one with a page count and use it for this read.
+                edition = self.edition_for_progress(book, ids) or edition
+                pages = edition.get("pages") or 0
+            if not pages:
                 if progress_percent == MAX_PROGRESS_PERCENTAGE:
                     # Finishing needs no page count (#2289). Without an edition
                     # the page progress below cannot be written, but a finished
@@ -236,6 +242,8 @@ class HardcoverClient:
                 if not read:
                     # read = self.add_read(book, pages_read)
                     # No read exists for some reason, return since we can't update anything.
+                    log.info("Hardcover user_book %s has no read in progress; progress not synced. "
+                             "Start reading the book on Hardcover once to create it.", book.get("id"))
                     return
                 else:
                     mutation = """
@@ -267,6 +275,109 @@ class HardcoverClient:
             return
         else:
             return
+
+    # reading_format_id of e-book editions (see Hardcover.FORMATS in the
+    # metadata provider). Preferred: these sync from e-readers.
+    EBOOK_READING_FORMAT = 4
+
+    def edition_for_progress(self, user_book, ids):
+        """Choose an edition with a page count for a user_book that has none.
+
+        In order: the book's own ``hardcover-edition`` identifier, Hardcover's
+        default e-book then physical edition, then the most shelved edition
+        with pages (e-books first). The choice is also saved on the user_book
+        so Hardcover shows it, best effort. Returns ``{"id", "pages"}`` or
+        None, in which case progress stays unsynced as before.
+        """
+        book_id = user_book.get("book_id")
+        if not book_id:
+            return None
+        preferred = ids.get("hardcover-edition")
+        candidates = self._editions_with_pages(int(book_id), edition_ids=[int(preferred)]) if preferred else []
+        chosen = next(iter(candidates), None)
+        if chosen is None:
+            defaults = self._default_edition_ids(int(book_id))
+            candidates = self._editions_with_pages(int(book_id), edition_ids=defaults) if defaults else []
+            by_id = {str(e.get("id")): e for e in candidates}
+            chosen = next((by_id[str(d)] for d in defaults if str(d) in by_id), None)
+        if chosen is None:
+            candidates = (self._editions_with_pages(int(book_id), ebooks_only=True)
+                          or self._editions_with_pages(int(book_id)))
+            chosen = next(iter(candidates), None)
+        if chosen is None:
+            return None
+        edition = {"id": int(chosen["id"]), "pages": int(chosen["pages"])}
+        log.info("Hardcover user_book %s had no edition with pages; using edition %s (%s pages)",
+                 user_book.get("id"), edition["id"], edition["pages"])
+        self._set_user_book_edition(user_book, edition["id"])
+        return edition
+
+    def _editions_with_pages(self, book_id, edition_ids=None, ebooks_only=False):
+        """The book's editions that have a page count.
+
+        ``users_count`` only orders the fallback choice; if the schema refuses
+        it, the query is retried with the fields the client already relies on.
+        """
+        # Filter and order before limiting: popular books can have thousands
+        # of editions, and their own/default e-book may be beyond the first 100.
+        where = {"book_id": {"_eq": book_id}, "pages": {"_gt": 0}}
+        if edition_ids is not None:
+            where["id"] = {"_in": edition_ids}
+        if ebooks_only:
+            where["reading_format_id"] = {"_eq": self.EBOOK_READING_FORMAT}
+        query = """
+            query ($where: editions_bool_exp!, $order: [editions_order_by!], $limit: Int!) {
+                editions(where: $where, order_by: $order, limit: $limit) {
+                    id
+                    pages
+                    reading_format_id%s
+                }
+            }"""
+        for extra in ("\n                    users_count", ""):
+            order = ([{"users_count": "desc_nulls_last"}] if extra else []) + [{"id": "asc"}]
+            try:
+                response = self.execute(query % extra, {
+                    "where": where, "order": order,
+                    "limit": len(edition_ids) if edition_ids is not None else 1,
+                })
+            except Exception as e:
+                log.debug(f"Hardcover editions query failed for book {book_id}: {e}")
+                continue
+            return [e for e in (response.get("editions") or []) if e and e.get("id") and e.get("pages")]
+        log.warning(f"Could not list Hardcover editions for book {book_id}")
+        return []
+
+    def _default_edition_ids(self, book_id):
+        """Hardcover's default e-book and physical editions, when it exposes them."""
+        try:
+            response = self.execute("""
+                query ($id: Int!) {
+                    books(where: {id: {_eq: $id}}, limit: 1) {
+                        default_ebook_edition_id
+                        default_physical_edition_id
+                    }
+                }""", {"id": book_id})
+        except Exception as e:
+            log.debug(f"Hardcover default editions unavailable for book {book_id}: {e}")
+            return []
+        books = response.get("books") or []
+        row = (books[0] if books else None) or {}
+        return [row.get(k) for k in ("default_ebook_edition_id", "default_physical_edition_id") if row.get(k)]
+
+    def _set_user_book_edition(self, user_book, edition_id):
+        """Record the chosen edition on the user_book; failure is only logged."""
+        try:
+            response = self.execute("""
+                mutation ($id: Int!, $edition_id: Int!) {
+                    update_user_book(id: $id, object: {edition_id: $edition_id}) {
+                        error
+                    }
+                }""", {"id": int(user_book.get("id")), "edition_id": int(edition_id)})
+            error = (response.get("update_user_book") or {}).get("error")
+            if error:
+                log.warning(f"Hardcover update_user_book edition error: {error}")
+        except Exception as e:
+            log.warning(f"Could not set the edition of Hardcover user_book {user_book.get('id')}: {e}")
 
     def mark_book_read(self, identifiers):
         """Mirror a manual "mark as read" into the user's Hardcover library (#2289).

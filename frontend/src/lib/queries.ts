@@ -1102,6 +1102,7 @@ export interface AdminConfig {
   config_default_ui_font_display: string;
   config_server_announcement: string;
   config_opds_filename_template: string;
+  config_kindle_usb_enabled: boolean;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }
@@ -1461,9 +1462,10 @@ export function useUploadBooks() {
     // The total before the files are queued is what later arrivals are counted
     // against (#1044).
     onMutate: async () => ({ watch: getImportWatch(), baseline: await readLibraryTotal() }),
-    mutationFn: (files: File[]) => {
+    mutationFn: (input: File[] | { files: File[]; kindleOwnerId: number }) => {
       const fd = new FormData();
-      for (const f of files) fd.append('file', f);
+      if (!Array.isArray(input)) fd.set('kindle_owner_id', String(input.kindleOwnerId));
+      for (const file of Array.isArray(input) ? input : input.files) fd.append('file', file);
       return apiUpload<UploadResult>('/api/v1/upload', fd);
     },
     onSuccess: (result, _files, context) => {

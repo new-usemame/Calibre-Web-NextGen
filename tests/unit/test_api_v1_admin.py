@@ -496,3 +496,27 @@ def test_create_user_password_policy_surfaces_400():
             resp = inspect.unwrap(mod.admin_create_user)()
     assert resp[1] == 400
     assert "password" in json.loads(resp[0].get_data())["error"]["message"].lower()
+
+
+
+@pytest.mark.unit
+def test_admin_can_enable_and_disable_experimental_kindle_usb():
+    from cps.api import admin as mod
+
+    cfg = _ui_config()
+    with patch.object(mod, "current_user", _admin()), \
+         patch.object(mod, "config", cfg), \
+         patch.object(mod, "locale_options", return_value=[]), \
+         patch.object(mod, "book_language_options", return_value=[]):
+        with _ctx("/api/v1/admin/config", method="GET"):
+            assert inspect.unwrap(mod.admin_get_config)().get_json()["config_kindle_usb_enabled"] is False
+
+        for enabled in (True, False):
+            with _ctx("/api/v1/admin/config", body={"config_kindle_usb_enabled": enabled}):
+                result = inspect.unwrap(mod.admin_update_config)().get_json()
+            assert result["config_kindle_usb_enabled"] is enabled
+            assert cfg.config_kindle_usb_enabled is enabled
+
+        with _ctx("/api/v1/admin/config", body={"config_kindle_usb_enabled": "false"}):
+            assert inspect.unwrap(mod.admin_update_config)()[1] == 400
+        assert cfg.config_kindle_usb_enabled is False

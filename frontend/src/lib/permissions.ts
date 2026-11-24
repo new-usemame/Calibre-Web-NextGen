@@ -34,6 +34,10 @@ export function canUploadBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.upload && me?.features?.uploading !== false;
 }
 
+export function canUseKindleUsb(me: Me | null | undefined): boolean {
+  return !!me?.id && !me.role?.anonymous && !!me.role?.download && me.features?.kindle_usb === true;
+}
+
 /** May this user open book content in a browser reader? Mirrors viewer_required. */
 export function canReadBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.viewer;

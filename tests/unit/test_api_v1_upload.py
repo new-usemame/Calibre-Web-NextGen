@@ -12,10 +12,10 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, mock_open
 
 
-def _ctx(files=None):
+def _ctx(files=None, **fields):
     app = flask.Flask(__name__)
     app.config["WTF_CSRF_ENABLED"] = False
-    data = {}
+    data = fields
     if files:
         data["file"] = files
     return app.test_request_context(
@@ -24,7 +24,7 @@ def _ctx(files=None):
 
 def _uploader(role_upload=True, anon=False):
     return SimpleNamespace(is_authenticated=True, is_anonymous=anon,
-                           role_upload=lambda: role_upload, id=1,
+                           role_upload=lambda: role_upload, role_download=lambda: True, id=1,
                            name="uploader", has_own_library=True)
 
 
@@ -77,9 +77,13 @@ def test_upload_no_files_400():
 
 
 @pytest.mark.unit
-def test_upload_valid_file_queued():
+@pytest.mark.parametrize("fields", [{}, {"kindle_owner_id": "1"}])
+def test_upload_valid_file_queued(fields):
     from cps.api import upload as mod
-    with _ctx(files=[(io.BytesIO(b"data"), "book.epub")]):
+
+    cfg = _cfg()
+    cfg.config_kindle_usb_enabled = True
+    with _ctx(files=[(io.BytesIO(b"data"), "book.epub")], **fields):
         with patch.object(mod, "current_user", _uploader()), \
              patch.object(mod, "_ensure_ingest_dir_writable", return_value=None), \
              patch.object(mod, "_validate_uploaded_file", return_value=True), \
@@ -89,7 +93,7 @@ def test_upload_valid_file_queued():
              patch("builtins.open", mock_open()) as manifest_open, \
              patch.object(mod, "os") as mock_os, \
              patch.object(mod, "WorkerThread") as worker, \
-             patch.object(mod, "config", _cfg()):
+             patch.object(mod, "config", cfg):
             resp = inspect.unwrap(mod.upload_books)()
     body = json.loads(resp.get_data())
     assert body["queued"] == ["book.epub"]
@@ -129,3 +133,26 @@ def test_upload_ingest_unwritable_500():
             resp = inspect.unwrap(mod.upload_books)()
     assert resp[1] == 500
     assert json.loads(resp[0].get_data())["error"]["code"] == "ingest_unwritable"
+
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("owner", "enabled", "download", "code"), [
+    ("2", True, True, "kindle_account_changed"),
+    ("1", False, True, "kindle_usb_disabled"),
+    ("1", True, False, "forbidden"),
+])
+def test_kindle_import_refuses_revoked_or_changed_account(owner, enabled, download, code):
+    from cps.api import upload as mod
+
+    user = _uploader()
+    user.role_download = lambda: download
+    cfg = _cfg()
+    cfg.config_kindle_usb_enabled = enabled
+    with _ctx(files=[(io.BytesIO(b"book"), "book.epub")], kindle_owner_id=owner):
+        with patch.object(mod, "current_user", user), patch.object(mod, "config", cfg), \
+             patch.object(mod, "_ensure_ingest_dir_writable", side_effect=PermissionError()) as ingest:
+            resp = inspect.unwrap(mod.upload_books)()
+
+    assert resp[0].get_json()["error"]["code"] == code
+    ingest.assert_not_called()

@@ -21608,6 +21608,186 @@ msgstr "Exposer les étagères sélectionnées dans OPDS"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "Added to the library"
+msgstr "Ajouté à la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Already on device"
+msgstr "Déjà sur l’appareil"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Connect another {name}"
+msgstr "Connecter un autre {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Connect {name}"
+msgstr "Connecter {name}"
+
+#: cps/spa_strings.py
+msgid "Connected device"
+msgstr "Appareil connecté"
+
+#: cps/spa_strings.py
+msgid "Connecting…"
+msgstr "Connexion en cours…"
+
+#: cps/spa_strings.py
+msgid "Copy this book to a device connected by USB"
+msgstr "Copier ce livre sur un appareil connecté par USB"
+
+#: cps/spa_strings.py
+msgid "Could not confirm safe eject. Keep the Kindle connected and try again."
+msgstr "Impossible de confirmer l’éjection. Laissez le Kindle branché et réessayez."
+
+#: cps/spa_strings.py
+msgid "Could not connect."
+msgstr "Connexion impossible."
+
+#: cps/spa_strings.py
+msgid "Could not import this book."
+msgstr "Impossible d’importer ce livre."
+
+#: cps/spa_strings.py
+msgid "Could not remove this book from the device."
+msgstr "Impossible de supprimer ce livre de l’appareil."
+
+#: cps/spa_strings.py
+msgid "Could not send to the device."
+msgstr "Impossible d’envoyer le livre à l’appareil."
+
+#: cps/spa_strings.py
+msgid "Device not connected"
+msgstr "Appareil non connecté"
+
+#: cps/spa_strings.py
+msgid "Downloading…"
+msgstr "Téléchargement en cours…"
+
+#: cps/spa_strings.py
+msgid "Eject"
+msgstr "Éjecter"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Eject {name}"
+msgstr "Éjecter {name}"
+
+#: cps/spa_strings.py
+msgid "Enable Kindle USB (experimental)"
+msgstr "Activer la connexion USB au Kindle (expérimental)"
+
+#: cps/spa_strings.py
+msgid "Importing…"
+msgstr "Importation en cours…"
+
+#: cps/spa_strings.py
+msgid "It is safe to unplug. Connect again to see its books."
+msgstr "Vous pouvez débrancher l’appareil. Reconnectez-le pour voir ses livres."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "No {name} connected"
+msgstr "Aucun appareil {name} connecté"
+
+#: cps/spa_strings.py
+msgid "Not in this library"
+msgstr "Absent de cette bibliothèque"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Permanently delete \"{file}\" from {name}?"
+msgstr "Supprimer définitivement « {file} » de {name} ?"
+
+#: cps/spa_strings.py
+msgid "Plug in your device with a USB cable, unlock it, and connect it here."
+msgstr "Branchez votre appareil avec un câble USB, déverrouillez-le, puis connectez-le ici."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Plug in your {name} with a USB cable, unlock it, and connect it here."
+msgstr "Branchez votre {name} avec un câble USB, déverrouillez-le, puis connectez-le ici."
+
+#: cps/spa_strings.py
+msgid "Reconnect"
+msgstr "Reconnecter"
+
+#: cps/spa_strings.py
+msgid "Remove from device"
+msgstr "Supprimer de l’appareil"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove from {name}"
+msgstr "Supprimer de {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Removed from {name}."
+msgstr "Supprimé de {name}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Send to {name}"
+msgstr "Envoyer à {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sent to {name} as {format}. Eject it here, then unplug it to see the book."
+msgstr "Envoyé à {name} au format {format}. Éjectez l’appareil ici, puis débranchez-le pour voir le livre."
+
+#: cps/spa_strings.py
+msgid "There are no books on this device yet. Send one from any book page."
+msgstr "Cet appareil ne contient encore aucun livre. Vous pouvez en envoyer un depuis la fiche d’un livre."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This book is already on {name}."
+msgstr "Ce livre se trouve déjà sur {name}."
+
+#: cps/spa_strings.py
+msgid "This browser cannot talk to USB devices. Use Chrome or Edge on an https:// or localhost address, signed in with download permission."
+msgstr "Ce navigateur ne peut pas accéder aux appareils USB. Utilisez Chrome ou Edge sur une adresse https:// ou localhost et connectez-vous avec un compte autorisé à télécharger."
+
+#: cps/spa_strings.py
+msgid "Use Chrome or Edge over HTTPS or on localhost. This lets signed-in readers with download permission manage files on a connected Kindle."
+msgstr "Utilisez Chrome ou Edge sur une adresse HTTPS ou localhost. Les lecteurs connectés qui sont autorisés à télécharger peuvent gérer les fichiers d’un Kindle branché."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} books on the device"
+msgstr "{count} livres sur l’appareil"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} ejected"
+msgstr "{name} a été éjecté"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} ejected. It is safe to unplug."
+msgstr "{name} a été éjecté. Vous pouvez le débrancher."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} is being added to the library."
+msgstr "Ajout de {name} à la bibliothèque en cours."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} not connected"
+msgstr "{name} non connecté"
+
+#: cps/spa_strings.py
+msgid "Ejecting…"
+msgstr "Éjection en cours…"
+
+#: cps/spa_strings.py
+msgid "Refreshing…"
+msgstr "Actualisation en cours…"
+
 #~ msgid "A few random picks from your library"
 #~ msgstr "Une sélection aléatoire de votre bibliothèque"
 

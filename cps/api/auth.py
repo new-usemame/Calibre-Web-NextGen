@@ -206,6 +206,7 @@ def _server_features():
         # Reports exactly what the enforcement gate will do — same predicate,
         # so the UI can never advertise an upload the endpoints would refuse.
         "uploading": uploads_enabled(config),
+        "kindle_usb": bool(getattr(config, "config_kindle_usb_enabled", False)),
     }
 
 

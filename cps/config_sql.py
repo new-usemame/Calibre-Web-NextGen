@@ -137,6 +137,7 @@ class _Settings(_Base):
     config_acquisition_enabled = Column(
         Boolean, nullable=False, default=False, server_default=text("0"),
     )
+    config_kindle_usb_enabled = Column(Boolean, nullable=False, default=False, server_default=text("0"))
     config_default_role = Column(SmallInteger, default=0)
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")

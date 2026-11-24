@@ -9,6 +9,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 | Fork PR | Upstream | Author | Description | SHA | Release |
 |---|---|---|---|---|---|
+| [#2997](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2997) | [#1521](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1521) | @manut999 | Ingest and library conversion update ownership only on paths whose user or group differs. Adapted to NextGen's shared service-user helper. | — | — |
 | [#2472](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2472) | Fork issue [#2367](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2367) | **Send to an e-reader from the New UI book page.** Visible labelled action opens the existing delivery form; drafts and results stay with their book/account, and recipient suggestions follow current permissions. | `14e4be6ea` | `v4.1.48` |
 | #4 | [#1313](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1313) | @ikuma-hiroyuki | i18n(ja) fill empty msgstr + fix existing | `f5fc59a` | v4.0.6 |
 | #5 | [#1291](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1291) | @sinyawskiy | i18n update messages.po | `67dce95` | v4.0.6 |

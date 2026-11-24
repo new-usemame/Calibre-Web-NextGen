@@ -21,8 +21,6 @@ after an API key that does not exist for a keyless scraper.
 """
 from __future__ import annotations
 
-import ast
-import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -35,9 +33,6 @@ from cps.metadata_provider.goodreads import Goodreads
 pytestmark = pytest.mark.unit
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "metadata"
-SEARCH_META = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "cps", "search_metadata.py")
-)
 
 
 def fixture(name):
@@ -45,27 +40,9 @@ def fixture(name):
 
 
 def _classifier():
-    """Extract ``_classify_provider_failure`` plus the registry it consults.
+    from cps.search_metadata import PROVIDER_KEY_REGISTRY, _classify_provider_failure
 
-    ``cps/search_metadata.py`` cannot be imported in the unit env (it pulls
-    ``cwa_db``, which only exists in the container). The registry is exec'd from
-    the same source rather than restated here, so the test cannot drift from the
-    real single source of truth for which providers take an API key.
-    """
-    tree = ast.parse(Path(SEARCH_META).read_text(encoding="utf-8"))
-    wanted = [
-        node for node in tree.body
-        if (isinstance(node, ast.FunctionDef) and node.name == "_classify_provider_failure")
-        or (isinstance(node, ast.Assign)
-            and any(getattr(t, "id", None) == "PROVIDER_KEY_REGISTRY" for t in node.targets))
-    ]
-    assert len(wanted) == 2, "expected PROVIDER_KEY_REGISTRY and _classify_provider_failure"
-    # The classifier's first check is for a provider's own refusal; the class is
-    # importable here even though the module that uses it is not.
-    from cps.services.Metadata import ProviderRefused
-    ns: dict = {"ProviderRefused": ProviderRefused}
-    exec(compile(ast.Module(body=wanted, type_ignores=[]), SEARCH_META, "exec"), ns)
-    return ns["_classify_provider_failure"], ns["PROVIDER_KEY_REGISTRY"]
+    return _classify_provider_failure, PROVIDER_KEY_REGISTRY
 
 
 def http_error(status: int, url: str = "https://www.goodreads.com/search?q=x"):

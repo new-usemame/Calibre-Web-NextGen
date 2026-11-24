@@ -554,6 +554,14 @@ def _file_identity(path):
     return f"{stat.st_dev}:{stat.st_ino}:{stat.st_size}:{stat.st_mtime_ns}"
 
 
+def opened_kepub_identity(file):
+    """Identity of the open file backing a KEPUB response or staged rewrite."""
+    try:
+        return _file_identity(file.fileno())
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
 def koreader_span(book_id, document, progress):
     """Convert only an XPointer known to address the current library EPUB.
 

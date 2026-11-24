@@ -269,6 +269,7 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),
         "share_place": bool(device.share_place),
+        "align_percent": bool(device.align_percent),
         "place_control": device_registry.place_control(device),
         "book_scope": scope_payload,
     }
@@ -811,9 +812,14 @@ class InvalidSharePlace(ValueError):
     """The sharing setting must be a JSON boolean, not a truthy value."""
 
 
+class InvalidAlignPercent(ValueError):
+    """The percentage setting must be a JSON boolean, for a Kobo only."""
+
+
 def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
                              share_place=_DEVICE_SETTING_UNSET,
-                             book_scope=_DEVICE_SETTING_UNSET, session, commit):
+                             book_scope=_DEVICE_SETTING_UNSET,
+                             align_percent=_DEVICE_SETTING_UNSET, session, commit):
     """Update the owner's label and/or sharing choice in a single commit.
 
     Resolve ownership before validation and validate every field before any
@@ -825,12 +831,16 @@ def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
         return None
     if share_place is not _DEVICE_SETTING_UNSET and not isinstance(share_place, bool):
         raise InvalidSharePlace("share_place must be a boolean")
+    if align_percent is not _DEVICE_SETTING_UNSET and (
+            not isinstance(align_percent, bool) or device.kind != "kobo"):
+        raise InvalidAlignPercent("align_percent must be a boolean, for a Kobo")
     from .services import device_book_scope
     if book_scope is not _DEVICE_SETTING_UNSET:
         book_scope = device_book_scope.validate(
             book_scope, _device_owner(device, session), device, session)
     if (label is _DEVICE_SETTING_UNSET and share_place is _DEVICE_SETTING_UNSET
-            and book_scope is _DEVICE_SETTING_UNSET):
+            and book_scope is _DEVICE_SETTING_UNSET
+            and align_percent is _DEVICE_SETTING_UNSET):
         raise ValueError("device label or share_place is required")
     if label is not _DEVICE_SETTING_UNSET:
         if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
@@ -840,6 +850,8 @@ def rename_annotation_device(public_id, *, user_id, label=_DEVICE_SETTING_UNSET,
     # Validate all fields before mutating any, including a combined PATCH.
     if label is not _DEVICE_SETTING_UNSET:
         device.display_name = label
+    if align_percent is not _DEVICE_SETTING_UNSET:
+        device.align_percent = align_percent
     if book_scope is not _DEVICE_SETTING_UNSET:
         device.book_scope = (None if book_scope["mode"] == "unset"
                              else json.dumps(book_scope, sort_keys=True))
@@ -1458,12 +1470,15 @@ def annotation_device_rename(public_id):
             label=data.get("label", _DEVICE_SETTING_UNSET),
             share_place=data.get("share_place", _DEVICE_SETTING_UNSET),
             book_scope=data.get("book_scope", _DEVICE_SETTING_UNSET),
+            align_percent=data.get("align_percent", _DEVICE_SETTING_UNSET),
             session=ub.session, commit=ub.session_commit,
         )
     except device_book_scope.InvalidBookScope:
         return jsonify({"error": "invalid_book_scope"}), 400
     except InvalidSharePlace:
         return jsonify({"error": "invalid_share_place"}), 400
+    except InvalidAlignPercent:
+        return jsonify({"error": "invalid_align_percent"}), 400
     except ValueError as error:
         return jsonify({"error": "invalid_label", "message": str(error)}), 400
     except (RuntimeError, SQLAlchemyError):

@@ -1,0 +1,149 @@
+{
+ "run": {
+  "id": 44486088217,
+  "event": "pull_request",
+  "head_branch": "feature/2771-email-settings-smtp-test",
+  "created_at": "2026-11-19T08:15:33Z"
+ },
+ "jobs": [
+  {
+   "id": 135429793677,
+   "name": "Fast Tests (Smoke + Unit)",
+   "status": "completed",
+   "conclusion": "failure",
+   "run_attempt": 1,
+   "started_at": "2026-11-19T08:15:36Z",
+   "completed_at": "2026-11-19T08:31:56Z",
+   "steps": [
+    {
+     "name": "Set up job",
+     "number": 1,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:15:36Z",
+     "completed_at": "2026-11-19T08:15:37Z"
+    },
+    {
+     "name": "Checkout code",
+     "number": 2,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:15:37Z",
+     "completed_at": "2026-11-19T08:15:58Z"
+    },
+    {
+     "name": "Remove Python bytecode and pycache",
+     "number": 3,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:15:58Z",
+     "completed_at": "2026-11-19T08:15:58Z"
+    },
+    {
+     "name": "Set up Python 3.13",
+     "number": 4,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:15:58Z",
+     "completed_at": "2026-11-19T08:16:00Z"
+    },
+    {
+     "name": "Set up Node 22",
+     "number": 5,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:16:00Z",
+     "completed_at": "2026-11-19T08:16:02Z"
+    },
+    {
+     "name": "Install frontend dependencies (npm ci)",
+     "number": 6,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:16:02Z",
+     "completed_at": "2026-11-19T08:16:06Z"
+    },
+    {
+     "name": "Install system dependencies",
+     "number": 7,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:16:06Z",
+     "completed_at": "2026-11-19T08:16:20Z"
+    },
+    {
+     "name": "Install dependencies",
+     "number": 8,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:16:20Z",
+     "completed_at": "2026-11-19T08:16:51Z"
+    },
+    {
+     "name": "Create test environment structure",
+     "number": 9,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:16:51Z",
+     "completed_at": "2026-11-19T08:16:51Z"
+    },
+    {
+     "name": "Run smoke and unit tests",
+     "number": 10,
+     "status": "completed",
+     "conclusion": "failure",
+     "started_at": "2026-11-19T08:16:51Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Run non-xdist unit tests (lane opt-outs)",
+     "number": 11,
+     "status": "completed",
+     "conclusion": "skipped",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Comment PR with results",
+     "number": 12,
+     "status": "completed",
+     "conclusion": "failure",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Post Set up Node 22",
+     "number": 22,
+     "status": "completed",
+     "conclusion": "skipped",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Post Set up Python 3.13",
+     "number": 23,
+     "status": "completed",
+     "conclusion": "skipped",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Post Checkout code",
+     "number": 24,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    },
+    {
+     "name": "Complete job",
+     "number": 25,
+     "status": "completed",
+     "conclusion": "success",
+     "started_at": "2026-11-19T08:31:54Z",
+     "completed_at": "2026-11-19T08:31:54Z"
+    }
+   ]
+  }
+ ]
+}

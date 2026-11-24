@@ -105,7 +105,12 @@ class WorkerThread(threading.Thread):
                 ret = alive
             else:
                 # otherwise, loop off the oldest dead tasks until we hit the target trigger
-                ret = sorted(dead, key=lambda y: y.task.end_time)[-TASK_CLEANUP_TRIGGER:] + alive
+                def completion_order(item):
+                    # Cancelled tasks without a completion time sort first.
+                    ended_at = item.task.end_time
+                    return ended_at is not None, ended_at
+
+                ret = sorted(dead, key=completion_order)[-TASK_CLEANUP_TRIGGER:] + alive
 
             self.dequeued = sorted(ret, key=lambda y: y.num)
 
@@ -139,7 +144,10 @@ class WorkerThread(threading.Thread):
 
             # remove self_cleanup tasks and hidden "System Tasks" from list
             if item.task.self_cleanup or item.hidden:
-                self.dequeued.remove(item)
+                with self.doLock:
+                    # Cleanup may already have evicted a cancelled task.
+                    if item in self.dequeued:
+                        self.dequeued.remove(item)
 
             self.queue.task_done()
 

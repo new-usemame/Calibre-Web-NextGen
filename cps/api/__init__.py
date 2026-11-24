@@ -348,6 +348,7 @@ from . import search   # noqa: E402,F401
 from . import account  # noqa: E402,F401
 from . import reader   # noqa: E402,F401
 from . import reader_fonts  # noqa: E402,F401
+from . import cover_flags  # noqa: E402,F401
 from . import book_reviews  # noqa: E402,F401
 from . import book_ratings  # noqa: E402,F401
 from . import ingest_folder_labels  # noqa: E402,F401
@@ -358,6 +359,7 @@ from . import info     # noqa: E402,F401
 from . import duplicates  # noqa: E402,F401
 from . import magicshelves  # noqa: E402,F401
 from . import columns  # noqa: E402,F401
+from . import cc_values  # noqa: E402,F401
 from . import comic     # noqa: E402,F401
 from . import admin_security  # noqa: E402,F401
 from . import notices   # noqa: E402,F401
@@ -368,6 +370,7 @@ from . import acquisition  # noqa: E402,F401
 from . import discover_source  # noqa: E402,F401
 
 from . import device_sleep_screen  # noqa: E402,F401
+from . import value_maps  # noqa: E402,F401
 
 # #2842 part 2: convert_format lets a reader app ask for a format the book lacks
 # (an EPUB of an AZW3-only book); it keeps its own edit-role check, so an app

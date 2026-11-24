@@ -258,6 +258,19 @@ def _deleted_entitlement_change_basis(deleted_at):
     return "v1|deleted={}".format(_ledger_timestamp_component(deleted_at))
 
 
+def _is_metadata_only_edit(book, record, edit, change_basis):
+    if edit is None or not record.change_basis or book.is_archived or edit.book_uuid != book.Books.uuid:
+        return False
+    archive_clock = book.last_modified
+    first_basis = _book_entitlement_change_basis(edit.first_modified, archive_clock)
+    last_basis = _book_entitlement_change_basis(edit.last_modified, archive_clock)
+    return (
+        change_basis == last_basis
+        and record.change_basis.endswith("|archive=" + _ledger_timestamp_component(archive_clock))
+        and first_basis <= record.change_basis < last_basis
+    )
+
+
 def _entitlement_replay_decision(record, fingerprint, change_basis,
                                  twin_fingerprint=None):
     """Return ``(suppress, shape_reseed, refresh_record)`` for one candidate.
@@ -2818,6 +2831,12 @@ def HandleSyncRequest():
         # optional diagnostics. They suppress exact absent/partial-token
         # replays and classify a genuine mismatch as Changed.
         prior_entitlement_fingerprints = known_entitlement_fingerprints
+        metadata_edits = {}
+        if prior_entitlement_fingerprints and getattr(calibre_db, "book_metadata_edits_available", False):
+            metadata_edits = {
+                edit.book_id: edit for edit in calibre_db.session.query(db.BookMetadataEdit)
+                .filter(db.BookMetadataEdit.book_id.in_(prior_entitlement_fingerprints))
+            }
         for book in candidate_page:
             candidate_emitted_work = False
             kobo_reading_state = book.KoboReadingState  # None when no record exists yet
@@ -2842,13 +2861,14 @@ def HandleSyncRequest():
                 book.Books.last_modified,
                 book.last_modified,
             )
+            prior_entitlement = prior_entitlement_fingerprints.get(book.Books.id)
             if replay_suppression_eligible:
                 (
                     entitlement_is_unchanged,
                     shape_reseed,
                     refresh_fingerprint_record,
                 ) = _entitlement_replay_decision(
-                    prior_entitlement_fingerprints.get(book.Books.id),
+                    prior_entitlement,
                     entitlement_fingerprint,
                     entitlement_change_basis,
                     lambda: _entitlement_fingerprint_twin(entitlement),
@@ -2858,6 +2878,12 @@ def HandleSyncRequest():
                 shape_reseed = False
                 refresh_fingerprint_record = False
 
+            metadata_only = (
+                not entitlement_is_unchanged and prior_entitlement is not None
+                and _is_metadata_only_edit(
+                    book, prior_entitlement, metadata_edits.get(book.Books.id), entitlement_change_basis,
+                )
+            )
             if (kobo_reading_state is not None
                     and kobo_reading_state.id in reading_state_page_ids
                     and _withhold_shared_state(book.Books.id)):
@@ -2875,10 +2901,8 @@ def HandleSyncRequest():
                     books_cursor_datetime(kobo_reading_state.last_modified),
                 )
                 reading_state_book_ids_emitted.append(book.Books.id)
-                if entitlement_is_unchanged:
-                    # Replay suppression applies only to the byte-identical
-                    # base entitlement. A state admitted to this response's
-                    # ordered frontier must still be emitted independently.
+                if entitlement_is_unchanged or metadata_only:
+                    # Neither case carries a full entitlement for the reading state.
                     sync_results.append({
                         "ChangedReadingState": {"ReadingState": reading_state}
                     })
@@ -2914,6 +2938,13 @@ def HandleSyncRequest():
                         )
                 if book.Books.id not in prior_entitlement_fingerprints:
                     sync_results.append({"NewEntitlement": entitlement})
+                elif metadata_only:
+                    metadata = entitlement["BookMetadata"]
+                    metadata["ContributorRoles"] = [
+                        {**contributor, "Role": "Author"}
+                        for contributor in metadata.get("ContributorRoles", [])
+                    ]
+                    sync_results.append({"ChangedProductMetadata": {"BookMetadata": metadata}})
                 else:
                     sync_results.append({"ChangedEntitlement": entitlement})
                     # Nickel answers a Changed entitlement for a book it
@@ -2927,7 +2958,8 @@ def HandleSyncRequest():
                 # that #1925 suppresses (including a declared #1953 shape
                 # reseed) must not mass-arm the user's position journal.
                 if requesting_device_id:
-                    rehydrate_book_ids.add(book.Books.id)
+                    if not metadata_only:
+                        rehydrate_book_ids.add(book.Books.id)
                     # The per-device ledger is the New-vs-Changed
                     # classification source even when suppression is disabled.
                     entitlement_fingerprint_updates[book.Books.id] = \
@@ -4943,18 +4975,21 @@ def HandleStateRequest(book_uuid):
         if resolved_bookmark_accepted:
             if request_bookmark and request_bookmark.get("ProgressPercent") is not None:
                 accepted_progress = bookmark_outcome.percentage
-                push_reading_state_to_hardcover(
-                    current_user, book, accepted_progress,
-                )
                 if checked:
-                    share_kobo_progress_with_koreader(
+                    shared_progress = share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
                         report=kobo_place_gate.Report(client_lm, bookmark_outcome.received_at),
+                        location=location, device_id=device_id,
                     )
                 else:
-                    share_kobo_progress_with_koreader(
+                    shared_progress = share_kobo_progress_with_koreader(
                         current_user.id, book.id, accepted_progress,
+                        location=location, device_id=device_id,
+                        received_at=current_bookmark.server_modified_at,
                     )
+                push_reading_state_to_hardcover(
+                    current_user, book, shared_progress,
+                )
 
         ub.session.merge(kobo_reading_state)
         # #1318 again, on the reading-state path: ``session_commit()`` returns
@@ -5075,7 +5110,15 @@ def _handle_unchecked_state_request(book, device_id):
     })
 
 
-def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None):
+# How far CrossPoint's percentage at a Kobo's span may sit from the Kobo's own whole-number
+# percentage and still be shared (#2887). The Kobo rounds down a measure taken on its KEPUB and
+# CrossPoint weighs EPUB bytes, so they differ by a point or two; a larger gap means the span
+# resolved to the wrong place, and the device's own value is shared instead.
+ALIGN_PERCENT_TOLERANCE = 5.0
+
+
+def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=None,
+                                      location=None, device_id=None, received_at=None):
     """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
 
     #1425 gap 1. KOReader fetches ``KOSyncProgress`` over kosync; a Kobo sync
@@ -5092,6 +5135,16 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     have not advertised support for that are served nothing, exactly as
     before (see ``record_percentage_only_progress``).
 
+    A Kobo's percentage is a whole number, measured on its own KEPUB, so
+    KOReader and CrossPoint would compare and show a coarser value than
+    their own. When the reporting Kobo has the opt-in ``align_percent`` on and
+    ``location`` is its span in the library KEPUB, the row
+    gets the percentage CrossPoint computes at that span instead
+    (``koreader_position.kobo_share_percent``). The Kobo's own
+    bookmark keeps the device's value: the device echoes it back. The caller
+    sends the returned value to Hardcover, so Hardcover gets the same
+    measure as a CrossPoint or KOReader push.
+
     With an accepted checked report, ``report`` supplies its raw client clock
     and bookmark receipt to the latest-wins carrier. Legacy calls retain the
     existing furthest-wins write.
@@ -5103,12 +5156,17 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     :param user_id: Owner of the reading position.
     :param book_id: Calibre book id — the key ``update_progress`` converges on.
     :param percentage: Reading progress, 0-100, as the device reported it.
-    :return: None
+    :param location: The ``Location`` of the device's report, if any.
+    :param device_id: The reporting Kobo's ``Device`` id.
+    :param received_at: The accepted legacy bookmark's server receipt, so the
+        book page can identify its shared percentage without changing arbitration.
+    :return: The percentage for the row: the CrossPoint value, or else
+        ``percentage``. It is returned also when the row write fails.
     """
     # Imported lazily: ``kosync`` imports this module for
     # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
     from .progress_syncing.protocols.kosync import record_percentage_only_progress
-    from .services.koreader_position import KOBO_DEVICE
+    from .services.koreader_position import KOBO_DEVICE, kobo_share_percent
 
     try:
         # A SAVEPOINT only contains what is flushed after it, so the Kobo's own
@@ -5116,9 +5174,26 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
         # rollback here would take them with it (#1318, same precondition the
         # web reader path documents).
         ub.session_flush()
+        finer = None
+        if _aligns_percent(device_id):
+            try:
+                finer = kobo_share_percent(book_id=book_id, device_id=device_id,
+                                           location=location)
+            except Exception:
+                log.debug("No CrossPoint percentage for book %s", book_id, exc_info=True)
+        if finer is not None and abs(finer - float(percentage)) <= ALIGN_PERCENT_TOLERANCE:
+            percentage = finer
+        elif finer is not None:
+            # The two measures weigh a book differently, but not by this much: the span
+            # matched the wrong place. A furthest-wins row would hold every reader there.
+            log.info("Kobo reported %s%% for book %s but its span measures %.2f%%; sharing %s%%",
+                     percentage, book_id, finer, percentage)
         with ub.begin_contained_nested(ub.session):
             if report is None:
-                record_percentage_only_progress(user_id, book_id, percentage, device=KOBO_DEVICE)
+                record_percentage_only_progress(
+                    user_id, book_id, percentage, device=KOBO_DEVICE,
+                    received_at=received_at,
+                )
             else:
                 from .services.kosync_place import latest_write
                 from .progress_syncing.models import KOSyncProgress
@@ -5153,6 +5228,18 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage, *, report=No
     except Exception as e:
         log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
                     user_id, book_id, e)
+    return percentage
+
+
+def _aligns_percent(device_id):
+    """True when the Kobo ``device_id`` has the opt-in ``align_percent`` on."""
+    if device_id is None:
+        return False
+    try:
+        device = ub.session.get(ub.Device, int(device_id))
+    except (TypeError, ValueError, SQLAlchemyError):
+        return False
+    return bool(device is not None and device.kind == "kobo" and device.align_percent)
 
 
 def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: int):
@@ -5969,13 +6056,31 @@ def HandleAuthRequest():
 
 
 
+def _kobo_direct_origin():
+    """Use the configured external port when there is no reverse proxy."""
+    host = request.host
+    if ':' in host and not host.endswith(']'):
+        host = host.rsplit(':', 1)[0]
+    return f"{request.scheme}://{host}:{config.config_external_port}"
+
+
+def _kobo_oauth_base_url():
+    # Some Kobos omit the port in Host. With the store proxy off, the local
+    # OAuth URLs need the same external port as the rest of the sync URLs.
+    use_request_origin = config.config_kobo_proxy or current_app.wsgi_app.is_proxied
+    oauth_url = url_for("kobo.HandleOauthRequest",
+                        auth_token=kobo_auth.get_auth_token(),
+                        _external=use_request_origin)
+    if not use_request_origin:
+        oauth_url = _kobo_direct_origin() + oauth_url
+    return oauth_url.rsplit("/oauth", 1)[0]
+
+
 @csrf.exempt
 @kobo.route('/oauth/.well-known/openid-configuration', methods=['GET', 'POST'])
 @requires_kobo_auth
 def HandleOidcDiscovery():
-    base_url = url_for("kobo.HandleOauthRequest",
-                       auth_token=get_auth_token(),
-                       _external=True).rsplit("/oauth", 1)[0]
+    base_url = _kobo_oauth_base_url()
     payload = {
         'issuer': base_url,
         'authorization_endpoint': base_url + '/oauth/authorize',
@@ -6047,15 +6152,7 @@ def HandleInitRequest():
 
     if not current_app.wsgi_app.is_proxied:
         log.debug('Kobo: Received unproxied request, changed request port to external server port')
-        if ':' in request.host and not request.host.endswith(']'):
-            host = "".join(request.host.split(':')[:-1])
-        else:
-            host = request.host
-        calibre_web_url = "{url_scheme}://{url_base}:{url_port}".format(
-            url_scheme=request.scheme,
-            url_base=host,
-            url_port=config.config_external_port
-        )
+        calibre_web_url = _kobo_direct_origin()
         log.debug('Kobo: Received unproxied request, changed request url to %s', calibre_web_url)
         kobo_resources["image_host"] = calibre_web_url
         kobo_resources["image_url_quality_template"] = unquote(calibre_web_url +
@@ -6117,13 +6214,9 @@ def HandleInitRequest():
                                                   _external=True)
         kobo_resources["rating"] = _rating_resource_url()
 
-    # When not proxying Kobo Store requests, point oauth_host to CWA and
-    # serve dummy OAuth responses for unregistered devices.
+    # Point devices at local OAuth when they aren't using the Kobo Store.
     if not config.config_kobo_proxy:
-        oauth_token_url = url_for("kobo.HandleOauthRequest",
-                                  auth_token=kobo_auth.get_auth_token(),
-                                  _external=True)
-        kobo_resources["oauth_host"] = oauth_token_url.rsplit("/oauth", 1)[0] + "/oauth"
+        kobo_resources["oauth_host"] = _kobo_oauth_base_url() + "/oauth"
 
     response = make_response(jsonify({"Resources": kobo_resources}))
     response.headers["x-kobo-apitoken"] = "e30="

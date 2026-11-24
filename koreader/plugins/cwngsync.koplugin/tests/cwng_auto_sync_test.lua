@@ -116,6 +116,50 @@ local function testABookOnlyGlancedAtSendsNothing()
     assertEqual(plugin:captureOpenBook(true), nil, "opening and closing a book says nothing")
 end
 
+local function testAutomaticDeliveryCooldown()
+    local real_time = os.time
+    local now, checks = 1000, 0
+    local root = os.tmpname()
+    os.remove(root)
+    assert(os.execute("mkdir -p " .. root))
+    package.loaded["datastorage"] = { getSettingsDir = function() return root end }
+    package.loaded["ffi/sha2"] = { md5 = function(value) return value end }
+    os.time = function() return now end
+    local function instance(owner)
+        return setmetatable({
+            accountOwner = function() return owner end,
+            collectDeliveries = function() checks = checks + 1 end,
+        }, { __index = require("cwng_auto_sync") })
+    end
+    local reader = instance("first")
+    local network = require("ui/network/manager")
+    local connected = network.isConnected
+    network.isConnected = function() return false end
+    reader:checkDeliveriesIfDue()
+    assertEqual(checks, 0, "a queued callback after disconnect skips the inventory")
+    network.isConnected = connected
+    reader:checkDeliveriesIfDue()
+    assertEqual(checks, 1, "the first online check is still due")
+    now = now + 299
+    package.loaded["cwng_auto_sync"] = nil
+    local browser = instance("first")
+    browser:checkDeliveriesIfDue()
+    assertEqual(checks, 1, "returning to the browser shares the reader's inventory check")
+    now = now + 1
+    browser:checkDeliveriesIfDue()
+    assertEqual(checks, 2, "automatic delivery resumes at five minutes")
+    instance("second"):checkDeliveriesIfDue()
+    assertEqual(checks, 3, "a different account gets its own first check")
+    now = 900
+    browser:checkDeliveriesIfDue()
+    assertEqual(checks, 4, "moving the clock back cannot suppress delivery")
+    os.time = real_time
+    os.remove(root .. "/cwngsync_delivery_first")
+    os.remove(root .. "/cwngsync_delivery_second")
+    os.remove(root)
+end
+
+testAutomaticDeliveryCooldown()
 testAChangeTheServerWillNeverTakeIsLetGo()
 testAChangeTheServerAsksToSendLaterIsKept()
 testAQueuedHighlightSaysWhichDeviceMadeIt()

@@ -56,6 +56,60 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.74',
+    date: '2026-11-23',
+    items: [
+      {
+        title: 'Read a series in order on a shelf',
+        body: 'Open a shelf in the new interface and choose Series order or Series order (reverse) to sort its books by their volume number.',
+        category: 'Library',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'Use the publication date you find',
+        body: 'When you fetch metadata in the new book editor, choose Published to apply the source’s date or year, then save the book.',
+        category: 'Library',
+      },
+      {
+        title: 'Keep background tasks running after a cancellation',
+        body: 'Cancelling a task before it starts leaves the background queue ready to work through the remaining jobs.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Use more of Calibre-Web NextGen in German',
+        body: 'The German catalog fills 289 translations across areas including library settings, device controls and metadata cleanup.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.73',
+    date: '2026-11-22',
+    items: [
+      {
+        title: 'Start with the newest books every time',
+        body: 'Switching from Recent back to Newest in Your Library puts the latest additions first, even after you have loaded more rows in both sorts.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Keep Kobo sync working with the store proxy off',
+        body: 'Calibre-Web NextGen now answers the Kobo’s UserStorage metadata check locally. The device can finish syncing after it renews its token.',
+        category: 'Sync',
+      },
+      {
+        title: 'Renew Kobo tokens on a custom port',
+        body: 'If your Kobo connects directly to a custom port with store proxying off, it now uses that port to renew its token too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Find the reason for a failed KOReader book match',
+        body: 'The server log now names the affected book when a lookup suggests the library’s checksum index might be damaged.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.72',
     date: '2026-11-20',
     items: [

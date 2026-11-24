@@ -3327,7 +3327,26 @@ def save_cover_with_thumbnail_update(img, book_path, book_id=None):
     return save_cover(img, book_path)
 
 
-def do_download_file(book, book_format, client, data, headers, cover_user_id=None):
+def _stage_kobo_download(source_path, expected_identity, stage):
+    """Carry proof through a metadata or cover rewrite of the same open source."""
+    if not expected_identity:
+        return stage(source_path), None
+
+    from .services.kobo_place_gate import _readable_kepub_identity, opened_kepub_identity
+    with open(source_path, "rb") as source:
+        before = opened_kepub_identity(source)
+        result = stage(source)
+        if result is None:
+            return None, expected_identity
+        if before != expected_identity or before != opened_kepub_identity(source):
+            return result, None
+
+    directory, stem = result
+    return result, _readable_kepub_identity(os.path.join(directory, stem + ".kepub"))
+
+
+def do_download_file(book, book_format, client, data, headers, cover_user_id=None, *,
+                     kobo_delivery_identity=None):
     # Fork issue #103 / mirrors janeczku/calibre-web#3274. Validate inputs so a
     # malformed call (None book_format, or a Data row with a NULL `name` because
     # the calibre.db is anomalous) surfaces as a clean 400 with a diagnostic log
@@ -3420,8 +3439,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
 
         if book_format == "kepub" and config.config_kepubifypath and config.config_embed_metadata:
             try:
-                filename, download_name = do_kepubify_metadata_replace(book, os.path.join(filename,
-                                                                                          book_name + "." + book_format))
+                (filename, download_name), kobo_delivery_identity = _stage_kobo_download(
+                    os.path.join(filename, book_name + ".kepub"), kobo_delivery_identity,
+                    partial(do_kepubify_metadata_replace, book),
+                )
                 metadata_was_embedded = True
             except Exception as e:
                 log.error_or_exception(f"Failed to kepubify metadata for book {book.id}: {e}")
@@ -3447,8 +3468,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
         source_path = os.path.join(filename, download_name + "." + book_format)
         try:
             from .services import user_cover
-            personal_copy = user_cover.materialize_delivery_copy(
-                cover_user_id, book.id, source_path, book_format,
+            personal_copy, kobo_delivery_identity = _stage_kobo_download(
+                source_path, kobo_delivery_identity,
+                partial(user_cover.materialize_delivery_copy, cover_user_id, book.id,
+                        book_format=book_format),
             )
             if personal_copy is not None:
                 if filename == get_temp_dir():
@@ -3521,19 +3544,20 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                 log.warning('Failed to remove staged download %s: %s', _tmp_path, ex)
             return resp
     response = make_response(send_from_directory(filename, download_name + "." + book_format))
+    response.kobo_delivery_identity = kobo_delivery_identity
     # ToDo Check headers parameter
     for element in headers:
         response.headers[element[0]] = element[1]
     return response
 
 
-def do_kepubify_metadata_replace(book, file_path):
+def do_kepubify_metadata_replace(book, source_file):
     custom_columns = (calibre_db.session.query(db.CustomColumns)
                       .filter(db.CustomColumns.mark_for_delete == 0)
                       .filter(db.CustomColumns.datatype.notin_(db.cc_exceptions))
                       .order_by(db.CustomColumns.label).all())
 
-    tree, cf_name = get_content_opf(file_path)
+    tree, cf_name = get_content_opf(source_file)
     package = create_new_metadata_backup(book, custom_columns, current_user.locale, _("Cover"), lang_type=2)
     content = merge_kepub_metadata(tree, package)
     tmp_dir = get_temp_dir()
@@ -3541,7 +3565,7 @@ def do_kepubify_metadata_replace(book, file_path):
     # open zipfile and replace metadata block in content.opf
     parallel.run_blocking(partial(
         updateEpub,
-        file_path,
+        source_file,
         os.path.join(tmp_dir, temp_file_name + ".kepub"),
         cf_name,
         content,
@@ -3740,6 +3764,7 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
         abort(404)
 
     download_proof = None
+    kepub_path = None
     if client == "kobo":
         # The device is about to replace its local copy; remember that so the
         # annotation GET that follows is answered from CWNG's own rows.
@@ -3756,11 +3781,21 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
                 device_id = tagged_download_device(
                     getattr(current_user, "id", None),
                     request.args.get(DOWNLOAD_DEVICE_PARAM))
+            # The conversion worker can add KEPUB after this request loaded
+            # book.data. Use the format row this response will actually serve.
+            if book_format == "kepub" and data1.name and not getattr(config, "config_use_google_drive", False):
+                try:
+                    candidate = os.path.join(config.get_book_path(), book.path, data1.name + ".kepub")
+                    if os.path.isfile(candidate):
+                        kepub_path = candidate
+                except (OSError, TypeError, AttributeError):
+                    # Missing file proof must not block annotation restoration.
+                    log.debug("Could not resolve Kobo download file for book %s", book_id, exc_info=True)
             download = record_download(
                 device_id=device_id,
                 book_id=book.id, book_format=book_format, log=log,
                 user_id=getattr(current_user, "id", None),
-                completed=False,
+                completed=False, kepub_path=kepub_path,
             )
             # A row already completed is proof kept from an earlier download,
             # not an attempt this response can confirm.
@@ -3820,19 +3855,25 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             cover_user_id = int(current_user.id)
     except (AttributeError, TypeError, ValueError):
         pass
+    from flask import current_app, request
+    eligible_transfer = (download_proof and request.method == "GET" and "Range" not in request.headers
+                         # Only gevent writes each chunk before iterating the next one.
+                         and request.environ.get("SERVER_SOFTWARE", "").startswith("gevent/"))
     response = do_download_file(
         book, book_format, client, data1, headers,
         cover_user_id=cover_user_id,
+        kobo_delivery_identity=download_proof[2] if eligible_transfer else None,
     )
-    from flask import current_app, request
-    if (download_proof and request.method == "GET"
-            and "Range" not in request.headers and response.status_code == 200
-            # Tornado buffers the iterable before writing; only gevent's
-            # chunk-by-chunk writes make exhaustion completion evidence.
-            and request.environ.get("SERVER_SOFTWARE", "").startswith("gevent/")):
+    if eligible_transfer and response.status_code == 200:
         try:
-            from .services.kobo_place_gate import _book_paths
-            _epub, kepub_path = _book_paths(book)
+            from .services.kobo_place_gate import opened_kepub_identity
+            if download_proof[2]:
+                expected = getattr(response, "kobo_delivery_identity", download_proof[2])
+                opened = opened_kepub_identity(getattr(response.response, "file", None))
+                if not expected or opened != expected:
+                    log.debug("Kobo download of book %s: completion not recorded: "
+                              "the opened file was not verified against the library KEPUB", book.id)
+                    return response
             # Streaming runs after Flask has popped the request context. Keep
             # only scalar proof inputs, the app, and the thread-safe DB bind.
             response.response = completed_download_body(

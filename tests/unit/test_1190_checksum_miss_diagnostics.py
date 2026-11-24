@@ -388,6 +388,8 @@ def test_bulk_lookups_skip_index_diagnostics(session, caplog):
 def test_full_scans_have_their_own_window_budget(session, monkeypatch):
     k = _kosync()
     scans = []
+    now = 1_000.0
+    monkeypatch.setattr(k, "time", SimpleNamespace(monotonic=lambda: now))
 
     def observe(_conn, _cursor, statement, _parameters, _context, _executemany):
         if "NOT INDEXED" in statement:
@@ -397,12 +399,15 @@ def test_full_scans_have_their_own_window_budget(session, monkeypatch):
     with patch.object(cps, "calibre_db", SimpleNamespace(session=session), create=True):
         for i in range(12):
             k.get_book_by_checksum(f"{i:032x}")
-        assert 0 < len(scans) <= 4
-        count = len(scans)
-        next_window = k._miss_diag_window["start"] + k._MISS_DIAG_INTERVAL
-        monkeypatch.setattr(k.time, "monotonic", lambda: next_window)
+        assert len(scans) == 4
+
+        now += k._MISS_DIAG_INTERVAL - 1.0
+        k.get_book_by_checksum(f"{12:032x}")
+        assert len(scans) == 4
+
+        now += 1.0
         k.get_book_by_checksum(f"{0:032x}")
-        assert len(scans) == count + 1
+        assert len(scans) == 5
 
 
 def test_unindexed_orphan_is_reported_as_stale(damaged_index_session, caplog):

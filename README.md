@@ -44,15 +44,15 @@ Run Docker from a NAS or a web UI instead of a terminal? Follow the step-by-step
 <!-- progress-tracker:start (regenerate with scripts/progress_tracker.py; do not hand-edit) -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-throughput-dark.svg">
-  <img alt="Pull request throughput: 43 open, 1,958 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
+  <img alt="Pull request throughput: 28 open, 2,000 closed since May 2026." src="README_images/progress-throughput-light.svg" width="100%">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="README_images/progress-outcomes-dark.svg">
-  <img alt="Fix outcomes by week: 287 happy, 83 not fixed, 500 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
+  <img alt="Fix outcomes by week: 288 happy, 83 not fixed, 524 no reply." src="README_images/progress-outcomes-light.svg" width="100%">
 </picture>
 
-On November 19, 2026, 43 pull requests were open and 1,958 closed, 1,780 of them merged. Of 870 fixes delivered to a person, 33% heard back happy, 10% not fixed and 57% got no reply. When someone did answer, the answer was happy 78% of the time.
+On November 22, 2026, 28 pull requests were open and 2,000 closed, 1,822 of them merged. Of 895 fixes delivered to a person, 32% heard back happy, 9% not fixed and 59% got no reply. When someone did answer, the answer was happy 78% of the time. 4 replies wait to be judged and are left out.
 
 A fix is one moment someone was told their problem was dealt with: a fix PR merged for their issue, their issue closed as done, their own PR merged or closed, or our note on an upstream CWA or Calibre-Web thread pointing them to a fix here. Happy means they then said it works or were content with it. Not fixed means they reopened it, said it is still broken in whole or part, or were unhappy with how it went, and every close in a close-and-reopen cycle counts. No reply means nothing came back. Each reply is judged against [a written rubric](docs/progress-tracker/JUDGING.md) by one model and checked by a second; where they disagree the thread is reread and settled. Every verdict and the quote behind it are in [docs/progress-tracker](docs/progress-tracker/). Replies on Discord and Reddit are not counted.
 
@@ -65,8 +65,8 @@ A fix is one moment someone was told their problem was dealt with: a fix PR merg
 | Jul 2026 | 359 | 362 | 3 | 107 | 26 | 70 |
 | Aug 2026 | 578 | 573 | 11 | 35 | 14 | 71 |
 | Sep 2026 | 224 | 218 | 12 | 23 | 5 | 32 |
-| Oct 2026 | 279 | 241 | 35 | 38 | 5 | 72 |
-| Nov 2026 | 123 | 130 | 53 | 14 | 4 | 60 |
+| Oct 2026 | 279 | 241 | 35 | 38 | 5 | 71 |
+| Nov 2026 | 150 | 172 | 50 | 15 | 4 | 85 |
 
 Regenerate with `python3 scripts/progress_tracker.py fetch`, then `queue`, judge the new replies, `apply` and `render`.
 
@@ -791,9 +791,9 @@ Completion refreshes automatically on every push to `main`, via [`scripts/genera
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | n/a |
+| German (`de`) | `████████████████████` 100% | 4429/4429 | 0 |
 | French (`fr`) | `████████████████████` 99% | 4367/4429 | 1 |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `███████████████████░` 94% | 4163/4429 | 1 |
-| German (`de`) | `███████████████████░` 94% | 4140/4429 | 0 |
 | Russian (`ru`) | `██████████████████░░` 92% | 4084/4429 | 0 |
 | ca (`ca`) | `██████████████████░░` 92% | 4084/4429 | 0 |
 | Slovak (`sk`) | `██████████████████░░` 92% | 4080/4429 | 0 |

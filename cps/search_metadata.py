@@ -12,6 +12,7 @@ import json
 import os
 import sys
 
+import requests
 from flask import Blueprint, request, url_for, make_response, jsonify, copy_current_request_context
 from .cw_login import current_user
 from flask_babel import get_locale
@@ -24,7 +25,7 @@ from cps.services.cover_picker import format_provider_summary
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
 from .usermanagement import user_login_required
-from .metadata_constants import metadata_provider_enabled
+from .metadata_constants import metadata_provider_enabled, ORDER_OPT_IN_METADATA_PROVIDERS
 
 
 meta = Blueprint("metadata", __name__)
@@ -265,6 +266,7 @@ def metadata_keys_save(prov_id):
 def metadata_provider():
     active = current_user.view_settings.get("metadata", {})
     global_enabled = _get_global_provider_enabled_map()
+    hierarchy = _get_provider_hierarchy()
     provider = list()
     for c in cl:
         ac = metadata_provider_enabled(c.__id__, active)
@@ -277,6 +279,11 @@ def metadata_provider():
                 # Global omission means available; best-effort defaults are a
                 # per-user/ingest opt-in, not hidden from the SPA toggle list.
                 "globally_enabled": bool(global_enabled.get(c.__id__, True)),
+                "requires_ingest_opt_in": c.__id__ in ORDER_OPT_IN_METADATA_PROVIDERS,
+                # The settings page lists new providers in its reorder control.
+                # Saving that page must not opt into a new service implicitly.
+                "default_ingest_enabled": (c.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS or
+                                           c.__id__ in hierarchy),
             }
         )
     return make_response(jsonify(provider))
@@ -305,7 +312,9 @@ def metadata_change_active_provider(prov_name):
         # Respect global disablement for preview search as well
         global_enabled = _get_global_provider_enabled_map()
         if provider is not None:
-            if bool(global_enabled.get(provider.__id__, True)):
+            selected = (provider.__id__ not in ORDER_OPT_IN_METADATA_PROVIDERS
+                        or metadata_provider_enabled(provider.__id__, active))
+            if selected and bool(global_enabled.get(provider.__id__, True)):
                 try:
                     # parallel.run_blocking, not a bare call: this runs on the
                     # request greenlet and the provider blocks on its own
@@ -389,10 +398,14 @@ def _classify_provider_failure(exc: Exception, provider=None) -> tuple:
         # The provider already knows what happened and what to do about it.
         return (exc.status, str(exc))
     text = str(exc) or exc.__class__.__name__
-    lowered = text.lower()
     pid = getattr(provider, "__id__", None)
     takes_key = pid is None or pid in PROVIDER_KEY_REGISTRY
     code = getattr(getattr(exc, "response", None), "status_code", None)
+    if code is None and isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+        return ("error", "Could not reach this source. Try again shortly.")
+    # HTTP error strings contain the request URL, including the search query.
+    # Only use words from the error as hints when there is no HTTP status.
+    lowered = text.lower() if code is None else ""
 
     def is_status(*codes: int) -> bool:
         # Prefer the real status code. str(HTTPError) carries the request URL,

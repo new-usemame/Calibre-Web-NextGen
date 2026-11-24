@@ -37,8 +37,8 @@ import styles from './Catalog.module.css';
 import { advancedSearchHref } from '../lib/advancedSearchUrl';
 import { canUploadBooks } from '../lib/permissions';
 import {
-  LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
-  defaultCatalogSort, resolveLibrarySort,
+  LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SERIES_SORT_OPTIONS, SORT_OPTIONS,
+  READ_DATE_SORT_VALUES, defaultCatalogSort, readListSortOptions, resolveLibrarySort,
 } from '../lib/bookSortOptions';
 
 const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
@@ -48,15 +48,6 @@ const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
   favorites: { label: 'Favorites' },
   archived: { label: 'Archived' },
 };
-
-// Series-order sorts (by metadata series_index). Only offered when viewing a
-// single series, where a numeric position is meaningful — a whole-library
-// series_index sort is not. The ascending option is also the series view's
-// default (see defaultSort below) so a series reads 1, 2, 3… out of the box (#573).
-const SERIES_SORT_OPTIONS = [
-  { label: 'Series order', value: 'seriesasc' },
-  { label: 'Series order (reverse)', value: 'seriesdesc' },
-];
 
 const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },
@@ -74,7 +65,7 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
 // defaults (#573 series-order, #498 saved view) and are intentionally excluded — a
 // remembered whole-library sort must not leak into a series or author listing.
 const LIBRARY_READ_FILTER_KEY = 'cwng:library-readfilter-v1';
-const LIBRARY_SORT_VALUES = SORT_OPTIONS.map((o) => o.value);
+const LIBRARY_SORT_VALUES = [...SORT_OPTIONS.map((o) => o.value), ...READ_DATE_SORT_VALUES];
 const LIBRARY_READ_FILTER_VALUES: ReadFilter[] = READ_FILTERS.map((f) => f.value);
 
 // A stored choice is honoured only if it is still a valid option; anything else
@@ -693,6 +684,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // must reset rather than append the new set onto the old (#928).
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', encodeURIComponent(tagPath ?? ''), perPage, showHidden,
     filterActive ? JSON.stringify(defaultFilter) : '', libraryScope, discoverIdentity].join('|');
+  const [pagingKey, setPagingKey] = useState(resetKey);
 
   useLayoutEffect(() => {
     if (!changedDiscover) return;
@@ -701,9 +693,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     setSelected(new Set());
     setPage(1); setAllBooks([]); accKeyRef.current = '';
   }, [changedDiscover, discoverIdentity]);
-  // Use page 1 in this render, before the effect updates pagination. Otherwise
-  // changing selection on a loaded page can issue the new query at the old offset.
-  const requestPage = changedLibrary || changedDiscover ? 1 : page;
+  // Reset the request in this render. A later page cached under the new sort
+  // or filter could otherwise reach the accumulator ahead of page 1.
+  const requestPage = changedLibrary || changedDiscover || pagingKey !== resetKey ? 1 : page;
   useEffect(() => {
     if (!changedLibrary) return;
     previousLibraryScope.current = libraryScope;
@@ -715,12 +707,12 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
   // Any filter change resets paging to the first page — except on the first
   // restored mount, where the rehydrated page must survive (#578).
   useEffect(() => {
-    if (restoringRef.current) return;
+    if (pagingKey === resetKey) return;
+    setPagingKey(resetKey);
     setPage(1);
-  }, [resetKey]);
+  }, [pagingKey, resetKey]);
 
-  // Clear the restoring flag after the initial mount so later filter/URL changes
-  // behave normally. Runs after the two guarded effects above (effect order).
+  // Clear the restoring flag after the initial URL sync effect.
   useEffect(() => {
     restoringRef.current = false;
   }, []);
@@ -811,7 +803,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter, tagPath }: 
     filterActive ? advQuery : booksQuery;
   const customSortOptions = view === 'hot' || view === 'discover'
     ? [] : (data?.custom_sort_options ?? []);
-  const activeSortOptions = [...sortOptions, ...customSortOptions];
+  const onReadList = readFilter === 'read';
+  const activeSortOptions = [...(onReadList ? readListSortOptions(sortOptions) : sortOptions), ...customSortOptions];
+  // "Date read" exists only on the Read list; leaving it must not strand the menu
+  // on a value it no longer offers (#2800).
+  useEffect(() => {
+    if (!onReadList && READ_DATE_SORT_VALUES.includes(sort)) setSort(defaultSort);
+  }, [onReadList, sort, defaultSort]);
   const customColumnDefinitions = (data?.custom_column_definitions ?? []).map((column) => ({
     ...column,
     name: customFieldLabels[String(column.id)]?.trim() || column.name,

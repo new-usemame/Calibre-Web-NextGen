@@ -99,13 +99,14 @@ def network_share_mode():
     )
 
 
-def chown_to_service_user(path, label, recursive=True, respect_network_share_mode=True, log=print):
+def chown_to_service_user(
+    path, label, recursive=True, respect_network_share_mode=True, log=print, *, skip_matching=False
+):
     """Give ``path`` to the service account, skipping cleanly when we cannot.
 
-    Returns True only when a chown actually ran and succeeded. The three
-    skip paths (no service account, NETWORK_SHARE_MODE, chown failed) all
-    return False and say which one applied, so a source install's log reads as
-    a decision rather than a fault.
+    Return True on success, including a recursive check that finds nothing to
+    change. Return False with a log message if ownership work is skipped or fails.
+    With skip_matching, a recursive walk changes only entries whose ownership differs.
 
     ``log`` takes the caller's own emitter — ``convert_library`` needs its
     ``print_and_log`` so these lines reach the run log like everything else.
@@ -125,14 +126,23 @@ def chown_to_service_user(path, label, recursive=True, respect_network_share_mod
         return False
 
     uid, gid = ids
-    command = ["chown"]
-    if recursive:
-        command.append("-R")
-    # `--` so a path is never parsed as an option. dirs.json is the operator's
-    # file rather than anything reachable from the web, so this is not an
-    # exploit path, but a library directory whose name begins with `-` should
-    # fail as a missing file rather than turn into a flag.
-    command += [f"{uid}:{gid}", "--", str(path)]
+    owner = f"{uid}:{gid}"
+    if recursive and skip_matching:
+        # Prefix relative paths so find treats even "-library" as a path.
+        root = str(path)
+        if root and not os.path.isabs(root):
+            root = os.path.join(".", root)
+        # Match chown -R's symlink handling by inspecting and changing the link itself.
+        command = [
+            "find", "-P", root,
+            "(", "!", "-uid", str(uid), "-o", "!", "-gid", str(gid), ")",
+            "-exec", "chown", "-h", "--", owner, "{}", "+",
+        ]
+    else:
+        command = ["chown"]
+        if recursive:
+            command.append("-R")
+        command += [owner, "--", str(path)]
     try:
         subprocess.run(command, check=True)
         return True

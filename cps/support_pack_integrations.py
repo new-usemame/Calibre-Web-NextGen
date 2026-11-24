@@ -34,10 +34,12 @@ task tuples) so it can be tested without booting the app.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import sqlite3
 
+from . import support_pack_state
 from .support_pack_state import _error, _open_readonly
 
 MAX_DEVICES_LISTED = 200
@@ -96,20 +98,76 @@ def _utc(value):
     return f"{match.group(1)}T{match.group(2)}Z" if match else None
 
 
-def _columns(conn, table: str) -> set:
+class Unavailable:
+    """Data that could not be read, as distinct from data that is empty.
+
+    A locked or unreadable table must never look like "0 devices" or "0 pending":
+    a support pack that reports healthy when it could not read anything is the
+    worst outcome for a debugging tool. Sections show this as
+    ``"unavailable": "<reason>"``."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+
+def _reason(ex: BaseException) -> str:
+    """A short, safe reason: the exception type, or a plain-English category for
+    the few SQLite failures worth telling apart. Never the message itself."""
+    message = str(ex).lower()
+    if "locked" in message or "busy" in message:
+        return "database locked"
+    if "no such table" in message:
+        return "table missing"
+    if "no such column" in message:
+        return "column missing"
+    return type(ex).__name__
+
+
+def _columns(conn, table: str):
+    """The table's column names, or ``Unavailable`` if they could not be read.
+    An empty set means the table genuinely does not exist."""
     try:
         return {row[1] for row in conn.execute(f'PRAGMA table_info("{table}")')}
-    except sqlite3.Error:
-        return set()
+    except sqlite3.Error as ex:
+        return Unavailable(_reason(ex))
 
 
-def _grouped(conn, sql: str) -> dict:
-    """Run a ``key, count[, extra]`` GROUP BY query; ``{}`` if the table is
-    missing or the query fails, so one absent table cannot sink a section."""
+def _grouped(conn, sql: str):
+    """Run a ``key, count[, extra]`` GROUP BY query. ``{}`` means no rows;
+    ``Unavailable`` means it could not be read (missing table, locked database)."""
     try:
         return {row[0]: row[1:] for row in conn.execute(sql)}
-    except sqlite3.Error:
-        return {}
+    except sqlite3.Error as ex:
+        return Unavailable(_reason(ex))
+
+
+def _json_size(obj) -> int:
+    return len(json.dumps(obj, sort_keys=True, indent=2).encode("utf-8"))
+
+
+def _fit_devices_to_budget(section: dict) -> None:
+    """Trim the device list, never the summary, so the section fits its size cap.
+
+    Without this the generic cap would replace the whole section with a
+    truncation marker and lose the aggregates, which are the part that always
+    covers every device. The largest list that fits is found by measuring the
+    real output (a device nested in the list is indented further than on its
+    own, so adding up per-device sizes undercounts)."""
+    limit = support_pack_state.MAX_SECTION_BYTES - 1024  # headroom for formatting
+    if _json_size(section) <= limit:
+        return
+    devices = section["devices"]
+    low, high = 0, len(devices)  # the largest k with devices[:k] fitting is in [low, high)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if _json_size(dict(section, devices=devices[:middle])) <= limit:
+            low = middle
+        else:
+            high = middle - 1
+    del devices[low:]
+    section["summary"]["listed"] = low
+    section["summary"]["truncated"] = True
+    section["summary"]["trimmed_for_size"] = True
 
 
 def _open_app_db(app_db_path):
@@ -121,12 +179,14 @@ def _open_app_db(app_db_path):
 # ---------------------------------------------------------------- devices
 
 def collect_devices(app_db_path) -> dict:
-    """Reading devices (Kobo, browser reader) from the ``device`` table."""
+    """Reading devices (Kobo, browser reader, KOReader) from the ``device`` table."""
     conn = _open_app_db(app_db_path)
     if conn is None:
         return {"exists": False}
     try:
         present = _columns(conn, "device")
+        if isinstance(present, Unavailable):
+            return {"exists": True, "unavailable": present.reason}
         if not present:
             return {"exists": True, "device_table": False}
         wanted = [c for c in _DEVICE_COLUMNS if c in present]
@@ -145,6 +205,13 @@ def collect_devices(app_db_path) -> dict:
         nudges = _grouped(
             conn, "SELECT device_id, COUNT(*) FROM kobo_share_place_nudge GROUP BY device_id"
         )
+        # Anything that could not be read is reported as unavailable, with the
+        # reason, and its per-device values are null: never a zero.
+        unavailable: dict = {}
+        if isinstance(positions, Unavailable):
+            unavailable["reading_positions"] = unavailable["rehydrate_pending"] = positions.reason
+        if isinstance(nudges, Unavailable):
+            unavailable["share_place_nudges_pending"] = nudges.reason
 
         user_labels: dict = {}
         devices = []
@@ -152,7 +219,12 @@ def collect_devices(app_db_path) -> dict:
             row = dict(zip(wanted, values))
             device_id = row.get("id")
             user_label = user_labels.setdefault(row.get("user_id"), f"u{len(user_labels) + 1}")
-            pos = positions.get(device_id, (0, 0))
+            if isinstance(positions, Unavailable):
+                reading_positions = rehydrate_pending = None
+            else:
+                counted, pending = positions.get(device_id, (0, 0))
+                reading_positions, rehydrate_pending = counted or 0, int(pending or 0)
+            nudge_count = None if isinstance(nudges, Unavailable) else (nudges.get(device_id) or (0,))[0]
             kind = _known_value(row.get("kind"), _DEVICE_KINDS)
             model_raw = row.get("model")
             model_reported = kind in _MODEL_REPORTED_KINDS
@@ -173,9 +245,9 @@ def collect_devices(app_db_path) -> dict:
                 "cwng_header_seen": bool(row.get("cwng_header_seen_at")) if "cwng_header_seen_at" in row else None,
                 "first_seen_at": _utc(row.get("first_seen_at")),
                 "last_seen_at": _utc(row.get("last_seen_at")),
-                "reading_positions": pos[0] or 0,
-                "rehydrate_pending": int(pos[1] or 0),
-                "share_place_nudges_pending": (nudges.get(device_id) or (0,))[0],
+                "reading_positions": reading_positions,
+                "rehydrate_pending": rehydrate_pending,
+                "share_place_nudges_pending": nudge_count,
             })
 
         # Aggregates cover every device, not just the listed ones.
@@ -186,11 +258,15 @@ def collect_devices(app_db_path) -> dict:
             "COUNT(DISTINCT user_id) FROM device"
         ).fetchone()
         grouped_kinds = _grouped(conn, "SELECT kind, COUNT(*) FROM device GROUP BY kind")
-        by_kind = {}
-        for raw_kind, (count,) in grouped_kinds.items():
-            kind = _known_value(raw_kind, _DEVICE_KINDS) or "unknown"
-            by_kind[kind] = by_kind.get(kind, 0) + count
-        return {
+        if isinstance(grouped_kinds, Unavailable):
+            unavailable["by_kind"] = grouped_kinds.reason
+            by_kind = None
+        else:
+            by_kind = {}
+            for raw_kind, (count,) in grouped_kinds.items():
+                kind = _known_value(raw_kind, _DEVICE_KINDS) or "unknown"
+                by_kind[kind] = by_kind.get(kind, 0) + count
+        section = {
             "exists": True,
             "summary": {
                 "total": total,
@@ -203,6 +279,10 @@ def collect_devices(app_db_path) -> dict:
             },
             "devices": devices,
         }
+        if unavailable:
+            section["unavailable"] = unavailable
+        _fit_devices_to_budget(section)
+        return section
     except Exception as ex:  # pylint: disable=broad-except
         return {"exists": True, **_error(ex)}
     finally:
@@ -219,6 +299,8 @@ def collect_koreader(app_db_path, sync_enabled=None) -> dict:
         return {"exists": False}
     try:
         present = _columns(conn, "kosync_progress")
+        if isinstance(present, Unavailable):
+            return {"exists": True, "unavailable": present.reason, "sync_enabled": sync_enabled}
         if not present:
             return {"exists": True, "kosync_table": False, "sync_enabled": sync_enabled}
         total, users, devices, newest = conn.execute(
@@ -263,6 +345,28 @@ def collect_koreader(app_db_path, sync_enabled=None) -> dict:
 
 # ------------------------------------------------------------------ email
 
+def _account_counts(conn) -> dict:
+    """How many accounts exist and how many have an eReader email or a custom
+    subject. Counts only: never an address or a subject."""
+    present = _columns(conn, "user")
+    if isinstance(present, Unavailable):
+        return {"exists": True, "unavailable": present.reason}
+    has_mail = "kindle_mail" in present
+    has_subject = "kindle_mail_subject" in present
+    total, with_mail, with_subject = conn.execute(
+        'SELECT COUNT(*), '
+        + ("SUM(CASE WHEN COALESCE(kindle_mail, '') != '' THEN 1 ELSE 0 END)" if has_mail else "NULL") + ", "
+        + ("SUM(CASE WHEN COALESCE(kindle_mail_subject, '') != '' THEN 1 ELSE 0 END)" if has_subject else "NULL")
+        + ' FROM "user"'
+    ).fetchone()
+    return {
+        "exists": True,
+        "total": total,
+        "with_ereader_email": int(with_mail) if with_mail is not None else None,
+        "with_custom_subject": int(with_subject) if with_subject is not None else None,
+    }
+
+
 def collect_email(mail_settings, worker_tasks, app_db_path) -> dict:
     """Send-to-eReader path: SMTP shape, how many accounts use it, and task
     outcomes since the process started. Never a host name, address, subject
@@ -287,21 +391,7 @@ def collect_email(mail_settings, worker_tasks, app_db_path) -> dict:
         if conn is None:
             out["users"] = {"exists": False}
         else:
-            present = _columns(conn, "user")
-            has_mail = "kindle_mail" in present
-            has_subject = "kindle_mail_subject" in present
-            total, with_mail, with_subject = conn.execute(
-                'SELECT COUNT(*), '
-                + ("SUM(CASE WHEN COALESCE(kindle_mail, '') != '' THEN 1 ELSE 0 END)" if has_mail else "NULL") + ", "
-                + ("SUM(CASE WHEN COALESCE(kindle_mail_subject, '') != '' THEN 1 ELSE 0 END)" if has_subject else "NULL")
-                + ' FROM "user"'
-            ).fetchone()
-            out["users"] = {
-                "exists": True,
-                "total": total,
-                "with_ereader_email": int(with_mail) if with_mail is not None else None,
-                "with_custom_subject": int(with_subject) if with_subject is not None else None,
-            }
+            out["users"] = _account_counts(conn)
     except Exception as ex:  # pylint: disable=broad-except
         out["users"] = _error(ex)
     finally:

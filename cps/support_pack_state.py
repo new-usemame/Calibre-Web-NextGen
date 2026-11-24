@@ -458,8 +458,8 @@ def _encode(section: dict) -> tuple:
 def _section_ok(value) -> bool:
     """Include nested failures in the manifest's per-section status."""
     if isinstance(value, dict):
-        if ("error" in value or value.get("timed_out") or value.get("truncated")
-                or value.get("quick_check") == "failed"):
+        if ("error" in value or value.get("unavailable") or value.get("timed_out")
+                or value.get("truncated") or value.get("quick_check") == "failed"):
             return False
         if "row_counts" in value and any(count is None for count in value["row_counts"].values()):
             return False

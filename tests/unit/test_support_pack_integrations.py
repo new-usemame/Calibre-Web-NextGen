@@ -164,7 +164,9 @@ class TestDevices:
         conn.close()
         out = integ.collect_devices(str(path))
         device = out["devices"][0]
-        assert device["share_place"] is None and device["reading_positions"] == 0
+        # A table that is not there is "unavailable", never "0 positions".
+        assert device["share_place"] is None and device["reading_positions"] is None
+        assert out["unavailable"]["reading_positions"] == "table missing"
         assert out["summary"]["share_place_enabled"] is None and out["summary"]["total"] == 1
 
     def test_missing_database_and_missing_table(self, tmp_path):

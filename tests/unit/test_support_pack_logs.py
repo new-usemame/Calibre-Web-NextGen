@@ -91,7 +91,8 @@ class TestSanitizeLogBytes:
     def test_cap_is_spent_on_useful_lines_not_noise(self, monkeypatch):
         useful = [f"[2026-11-20 19:32:{i:02d},000]  INFO {{cps.web:1}} request {i:02d}\n" for i in range(20)]
         line_bytes = len(useful[0].encode())
-        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", line_bytes * 10)
+        cap = line_bytes * 10 + 400  # room for the omission note, which counts toward the cap
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", cap)
         # Isolate the ordering (drop noise, then cap) from the separate guard on
         # pathologically large files, which would trip on this tiny cap.
         monkeypatch.setattr(debug_info, "_RAW_READ_FACTOR", 10_000)
@@ -101,8 +102,11 @@ class TestSanitizeLogBytes:
             mixed.extend([SUCCESS] * 25)
             mixed.append(line)
         text = self._run(*mixed)
+        header_bytes = len(text.split("\n", 1)[0].encode()) + 1
+        fits = (cap - header_bytes) // line_bytes  # whole lines the cap leaves room for
         kept = [ln for ln in text.splitlines() if "request " in ln]
-        assert kept == [ln.rstrip("\n") for ln in useful[-10:]]  # the 10 most recent
+        assert fits >= 5 and kept == [ln.rstrip("\n") for ln in useful[-fits:]]  # the most recent ones
+        assert len(text.encode()) <= cap
 
     def test_pathological_file_is_bounded_and_starts_on_a_whole_line(self, monkeypatch):
         monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", 100)

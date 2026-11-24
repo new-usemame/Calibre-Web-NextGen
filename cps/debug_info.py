@@ -521,20 +521,50 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
             continue
         kept.append(line)
 
-    # Tail cap on what is left, counted in bytes.
+    # Cap what is left before scrubbing, so no CPU goes on lines that would be
+    # dropped anyway, counted in bytes.
+    kept = _tail_within(kept, _PER_FILE_MAX_BYTES)
+
+    # Scrubbing can make a line longer (a short address becomes "<email_1>") and
+    # the omission note adds bytes, so cap again on what is actually written: the
+    # file in the archive is never over the limit, whatever redaction did.
+    scrubbed = [scrubber(line) for line in kept]
+    header = _omitted_lines_header(omitted, first_ts, last_ts) if omitted else ""
+    budget = _PER_FILE_MAX_BYTES - len(header.encode("utf-8"))
+    if budget < 0:  # the note alone does not fit: drop it rather than break the cap
+        header, budget = "", _PER_FILE_MAX_BYTES
+    return (header + "".join(_tail_within(scrubbed, budget))).encode("utf-8")
+
+
+def _tail_within(lines, limit: int):
+    """The longest run of whole lines, from the end, that fits in ``limit`` bytes."""
     total = 0
-    start = len(kept)
-    for index in range(len(kept) - 1, -1, -1):
-        total += len(kept[index].encode("utf-8", errors="replace"))
-        if total > _PER_FILE_MAX_BYTES:
+    start = len(lines)
+    for index in range(len(lines) - 1, -1, -1):
+        total += len(lines[index].encode("utf-8", errors="replace"))
+        if total > limit:
             break
         start = index
-    kept = kept[start:]
+    return lines[start:]
 
-    body = "".join(scrubber(line) for line in kept)
-    if omitted:
-        body = _omitted_lines_header(omitted, first_ts, last_ts) + body
-    return body.encode("utf-8")
+
+def _read_log_tail(path: str, limit: int):
+    """Read at most the last ``limit`` bytes of a log: ``(bytes, was_cut)``.
+
+    The cap is applied where the read happens, at the file handle, so a very
+    large log is never pulled into memory only to be cut down afterwards. When the
+    file is bigger than the limit the read starts part-way through it, so the first
+    (partial) line is dropped. Raises ``OSError`` if the file cannot be read, for
+    the caller to record: a log that rotates away between the directory listing
+    and the read must not abort the whole pack."""
+    with open(path, "rb") as fd:
+        size = os.fstat(fd.fileno()).st_size
+        if size <= limit:
+            return fd.read(), False
+        fd.seek(size - limit)
+        data = fd.read(limit)
+    newline = data.find(b"\n")
+    return (data[newline + 1:] if newline != -1 else data), True
 
 
 # ---------------------------------------------------------------------------
@@ -715,31 +745,40 @@ def _assemble_pack(prep: dict):
             note += _USERNAME_LOOKUP_FAILED_NOTE
 
     memory_zip = BytesIO()
+    log_status = []
     with zipfile.ZipFile(memory_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('settings.txt', json.dumps(prep["settings"], sort_keys=True, indent=2))
         zf.writestr('libs.txt', json.dumps(prep["libs"], sort_keys=True, indent=2, cls=lazyEncoder))
+        # The manifest is written last, once it can say how each log fared.
+        manifest = json.loads(state_files.pop("manifest.json"))
         for state_name, state_bytes in state_files.items():
             zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
         digest = _TracebackDigest()
         for fp in prep["app_logs"] + prep["access_logs"]:
-            is_app_log = fp in prep["app_logs"]
-            if sanitize:
-                with open(fp, 'rb') as fd:
-                    raw = fd.read()
-                data = _sanitize_log_bytes(raw, scrubber)
-                zf.writestr(os.path.basename(fp), data)
-                if is_app_log:
-                    digest.feed(data.decode("utf-8", errors="replace"))
-            else:
-                zf.write(fp, os.path.basename(fp))
-                if is_app_log:
-                    with open(fp, 'rb') as fd:
-                        digest.feed(fd.read().decode("utf-8", errors="replace"))
+            name = os.path.basename(fp)
+            try:
+                raw, was_cut = _read_log_tail(fp, _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR)
+            except FileNotFoundError:
+                # Rotated away between the directory listing and the read.
+                log_status.append({"file": name, "status": "missing"})
+                continue
+            except OSError:
+                log_status.append({"file": name, "status": "unreadable"})
+                continue
+            data = _sanitize_log_bytes(raw, scrubber) if sanitize else raw
+            zf.writestr(name, data)
+            if fp in prep["app_logs"]:
+                # From the same bytes that went into the archive, so the digest can
+                # never describe a different version of the file.
+                digest.feed(data.decode("utf-8", errors="replace"))
+            log_status.append({"file": name, "status": "included", "bytes": len(data), "cut_to_tail": was_cut})
         zf.writestr('tracebacks.txt', digest.render(
             os.path.basename(prep["app_logs"][0]).split(".log")[0] + ".log*"
             if prep["app_logs"] else "no application log"))
+        manifest["logs"] = log_status
+        zf.writestr('manifest.json', json.dumps(manifest, sort_keys=True, indent=2))
     memory_zip.seek(0)
     return memory_zip
 

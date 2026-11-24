@@ -277,7 +277,7 @@ def _load_editbooks_module(delete_key_calls):
             "InvalidRequestError": Exception,
         },
     )
-    _install_stub("sqlalchemy.orm")
+    _install_stub("sqlalchemy.orm", {"with_parent": lambda *args, **kwargs: None})
     _install_stub("sqlalchemy.orm.exc", {"StaleDataError": Exception})
     _install_stub("sqlalchemy.sql")
     _install_stub("sqlalchemy.sql.expression", {"func": SimpleNamespace()})

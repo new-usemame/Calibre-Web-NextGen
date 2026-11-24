@@ -122,58 +122,42 @@ class DNB(Metadata):
     COVERURL = 'https://portal.dnb.de/opac/mvb/cover?isbn=%s'
 
     def search(self, query: str, generic_cover: str = "", locale: str = "en") -> Optional[List[MetaRecord]]:
-        try:
-            if not self.active:
-                return []
+        if not self.active:
+            return []
 
-            val = []
+        idn = isbn = title = None
+        if query.startswith('dnb-idn:'):
+            idn = query.removeprefix('dnb-idn:').strip()
+        elif query.startswith('isbn:'):
+            isbn = query.removeprefix('isbn:').strip()
+        else:
+            title = query
 
-            # Parse query for special identifiers
-            idn = None
-            isbn = None
-            title = None
-            authors = []
+        matches = []
+        last_error = None
+        for query_str in self._create_query_variations(idn=idn, isbn=isbn, title=title):
+            try:
+                records = self._execute_query(query_str)
+            except Exception as exc:
+                # A different query variation can still return usable records.
+                last_error = exc
+                continue
 
-            # Check if query contains special identifiers
-            if query.startswith('dnb-idn:'):
-                idn = query.replace('dnb-idn:', '').strip()
-            elif query.startswith('isbn:'):
-                isbn = query.replace('isbn:', '').strip()
-            else:
-                # Treat as title/author search
-                title = query
-
-            # Create query variations
-            queries = self._create_query_variations(idn, isbn, authors, title)
-
-            for query_str in queries:
+            for record in records:
                 try:
-                    results = self._execute_query(query_str)
-                    if not results:
-                        continue
+                    book_data = self._parse_marc21_record(record)
+                    if book_data:
+                        match = self._create_meta_record(book_data, generic_cover)
+                        if match:
+                            matches.append(match)
+                except Exception as exc:
+                    last_error = exc
+            if matches:
+                return matches
 
-                    log.info("Parsing DNB records")
-
-                    for record in results:
-                        book_data = self._parse_marc21_record(record)
-                        if book_data:
-                            meta_record = self._create_meta_record(book_data, generic_cover)
-                            if meta_record:
-                                val.append(meta_record)
-
-                    # Stop on first successful query
-                    if val:
-                        break
-
-                except Exception as e:
-                    log.warning(f"DNB search error: {e}")
-                    continue
-
-            return val if val else [] # None
-            pass
-        except Exception as e:
-            log.error(f"DNB search failed for query '{query}': {e}")
-            return [] # None  # Return None instead of letting exception propagate
+        if last_error is not None:
+            raise last_error
+        return matches
 
     def _create_query_variations(self, idn=None, isbn=None, authors=None, title=None):
         """Create SRU query variations with increasing fuzziness"""
@@ -225,24 +209,20 @@ class DNB(Metadata):
         query_url = self.QUERYURL % (self.MAXIMUMRECORDS, quote(query))
         log.info(f'DNB Query URL: {query_url}')
 
-        try:
-            response = requests.get(query_url, headers=headers, timeout=timeout)
-            response.raise_for_status()
+        response = requests.get(query_url, headers=headers, timeout=timeout)
+        response.raise_for_status()
 
-            xml_data = etree.XML(response.content)
-            num_records = xml_data.xpath("./zs:numberOfRecords",
-                                       namespaces={"zs": "http://www.loc.gov/zing/srw/"})[0].text.strip()
-            log.info(f'DNB found {num_records} records')
+        xml_data = etree.XML(response.content)
+        num_records = xml_data.xpath("./zs:numberOfRecords",
+                                   namespaces={"zs": "http://www.loc.gov/zing/srw/"})[0].text.strip()
+        log.info(f'DNB found {num_records} records')
 
-            if int(num_records) == 0:
-                return []  # Return empty list, not None
+        if int(num_records) == 0:
+            return []
 
-            return xml_data.xpath("./zs:records/zs:record/zs:recordData/marc21:record",
-                                namespaces={'marc21': 'http://www.loc.gov/MARC21/slim',
-                                          "zs": "http://www.loc.gov/zing/srw/"})
-        except Exception as e:
-            log.error(f'DNB query error: {e}')
-            return []  # Return empty list, not None
+        return xml_data.xpath("./zs:records/zs:record/zs:recordData/marc21:record",
+                            namespaces={'marc21': 'http://www.loc.gov/MARC21/slim',
+                                      "zs": "http://www.loc.gov/zing/srw/"})
 
     def _parse_marc21_record(self, record):
         """Parse MARC21 XML record into book data"""

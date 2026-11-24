@@ -10,7 +10,8 @@
 
 # Hardcover api document: https://Hardcover.gamespot.com/api/documentation
 """
-from typing import Dict, List, Optional, Union
+import re
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import requests
 from os import getenv
@@ -21,18 +22,25 @@ try:
         normalized_levenshtein_similarity,
         author_list_similarity,
         normalize_string,
-        calculate_year_similarity
+        calculate_year_similarity,
+        main_title,
     )
 except ImportError:
-    # Fallback for CLI usage
-    def normalized_levenshtein_similarity(s1: str, s2: str) -> float:
-        return 1.0 if s1.lower() == s2.lower() else 0.5
-    def author_list_similarity(a1: List[str], a2: List[str]) -> tuple[float, bool]:
-        return (0.5, False)
-    def normalize_string(s: str) -> str:
-        return s.lower()
-    def calculate_year_similarity(y1: str, y2: str) -> float:
-        return 1.0 if y1 == y2 else 0.0
+    # Direct CLI usage cannot always import the Flask package. Load the same
+    # dependency-free helpers by path so matching and ISBN validation agree.
+    import importlib.util
+    from pathlib import Path
+
+    _similarity_spec = importlib.util.spec_from_file_location(
+        "hardcover_text_similarity", Path(__file__).resolve().parents[1] / "utils" / "text_similarity.py",
+    )
+    _similarity = importlib.util.module_from_spec(_similarity_spec)
+    _similarity_spec.loader.exec_module(_similarity)
+    normalized_levenshtein_similarity = _similarity.normalized_levenshtein_similarity
+    author_list_similarity = _similarity.author_list_similarity
+    normalize_string = _similarity.normalize_string
+    calculate_year_similarity = _similarity.calculate_year_similarity
+    main_title = _similarity.main_title
 
 # Try importing from full app; if unavailable (CLI), use light fallbacks
 try:  # pragma: no cover - normal app path
@@ -125,6 +133,12 @@ except Exception:  # pragma: no cover - CLI/testing path
     current_user = _DummyUser()  # type: ignore
 
 log = logger.create()
+
+
+def normalize_isbn(value) -> str:
+    """Return a comparable ISBN-13, also accepting explicit ISBN-10/13 labels."""
+    unlabelled = re.sub(r"^isbn-1[03]:?\s*", "", str(value or "").strip(), flags=re.I)
+    return isbn13(unlabelled) or ""
 
 
 class Hardcover(Metadata):
@@ -307,6 +321,21 @@ class Hardcover(Metadata):
                 "hardcover-id": match.id,
                 "hardcover-slug": self._safe_get(document, "slug", default=""),
             }
+            # Search-only signals for the auto-matcher. Kept off ``identifiers``
+            # (accepting a review candidate writes every identifier to the
+            # book) and off the dataclass fields (``asdict`` would add them to
+            # every metadata-search response).
+            match.match_hints = {
+                "subtitle": self._safe_get(document, "subtitle", default="") or "",
+                "alternative_titles": [
+                    t for t in (self._safe_get(document, "alternative_titles", default=[]) or [])
+                    if isinstance(t, str) and t.strip()
+                ],
+                "isbns": [
+                    str(i) for i in (self._safe_get(document, "isbns", default=[]) or []) if i
+                ],
+                "users_count": self._safe_get(document, "users_count", default=0) or 0,
+            }
             return match
         except Exception as e:
             log.warning(f"Error parsing title result: {e}")
@@ -446,6 +475,65 @@ class Hardcover(Metadata):
             return default
 
     @staticmethod
+    def _result_isbns(result) -> Iterable[str]:
+        hints = getattr(result, "match_hints", None) or {}
+        isbn = (getattr(result, "identifiers", None) or {}).get("isbn")
+        if isbn:
+            yield isbn
+        yield from hints.get("isbns", []) or []
+
+    # A match found only after cutting a subtitle is good evidence, but weaker
+    # than the full title: "Mission" must not tie with "Mission: Impossible".
+    SUBTITLE_STRIPPED_WEIGHT = 0.9
+
+    @staticmethod
+    def title_similarity(query_title: str, result) -> Tuple[float, str]:
+        """Best similarity between the query and any title the result goes by.
+
+        Hardcover search returns the book under its canonical title, often the
+        original-language one, and lists translations in
+        ``alternative_titles``. Calibre titles often carry a subtitle that
+        Hardcover keeps separately, or the reverse. Every pairing is scored
+        and the best one wins; pairings that needed a subtitle cut are
+        discounted by ``SUBTITLE_STRIPPED_WEIGHT``.
+
+        Returns ``(similarity, note)`` where ``note`` names the title that
+        matched when it was not the plain one ("" otherwise).
+        """
+        hints = getattr(result, "match_hints", None) or {}
+        result_title = result.title or ""
+        subtitle = hints.get("subtitle") or ""
+        query_main = main_title(query_title)
+        query_has_subtitle = bool(query_main and query_main != query_title)
+        stripped = main_title(result_title)
+        result_has_subtitle = bool(subtitle or (stripped and stripped != result_title))
+
+        # If both records carry a subtitle, compare those subtitles too. A
+        # shared prefix can be a series name followed by different book names.
+        # The canonical title alone is incomplete when the API splits off its
+        # subtitle and the query also supplies one.
+        candidates = [] if subtitle and query_has_subtitle else [(result_title, 1.0, "")]
+        if subtitle:
+            candidates.append((f"{result_title}: {subtitle}", 1.0, "with subtitle"))
+        for alt in hints.get("alternative_titles", []) or []:
+            candidates.append((alt, 1.0, "alternative title"))
+        if stripped and stripped != result_title and not query_has_subtitle:
+            candidates.append((stripped, Hardcover.SUBTITLE_STRIPPED_WEIGHT, "subtitle ignored"))
+
+        queries = [(query_title, 1.0)]
+        if query_has_subtitle and not result_has_subtitle:
+            queries.append((query_main, Hardcover.SUBTITLE_STRIPPED_WEIGHT))
+
+        best, best_note = 0.0, ""
+        for q_text, q_weight in queries:
+            q_note = "subtitle ignored" if q_weight < 1.0 else ""
+            for r_text, r_weight, r_note in candidates:
+                sim = normalized_levenshtein_similarity(q_text, r_text) * min(q_weight, r_weight)
+                if sim > best:
+                    best, best_note = sim, r_note or q_note
+        return best, best_note
+
+    @staticmethod
     def calculate_confidence_score(
         result: MetaRecord,
         query_title: str,
@@ -477,24 +565,24 @@ class Hardcover(Metadata):
         score = 0.0
         reasons = []
         
-        # ISBN match (if available) - highest confidence
-        # Compared as ISBN-13s with a valid check digit, so an edition's
-        # ISBN-10 and ISBN-13 match each other and junk matches nothing.
-        if query_isbn and result.identifiers.get('isbn'):
-            result_isbn = isbn13(result.identifiers.get('isbn'))
-            if result_isbn and result_isbn == isbn13(query_isbn):
+        # Compare valid ISBNs as ISBN-13s across every edition in a search hit.
+        query_isbn_norm = normalize_isbn(query_isbn)
+        if query_isbn_norm:
+            result_isbns = {normalize_isbn(value) for value in Hardcover._result_isbns(result)}
+            if query_isbn_norm in result_isbns:
                 return (1.0, "ISBN exact match")
         
         # Title similarity (base score: 0.5-0.95)
         if query_title and result.title:
-            title_similarity = normalized_levenshtein_similarity(query_title, result.title)
+            title_similarity, title_note = Hardcover.title_similarity(query_title, result)
             score += title_similarity * 0.5
+            suffix = f", {title_note}" if title_note else ""
             if title_similarity >= 0.9:
-                reasons.append(f"title exact match ({title_similarity:.2f})")
+                reasons.append(f"title exact match ({title_similarity:.2f}{suffix})")
             elif title_similarity >= 0.7:
-                reasons.append(f"title close match ({title_similarity:.2f})")
+                reasons.append(f"title close match ({title_similarity:.2f}{suffix})")
             else:
-                reasons.append(f"title partial match ({title_similarity:.2f})")
+                reasons.append(f"title partial match ({title_similarity:.2f}{suffix})")
         
         # Author similarity (base score: 0.0-0.45)
         if query_authors and result.authors:

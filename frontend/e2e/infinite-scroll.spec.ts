@@ -51,6 +51,16 @@ function gridBookLinks(page: Page) {
   return page.locator('main a[href*="/book/"]:not([href$="/edit"])');
 }
 
+function disableAutomaticPaging() {
+  class NeverIntersectingObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+  }
+  window.IntersectionObserver = NeverIntersectingObserver as unknown as typeof IntersectionObserver;
+}
+
 test.describe('library infinite scroll', () => {
   test.beforeEach(async ({ page }) => {
     // Keep the optional Discover links out of the book-grid count. Authenticated
@@ -65,15 +75,7 @@ test.describe('library infinite scroll', () => {
   });
 
   test('Load more fetches the next page when IntersectionObserver never fires (#704)', async ({ page }) => {
-    await page.addInitScript(() => {
-      class NeverIntersectingObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-        takeRecords() { return []; }
-      }
-      window.IntersectionObserver = NeverIntersectingObserver as unknown as typeof IntersectionObserver;
-    });
+    await page.addInitScript(disableAutomaticPaging);
 
     const requestedPages: number[] = [];
     const requestedSizes: number[] = [];
@@ -129,6 +131,46 @@ test.describe('library infinite scroll', () => {
     expect(requestedPages, 'the button requests the second SPA library page').toEqual([1, 2]);
     expect(new Set(requestedSizes).size, 'both pages are requested at one size').toBe(1);
     assertNoPageErrors(errors);
+  });
+
+  test('returning from Recent to Newest starts with the newest books (#3012)', async ({ page }) => {
+    await page.addInitScript(disableAutomaticPaging);
+    await page.route('**/api/v1/books?**', async (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      const pageNumber = Number(params.get('page'));
+      const perPage = Number(params.get('per_page'));
+      const result = booksPage(pageNumber, perPage);
+      if (params.get('sort') === 'recent') {
+        result.items = result.items.map((book) => fakeBook(result.total + 1 - book.id));
+      }
+      await route.fulfill({ json: result });
+    });
+
+    await page.goto('/app');
+    const sort = page.getByRole('combobox', { name: 'Sort order' });
+    const loadMore = page.getByRole('button', { name: 'Load more', exact: true });
+    const books = gridBookLinks(page);
+    const bookOrder = () => books.evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+
+    await sort.selectOption('new');
+    await expect(books.first()).toHaveAttribute('href', /\/book\/1$/);
+    const newestFirstPage = await bookOrder();
+    await loadMore.click();
+    await expect(books).toHaveCount(2 * newestFirstPage.length);
+    const newestBothPages = await bookOrder();
+
+    await sort.selectOption('recent');
+    await expect(books.first()).toHaveAttribute('href', new RegExp(`/book/${2 * newestFirstPage.length}$`));
+    await loadMore.click();
+    await expect(books).toHaveCount(2 * newestFirstPage.length);
+
+    await sort.selectOption('new');
+    await expect.poll(bookOrder).toEqual(newestFirstPage);
+    await loadMore.click();
+    await expect.poll(bookOrder).toEqual(newestBothPages);
+    await page.reload();
+    await expect(sort).toHaveValue('new');
+    await expect.poll(bookOrder).toEqual(newestFirstPage);
   });
 
   test('scrolling auto-loads the next page through the real sentinel (#1144)', async ({ page }) => {

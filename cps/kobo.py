@@ -5936,6 +5936,20 @@ def HandleProductsRequest(dummy=None):
     return redirect_or_proxy_request()
 
 
+# Any other store call. The Kobo sends its storeapi.kobo.com calls to CWNG, so a
+# store path with no route above got Flask's 404, which Libby shows as "Network
+# Error" (#2962). It goes to the store like the others. Every route above wins
+# over this one; only a path no other route matches lands here.
+@csrf.exempt
+@kobo.route("/v1/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@kobo.route("/v2/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def HandleUnknownStoreRequest(subpath=None):
+    log.debug("Unknown Kobo Store request received: %s %s (%s)",
+              request.method, urlsplit(get_store_url_for_current_request()).path,
+              'forwarded to Kobo Store' if config.config_kobo_proxy else 'returning empty response')
+    return redirect_or_proxy_request()
+
+
 def _store_error_code(store_response):
     try:
         status = store_response.json().get("ResponseStatus") or {}

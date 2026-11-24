@@ -9,6 +9,7 @@ import {
 } from '../lib/queries';
 import { Button } from '../components/Button';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
+import { CcValuePicker } from '../components/CcValuePicker';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
@@ -81,13 +82,33 @@ function RatingSelector({ value, onChange }: { value: string; onChange: (value: 
 /** Which fields a fetched result can contribute, in display order. `has` decides
  *  whether the result actually offers the field (so we only show applicable rows),
  *  and `preview` renders the incoming value in the per-field apply checklist. */
-type ApplyKey = 'title' | 'authors' | 'series' | 'tags' | 'publisher' | 'rating' | 'description' | 'identifiers' | 'cover';
+type ApplyKey = 'title' | 'authors' | 'series' | 'tags' | 'publisher' | 'pubdate' | 'rating' | 'description' | 'identifiers' | 'cover';
+
+const PUBLICATION_TIME = /^[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?$/;
+
+function normalizePublicationDate(raw: MetaResult['publishedDate']) {
+  if (typeof raw !== 'string') return;
+  const match = /^(\d{4}(?:-\d{2}(?:-\d{2})?)?)(.*)$/.exec(raw.trim());
+  if (!match) return;
+  const [, calendar, suffix] = match;
+  if (suffix && (calendar.length !== 10 || !PUBLICATION_TIME.test(suffix))) return;
+
+  const [year, month = '01', day = '01'] = calendar.split('-');
+  if (Number(year) <= 101) return;
+  const value = `${year}-${month}-${day}`;
+  // Validate the calendar day in UTC so a provider's time or offset cannot shift it.
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !date.toISOString().startsWith(`${value}T`)) return;
+  return { value, preview: calendar };
+}
+
 const APPLY_FIELDS: { key: ApplyKey; label: string; has: (r: MetaResult) => boolean; preview: (r: MetaResult) => string }[] = [
   { key: 'title', label: 'Title', has: (r) => !!r.title, preview: (r) => r.title },
   { key: 'authors', label: 'Authors', has: (r) => !!r.authors?.length, preview: (r) => formatAuthors(r.authors) },
   { key: 'series', label: 'Series', has: (r) => !!r.series, preview: (r) => `${r.series}${r.series_index ? ` #${r.series_index}` : ''}` },
   { key: 'tags', label: 'Tags', has: (r) => !!r.tags?.length, preview: (r) => (r.tags || []).join(', ') },
   { key: 'publisher', label: 'Publisher', has: (r) => !!r.publisher, preview: (r) => r.publisher || '' },
+  { key: 'pubdate', label: 'Published', has: (r) => !!normalizePublicationDate(r.publishedDate), preview: (r) => normalizePublicationDate(r.publishedDate)?.preview || '' },
   { key: 'rating', label: 'Rating', has: (r) => !!r.rating, preview: (r) => `${Math.round(r.rating || 0)} ★` },
   { key: 'description', label: 'Description', has: (r) => !!r.description, preview: (r) => stripTags(r.description || '').slice(0, 140) },
   { key: 'identifiers', label: 'Identifiers', has: (r) => !!r.identifiers && Object.keys(r.identifiers).length > 0, preview: (r) => Object.entries(r.identifiers || {}).map(([k, v]) => `${k}:${v}`).join(', ') },
@@ -158,6 +179,10 @@ export function EditBook({ id }: { id: string }) {
       if (sel.has('authors') && r.authors?.length) next.authors = formatAuthors(r.authors);
       if (sel.has('tags') && r.tags?.length) next.tags = r.tags.join(', ');
       if (sel.has('publisher') && r.publisher) next.publishers = r.publisher;
+      if (sel.has('pubdate')) {
+        const date = normalizePublicationDate(r.publishedDate);
+        if (date) next.pubdate = date.value;
+      }
       if (sel.has('series') && r.series) {
         next.series = r.series;
         if (r.series_index) next.series_index = String(r.series_index);
@@ -748,6 +773,7 @@ function CoverManager({ id }: { id: string }) {
 function CustomColumnField({ column, value, error, onChange }:
   { column: EditableCustomColumn; value: string; error?: string; onChange: (v: string) => void }) {
   const t = useT();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const label = column.name || column.label;
 
   if (column.datatype === 'bool' && !column.is_multiple) {
@@ -820,10 +846,37 @@ function CustomColumnField({ column, value, error, onChange }:
 
   // text (and anything new calibre grows) — comma separated when the column
   // holds several values, which is how the server splits it back apart.
+  //
+  // Text columns also get the value picker: `hierarchical` (sent by the server
+  // from the same detector CcBrowse uses) chooses an indented tree or a plain
+  // list, so both kinds of column can be filled by choosing rather than by
+  // remembering exact spellings. Typing stays available — the picker only ever
+  // writes a comma-joined string back into this same field.
   return (
-    <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error}>
-      <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
-    </Field>
+    <>
+      <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error} composite>
+        <div className={styles.inputWithButton}>
+          <input className={styles.input} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} />
+          <button type="button" className={styles.pickerBtn}
+            onClick={() => setPickerOpen(true)}
+            aria-label={t('Choose from stored values')}
+            title={column.hierarchical ? t('Choose from the existing hierarchy') : t('Choose from the existing values')}>
+            <Search size={16} aria-hidden="true" focusable={false} />
+          </button>
+        </div>
+      </Field>
+      {pickerOpen && (
+        <CcValuePicker
+          columnId={column.id}
+          columnLabel={label}
+          hierarchical={!!column.hierarchical}
+          multiple={column.is_multiple}
+          value={value}
+          onApply={onChange}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </>
   );
 }
 

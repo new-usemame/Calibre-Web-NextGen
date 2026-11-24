@@ -6,7 +6,8 @@
 
 """Regression coverage for fork #1900's non-terminal thumbnail run."""
 
-import time
+import logging
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
@@ -26,11 +27,11 @@ class _Cache:
     pass
 
 
-def _task(monkeypatch, thumbnail, books):
+def _task(monkeypatch, thumbnail, books, *, book_id=-1):
     monkeypatch.setattr(thumbnail.ub, "get_new_session_instance", _Session)
     monkeypatch.setattr(thumbnail.fs, "FileSystem", _Cache)
     monkeypatch.setattr(thumbnail, "use_IM", True)
-    task = thumbnail.TaskGenerateCoverThumbnails()
+    task = thumbnail.TaskGenerateCoverThumbnails(book_id=book_id)
     monkeypatch.setattr(task, "get_cover_sources", lambda: list(books))
     return task
 
@@ -119,33 +120,52 @@ def test_real_timeout_wrapper_returns_control_to_the_worker(monkeypatch):
 
     task = _task(monkeypatch, thumbnail, [])
     monkeypatch.setattr(thumbnail, "_COVER_TIMEOUT_SECONDS", 0.02)
+    release_cover = Event()
     monkeypatch.setattr(
         task,
         "create_book_cover_thumbnails",
-        lambda _book: time.sleep(0.25),
+        lambda _book: release_cover.wait(timeout=5),
     )
 
-    started = time.monotonic()
-    with pytest.raises(thumbnail.CoverThumbnailTimeout):
-        task._run_cover_with_timeout(SimpleNamespace(id=7))
+    try:
+        with pytest.raises(thumbnail.CoverThumbnailTimeout):
+            task._run_cover_with_timeout(SimpleNamespace(id=7))
+    finally:
+        release_cover.set()
 
-    assert time.monotonic() - started < 0.15
 
-
-def test_start_and_finish_logs_publish_terminal_counts(monkeypatch):
+@pytest.mark.parametrize(("book_id", "level"), [(1, logging.DEBUG), (-1, logging.INFO)])
+def test_successful_cover_logs_keep_batch_summaries_visible(monkeypatch, caplog, book_id, level):
     from cps.tasks import thumbnail
 
-    task = _task(monkeypatch, thumbnail, [SimpleNamespace(id=1)])
+    task = _task(monkeypatch, thumbnail, [SimpleNamespace(id=1)], book_id=book_id)
     monkeypatch.setattr(task, "_run_cover_with_timeout", lambda _book: 4)
-    info_calls = []
-    monkeypatch.setattr(task.log, "info", lambda *args: info_calls.append(args))
 
-    task.run(None)
+    with caplog.at_level(logging.DEBUG, logger=task.log.name):
+        task.run(None)
 
-    rendered = [call[0] % call[1:] for call in info_calls]
-    assert sum("generation started" in line for line in rendered) == 1
-    assert sum("generation finished" in line for line in rendered) == 1
-    assert "total=1" in rendered[0]
-    assert "generated=1" in rendered[-1]
-    assert "skipped=0" in rendered[-1]
-    assert "failed=0" in rendered[-1]
+    records = [record for record in caplog.records if record.name == task.log.name
+               and record.getMessage().startswith("Cover thumbnail generation ")]
+    assert [record.levelno for record in records] == [level, level]
+    assert "started: total=1" in records[0].getMessage()
+    assert "finished: status=success" in records[1].getMessage()
+    assert "generated=1, skipped=0, failed=0" in records[1].getMessage()
+
+
+def test_single_book_cover_failure_stays_visible_at_info(monkeypatch, caplog):
+    from cps.tasks import thumbnail
+
+    task = _task(monkeypatch, thumbnail, [SimpleNamespace(id=1)], book_id=1)
+
+    def generate(_book):
+        raise OSError("broken cover")
+
+    monkeypatch.setattr(task, "_run_cover_with_timeout", generate)
+
+    with caplog.at_level(logging.INFO, logger=task.log.name):
+        task.run(None)
+
+    assert task.stat == STAT_FAIL
+    assert any(record.levelno >= logging.WARNING and "broken cover" in record.getMessage()
+               for record in caplog.records)
+    assert "finished: status=failed" in caplog.text

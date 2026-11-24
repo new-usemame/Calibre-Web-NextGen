@@ -22,6 +22,7 @@ import type { EntityListPage } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
+  CcPickerValues,
   Me, Book, BooksPage, BookDetail, ReadingStatus, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
@@ -29,7 +30,7 @@ import type {
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken, KoreaderPairRequest,
-  CcColumnsPage, CcTree, CcBooksPage,
+  CcColumnsPage, CcTree, CcBooksPage, CcValueWriteResult,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -561,6 +562,112 @@ export function useCcTree(colId: string | number, enabled = true) {
   });
 }
 
+export function useCcPickerValues(colId: number) {
+  return useQuery<CcPickerValues>({
+    queryKey: ['cc-picker', colId],
+    queryFn: () => apiGet<CcPickerValues>(`/ajax/get_cc_tree/${colId}`),
+    staleTime: 0,
+  });
+}
+
+/** Editing a custom column's VALUES (rename/merge/delete/move/create).
+ *
+ *  Every mutation re-reads the tree: a value may change shape (a move can make
+ *  a flat column hierarchical), so the cached node list is the thing most
+ *  likely to be wrong afterwards. Books are invalidated too because a delete
+ *  removes the value from them.
+ *
+ *  `confirm_merges` is only ever sent as literal `true`. The value column is
+ *  UNIQUE, so landing on a taken spelling is a merge, and a merge cannot be
+ *  undone -- the same opt-in rule the tag editor follows. */
+function invalidateCcViews(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ['cc-tree'] });
+  void qc.invalidateQueries({ queryKey: ['cc-books'] });
+  void qc.invalidateQueries({ queryKey: ['cc-columns'] });
+  void qc.invalidateQueries({ queryKey: ['entities'] });
+  void qc.invalidateQueries({ queryKey: ['books'] });
+}
+
+export interface RenameCcValueInput {
+  path: string;
+  newName: string;
+  confirmMerges?: boolean;
+}
+
+export function useRenameCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, newName, confirmMerges }: RenameCcValueInput) =>
+      apiPost<CcValueWriteResult>(
+        `/api/v1/columns/${colId}/values/rename`,
+        confirmMerges === true
+          ? { path, new_name: newName, confirm_merges: true }
+          : { path, new_name: newName },
+      ),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useMergeCcValues(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paths, into }: { paths: string[]; into: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/merge`, { paths, into }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useDeleteCcValues(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paths: string[]) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/delete`, { paths }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useMoveCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, newParent }: { path: string; newParent: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/move`,
+        { path, new_parent: newParent }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+/** Move one value one place up or down among its own siblings.
+ *
+ *  The only value operation that changes no stored value: no book is touched
+ *  and no value is rewritten, so there is no merge to confirm and nothing to
+ *  undo. A move cannot cross a level -- the server orders it against the node's
+ *  own sibling list -- and it answers 409 if the value is already at the end it
+ *  was asked to reach, which is what a stale tree looks like. */
+export function useReorderCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, direction }: { path: string; direction: 'up' | 'down' }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/reorder`,
+        { path, direction }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
+export function useCreateCcValue(colId: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    /* `after` places the new value immediately below that sibling -- the same
+     * level, not under it. Sent by the per-row create button; the bottom
+     * Create-new omits it and the value sorts alphabetically among its peers,
+     * which is the predictable default when the user has said nothing about
+     * where it should go. */
+    mutationFn: ({ path, after }: { path: string; after?: string }) =>
+      apiPost<CcValueWriteResult>(`/api/v1/columns/${colId}/values/create`,
+        after ? { path, after } : { path }),
+    onSuccess: () => invalidateCcViews(qc),
+  });
+}
+
 /** One page of books under a node of a custom column. An empty `path` lists
  *  every book carrying any value in the column. */
 export function useCcBooks(
@@ -1027,6 +1134,19 @@ export interface MailConfig {
   mail_filename_template: string;
   mail_server_type: number;
   has_password: boolean;
+  /** Whether the saved settings are enough for the app to send mail (#2771). */
+  mail_configured: boolean;
+  /** Whether Gmail OAuth (classic page only) has been authorised. */
+  gmail_authorised: boolean;
+}
+
+export interface MailTestResult { ok: boolean; email: string; message: string }
+
+/** Queue a test email to the signed-in admin's own address (#2771). */
+export function useSendTestMail() {
+  return useMutation({
+    mutationFn: () => apiPost<MailTestResult>('/api/v1/admin/mailsettings/test', {}),
+  });
 }
 
 export function useMailConfig() {
@@ -2127,6 +2247,67 @@ export function useDismissDuplicate() {
     mutationFn: (groupHash: string) =>
       apiPost(`/duplicates/dismiss/${encodeURIComponent(groupHash)}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+export type DuplicateStrategy =
+  | 'newest' | 'oldest' | 'merge'
+  | 'highest_quality_format' | 'most_metadata' | 'largest_file_size';
+
+export interface DuplicateResolutionPreviewGroup {
+  group_hash: string;
+  title: string;
+  author: string;
+  kept_book_id: number;
+  kept_book_formats: string[];
+  /** Publisher and year, so different editions in one group stand out (#1902). */
+  kept_book_edition?: { publisher: string | null; year: number | null };
+  deleted_book_ids: number[];
+  deleted_books_info: {
+    id: number; formats: string[]; publisher?: string | null; year?: number | null;
+  }[];
+}
+
+/** Shared by the dry run and the real run: the backend answers both with the
+ *  same counters and only adds `preview` for the dry run. */
+export interface DuplicateResolutionResult {
+  success: boolean;
+  resolved_count?: number;
+  kept_count?: number;
+  deleted_count?: number;
+  errors?: string[];
+  message?: string;
+  error?: string;
+  preview?: DuplicateResolutionPreviewGroup[] | null;
+}
+
+/** Dry run of the classic "Auto-Resolve Duplicates" panel (#1902). Admin only
+ *  on the server; nothing is deleted. */
+export function usePreviewDuplicateResolution() {
+  return useMutation<DuplicateResolutionResult, Error, DuplicateStrategy>({
+    mutationFn: (strategy) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/preview-resolution', { strategy }),
+  });
+}
+
+/** Real run: keeps one book per group and deletes the rest. */
+export function useExecuteDuplicateResolution() {
+  const qc = useQueryClient();
+  return useMutation<DuplicateResolutionResult, Error, {
+    strategy: DuplicateStrategy; expected_preview: DuplicateResolutionPreviewGroup[];
+  }>({
+    mutationFn: (plan) =>
+      apiPost<DuplicateResolutionResult>('/duplicates/execute-resolution', plan),
+    // Books were deleted, so every list that can show them is stale -- not just
+    // the duplicates view. Refresh on either outcome: a partial failure still
+    // deletes some groups before it reports its errors.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['duplicates'] });
+      invalidateBookVisibilityViews(qc);
+      void qc.invalidateQueries({ queryKey: ['book'] });
+      void qc.invalidateQueries({ queryKey: ['adv-search'] });
+      void qc.invalidateQueries({ queryKey: ['discover-strip'] });
+    },
   });
 }
 

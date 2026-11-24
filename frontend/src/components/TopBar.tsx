@@ -14,6 +14,7 @@ import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
 import { canDownloadSupportPack, canUploadBooks, showsProjectSupport, SUPPORT_PACK_URL } from '../lib/permissions';
 import { usePackDownload, type PackStatus } from '../lib/usePackDownload';
+import { apiUrl } from '../lib/api';
 
 interface TopBarProps {
   userName: string;
@@ -193,7 +194,7 @@ function HelpMenu() {
   const hostSupport = !showProjectLinks && me?.support?.url;
   const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const unread = useWhatsNewUnread();
-  const pack = usePackDownload(SUPPORT_PACK_URL);
+  const pack = usePackDownload(apiUrl(SUPPORT_PACK_URL));
   const packMessage = packStatusMessage(pack.status, t);
   // Prefill the issue with the version, the route SHAPE and a coarse browser,
   // instead of handing over a blank form and asking the reporter to look all
@@ -236,7 +237,7 @@ function HelpMenu() {
           {hostSupport && <MenuItem icon={<LifeBuoy size={15} />} label={me.support?.label || t('Contact support')} href={hostSupport} onSelect={close} />}
           {canDownloadSupportPack(me) && <MenuItem
             icon={<FileArchive size={15} />}
-            label={t('Get Support Pack')} href={SUPPORT_PACK_URL} download
+            label={t('Get Support Pack')} href={apiUrl(SUPPORT_PACK_URL)} download
             onDownload={pack.start} busy={pack.preparing}
             trailing={pack.preparing ? <Spinner size={14} /> : undefined}
             onSelect={close} />}

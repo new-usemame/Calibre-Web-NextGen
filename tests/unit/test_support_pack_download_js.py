@@ -168,6 +168,10 @@ class TestTemplateWiring:
         for name in ("preparing", "done", "busy", "failed", "timeout"):
             assert f"data-{name}=" in status.group(0), name
 
+    def test_the_status_line_carries_the_mount_prefix_for_the_cookie_path(self):
+        status = re.search(r'<span id="pack_status"[^>]*>', ADMIN_HTML, re.S)
+        assert status and 'data-mount-prefix="{{ request.script_root }}"' in status.group(0)
+
     def test_the_script_is_loaded_from_static_not_inline(self):
         assert "{% block js %}" in ADMIN_HTML
         assert "filename='js/support_pack_download.js'" in ADMIN_HTML
@@ -178,6 +182,7 @@ class TestTemplateWiring:
 DOM_HARNESS = r"""
 const api = require(process.argv[1]);
 const script = JSON.parse(process.argv[2]);
+const opts = JSON.parse(process.argv[3] || '{}');
 let now = 0, nextId = 1; const timers = new Map();
 function el(attrs) {
   const classes = new Set((attrs.class || '').split(' ').filter(Boolean));
@@ -190,19 +195,22 @@ function el(attrs) {
     set src(v) { this._src = v; }, get src() { return this._src; } };
 }
 const frames = [];
-const status = el({id: 'pack_status', 'data-preparing': 'PREPARING', 'data-done': 'DONE', 'data-busy': 'BUSY',
-  'data-failed': 'FAILED', 'data-timeout': 'TIMEOUT'});
+const status = el(Object.assign({id: 'pack_status', 'data-preparing': 'PREPARING', 'data-done': 'DONE', 'data-busy': 'BUSY',
+  'data-failed': 'FAILED', 'data-timeout': 'TIMEOUT'}, opts.prefix === undefined ? {} : {'data-mount-prefix': opts.prefix}));
 const pack = el({id: 'support_pack', class: 'btn btn-default', href: '/admin/debug/support-pack'});
 const debug = el({id: 'debug', class: 'btn btn-default', href: '/admin/debug'});
-const jar = {};
+const jar = {};   // name -> {val, path}: a cookie is only removed by a write with its own Path, as in a browser
 const doc = {
   getElementById: id => (id === 'pack_status' ? status : null),
   querySelectorAll: () => [pack, debug],
   createElement: () => Object.assign(el({}), {contentDocument: {body: {textContent: ''}}}),
   body: el({}),
-  get cookie() { return Object.entries(jar).map(([k, v]) => k + '=' + v).join('; '); },
+  get cookie() { return Object.entries(jar).map(([k, e]) => k + '=' + e.val).join('; '); },
   set cookie(v) { const [pair, ...rest] = v.split(';'); const [k, val] = pair.split('=');
-    if (rest.some(x => /Max-Age=0/i.test(x))) delete jar[k]; else jar[k] = val; },
+    const attr = rest.map(x => x.trim()).find(x => /^path=/i.test(x));
+    const path = attr ? attr.slice(5) : '/';
+    if (rest.some(x => /Max-Age=0/i.test(x))) { if (jar[k] && jar[k].path === path) delete jar[k]; }
+    else jar[k] = {val, path}; },
 };
 const win = {
   setTimeout: (fn, ms) => { const id = nextId++; timers.set(id, {fn, ms, at: now + ms, every: false}); return id; },
@@ -234,7 +242,9 @@ for (const step of script) {
     log.push({after: 'click ' + step.click, prevented: prevented.v, ...snap()});
   }
   if (step.advance) advance(step.advance);
-  if (step.cookie) { const f = frames[frames.length - 1]; const token = f.src.split('dl_token=')[1]; jar['cwng_pack_token'] = token; }
+  if (step.cookie) { const f = frames[frames.length - 1]; const token = f.src.split('dl_token=')[1];
+    jar['cwng_pack_token'] = {val: token, path: opts.serverPath || '/'}; }
+  if (step.jar) log.push({after: 'jar', jar: Object.keys(jar)});
   if (step.frameLoad) { const f = frames[frames.length - 1]; f.contentDocument.body.textContent = step.frameLoad.text;
     f.listeners.load[0](); }
   if (step.snap) log.push({after: step.snap, ...snap()});
@@ -243,8 +253,8 @@ console.log(JSON.stringify(log));
 """
 
 
-def _dom(script):
-    out = subprocess.run(["node", "-e", DOM_HARNESS, str(JS), json.dumps(script)],
+def _dom(script, **opts):
+    out = subprocess.run(["node", "-e", DOM_HARNESS, str(JS), json.dumps(script), json.dumps(opts)],
                          capture_output=True, text=True, check=True).stdout
     return json.loads(out)
 
@@ -294,6 +304,39 @@ class TestButtons:
 
 
 @needs_node
+class TestCookiePath:
+    """The server scopes the download-started cookie to the app's mount path; the
+    page has to clear it with the same Path or the browser keeps it."""
+
+    FLOW = [{"click": "pack"}, {"advance": 700}, {"cookie": True}, {"advance": 300}, {"jar": True}]
+
+    @pytest.mark.parametrize("prefix, server_path", [("", "/"), ("/calibre", "/calibre"), ("/books/cwng", "/books/cwng")])
+    def test_the_cookie_is_cleared_at_the_path_the_server_set_it_on(self, prefix, server_path):
+        log = _dom(self.FLOW, prefix=prefix, serverPath=server_path)
+        assert log[-1]["jar"] == []
+
+    def test_clearing_at_the_wrong_path_would_leave_it_behind(self):
+        # Guards the harness itself: it must be able to tell a path mismatch from a clean-up.
+        log = _dom(self.FLOW, prefix="", serverPath="/calibre")  # page thinks it is at the root
+        assert log[-1]["jar"] == ["cwng_pack_token"]
+
+    @pytest.mark.parametrize("prefix, expected", [
+        ("", "/"), ("/calibre", "/calibre"), ("/books/cwng", "/books/cwng"), ("/calibre/", "/calibre"),
+        ("//evil.example", "/"), ("/a b", "/"), ("/x;path=/", "/"), ("/../up", "/"), ("calibre", "/"),
+    ])
+    def test_the_path_follows_the_servers_rule_including_the_fallback_to_root(self, prefix, expected):
+        # The same table as tests/unit/test_support_pack_download_token.py: the two must agree.
+        out = subprocess.run(["node", "-e", "console.log(JSON.stringify(require(process.argv[1]).cookiePathFor(process.argv[2])))",
+                              str(JS), prefix], capture_output=True, text=True, check=True).stdout
+        assert json.loads(out) == expected
+
+    def test_the_clearing_write_names_the_path(self):
+        out = subprocess.run(["node", "-e", "console.log(require(process.argv[1]).clearCookieString('c', '/calibre'))", str(JS)],
+                             capture_output=True, text=True, check=True).stdout.strip()
+        assert out == "c=; Max-Age=0; path=/calibre"
+
+
+@needs_node
 class TestMutations:
     """The tests above must notice if the protocol is weakened."""
 
@@ -313,6 +356,15 @@ class TestMutations:
         mutated = self._with_source(tmp_path, "=== env.token;", "!== null;")
         assert self._outcomes(mutated, {"steps": [{"cookie": "another_tab_token_99"}, {"advance": 2000}]}) == ["done"]
         assert self._outcomes(JS, {"steps": [{"cookie": "another_tab_token_99"}, {"advance": 2000}]}) == []
+
+    def test_always_clearing_at_the_root_is_caught(self, tmp_path):
+        mutated = self._with_source(tmp_path, "clearCookieString(name, cookiePath)", 'clearCookieString(name, "/")')
+        flow = TestCookiePath.FLOW
+        for source, expected in ((mutated, ["cwng_pack_token"]), (JS, [])):
+            out = subprocess.run(["node", "-e", DOM_HARNESS, str(source), json.dumps(flow),
+                                  json.dumps({"prefix": "/calibre", "serverPath": "/calibre"})],
+                                 capture_output=True, text=True, check=True).stdout
+            assert json.loads(out)[-1]["jar"] == expected
 
     def test_judging_the_frame_before_the_cookie_can_land_is_caught(self, tmp_path):
         mutated = self._with_source(tmp_path, "}, GRACE_MS);", "}, 0);")

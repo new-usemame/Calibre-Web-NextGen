@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  browserEnv,
+  clearCookieString,
+  cookiePathFor,
   cookieValue,
   GIVE_UP_MS,
   interpretFrame,
@@ -176,4 +179,35 @@ test('only JSON that says busy is busy; everything else is a failure', () => {
   assert.deepEqual(interpretFrame('{"busy": false}'), { kind: 'failed', message: null });
   assert.deepEqual(interpretFrame('<html>504</html>'), { kind: 'failed', message: null });
   assert.deepEqual(interpretFrame('null'), { kind: 'failed', message: null });
+});
+
+// The server scopes the download-started cookie to the app's mount path, so the
+// page has to clear it with the same Path or the browser keeps it.
+test('the cookie path follows the server rule, including the fallback to the root', () => {
+  // The same table as tests/unit/test_support_pack_download_token.py: the two must agree.
+  const cases: [string, string][] = [
+    ['', '/'],
+    ['/calibre', '/calibre'],
+    ['/books/cwng', '/books/cwng'],
+    ['/calibre/', '/calibre'],
+    ['//evil.example', '/'],
+    ['/a b', '/'],
+    ['/x;path=/', '/'],
+    ['/../up', '/'],
+    ['calibre', '/'],
+  ];
+  for (const [prefix, expected] of cases) assert.equal(cookiePathFor(prefix), expected, JSON.stringify(prefix));
+});
+
+test('clearing names the path', () => {
+  assert.equal(clearCookieString(PACK_COOKIE, '/calibre'), 'cwng_pack_token=; Max-Age=0; path=/calibre');
+});
+
+test('the browser environment clears the cookie at the mount path, or at the root without one', () => {
+  const writes: string[] = [];
+  const doc = { set cookie(value: string) { writes.push(value); }, get cookie() { return ''; } };
+  const win = {} as unknown as Window;
+  browserEnv(doc as unknown as Document, win, '/calibre').clearCookie(PACK_COOKIE);
+  browserEnv(doc as unknown as Document, win).clearCookie(PACK_COOKIE);
+  assert.deepEqual(writes, ['cwng_pack_token=; Max-Age=0; path=/calibre', 'cwng_pack_token=; Max-Age=0; path=/']);
 });

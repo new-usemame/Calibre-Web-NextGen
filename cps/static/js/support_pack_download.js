@@ -28,6 +28,21 @@
   var DONE_MESSAGE_MS = 8000;
   var TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
 
+  // The Path the server gives the cookie: the app's mount prefix, or "/" at the
+  // domain root (the server's spa.mount_cookie_path()). A cookie is only removed
+  // by a write with the same Path, so this must stay in step with it, including
+  // falling back to "/" for a prefix the server would not trust.
+  var SAFE_PREFIX = /^(\/[A-Za-z0-9._~-]+)+$/;
+
+  function cookiePathFor(prefix) {
+    var trimmed = String(prefix || "").replace(/\/+$/, "");
+    return trimmed && SAFE_PREFIX.test(trimmed) && trimmed.indexOf("..") === -1 ? trimmed : "/";
+  }
+
+  function clearCookieString(name, path) {
+    return name + "=; Max-Age=0; path=" + path;
+  }
+
   function cookieValue(cookieString, name) {
     var parts = String(cookieString || "").split(";");
     for (var i = 0; i < parts.length; i += 1) {
@@ -122,6 +137,8 @@
     if (!status || !buttons.length) { return; }
     var running = false;
     var clearTimer = null;
+    // Where the server scoped the cookie (the template passes the mount prefix).
+    var cookiePath = cookiePathFor(status.getAttribute("data-mount-prefix"));
 
     function say(text, level) {
       status.textContent = text;
@@ -147,7 +164,7 @@
       return {
         token: makeToken(randomSource()),
         cookies: function () { return doc.cookie; },
-        clearCookie: function (name) { doc.cookie = name + "=; Max-Age=0; path=/"; },
+        clearCookie: function (name) { doc.cookie = clearCookieString(name, cookiePath); },
         setInterval: function (fn, ms) { return win.setInterval(fn, ms); },
         clearInterval: function (id) { win.clearInterval(id); },
         setTimeout: function (fn, ms) { return win.setTimeout(fn, ms); },
@@ -206,6 +223,8 @@
   }
 
   var api = {
+    cookiePathFor: cookiePathFor,
+    clearCookieString: clearCookieString,
     cookieValue: cookieValue,
     makeToken: makeToken,
     withToken: withToken,

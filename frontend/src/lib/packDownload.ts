@@ -51,6 +51,21 @@ export interface PackHandlers {
   onError(kind: PackErrorKind, message: string | null): void;
 }
 
+// The Path the server gives the cookie: the app's mount prefix, or "/" at the
+// domain root (the server's spa.mount_cookie_path()). A cookie is only removed by
+// a write with the same Path, so this must stay in step with it, including falling
+// back to "/" for a prefix the server would not trust.
+const SAFE_PREFIX = /^(\/[A-Za-z0-9._~-]+)+$/;
+
+export function cookiePathFor(prefix: string): string {
+  const trimmed = String(prefix || '').replace(/\/+$/, '');
+  return trimmed && SAFE_PREFIX.test(trimmed) && !trimmed.includes('..') ? trimmed : '/';
+}
+
+export function clearCookieString(name: string, path: string): string {
+  return `${name}=; Max-Age=0; path=${path}`;
+}
+
 export function cookieValue(cookieString: string, name: string): string | null {
   for (const part of String(cookieString || '').split(';')) {
     const piece = part.replace(/^\s+/, '');
@@ -151,13 +166,16 @@ function browserRandom(win: Window): () => number {
   return Math.random;
 }
 
-/** The real browser environment: cookie jar, timers and a hidden same-origin iframe. */
-export function browserEnv(doc: Document, win: Window): PackEnv {
+/** The real browser environment: cookie jar, timers and a hidden same-origin iframe.
+ *  `mountPrefix` is the reverse-proxy prefix the app is served under ('' at the
+ *  domain root); the cookie is scoped to it, so it is cleared there too. */
+export function browserEnv(doc: Document, win: Window, mountPrefix = ''): PackEnv {
+  const cookiePath = cookiePathFor(mountPrefix);
   return {
     token: makeToken(browserRandom(win)),
     cookies: () => doc.cookie,
     clearCookie: (name) => {
-      doc.cookie = `${name}=; Max-Age=0; path=/`;
+      doc.cookie = clearCookieString(name, cookiePath);
     },
     setInterval: (fn, ms) => win.setInterval(fn, ms),
     clearInterval: (id) => win.clearInterval(id as number),

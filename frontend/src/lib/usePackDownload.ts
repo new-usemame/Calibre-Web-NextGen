@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { BASE_PREFIX } from './api';
 import { browserEnv, DONE_MESSAGE_MS, startPackDownload } from './packDownload';
 
 export type PackStatus = 'idle' | 'preparing' | 'started' | 'busy' | 'failed' | 'timeout';
@@ -23,7 +24,7 @@ export function usePackDownload(url: string) {
     if (running.current) return; // one at a time: a second click does nothing
     window.clearTimeout(clearTimer.current);
     setStatus('preparing');
-    running.current = startPackDownload(browserEnv(document, window), url, {
+    running.current = startPackDownload(browserEnv(document, window, BASE_PREFIX), url, {
       onDone: () => {
         running.current = null;
         setStatus('started');

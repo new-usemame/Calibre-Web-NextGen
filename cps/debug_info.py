@@ -483,17 +483,28 @@ def _omitted_lines_header(count: int, first_ts, last_ts) -> str:
 
 
 def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
+    """``_sanitize_log`` without the report of whether the head was dropped."""
+    return _sanitize_log(raw, scrubber)[0]
+
+
+def _sanitize_log(raw: bytes, scrubber=None):
     """Read a log file, drop routine scheduler lines, sanitize the rest, and
-    return the result capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the
-    most recent content, drop the head if oversize).
+    return ``(data, cut)``: the result capped at ``_PER_FILE_MAX_BYTES``
+    (tail-biased: keep the most recent content, drop the head if oversize), and
+    whether the oldest content was dropped to fit that cap.
+
+    ``cut`` is about the size cap only. Routine scheduler lines that are counted
+    instead of carried are announced by the header note, not by ``cut``.
 
     Order matters. Routine lines are dropped *before* the cap, so the cap
     spends its budget on lines worth reading rather than on noise, and the cap
     is applied *before* scrubbing, so no CPU goes on bytes that would be
     dropped anyway."""
     if not raw:
-        return raw
+        return raw, False
+    cut = False
     if len(raw) > _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:
+        cut = True
         raw = raw[-_PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:]
         newline = raw.find(b"\n")
         if newline != -1:
@@ -501,7 +512,7 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
     try:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
-        return raw[-_PER_FILE_MAX_BYTES:]
+        return raw[-_PER_FILE_MAX_BYTES:], True
     if scrubber is None:
         install_paths = _install_path_patterns()
 
@@ -524,7 +535,9 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
 
     # Cap what is left before scrubbing, so no CPU goes on lines that would be
     # dropped anyway, counted in bytes.
-    kept = _tail_within(kept, _PER_FILE_MAX_BYTES)
+    within_cap = _tail_within(kept, _PER_FILE_MAX_BYTES)
+    cut = cut or len(within_cap) < len(kept)
+    kept = within_cap
 
     # Scrubbing can make a line longer (a short address becomes "<email_1>") and
     # the omission note adds bytes, so cap again on what is actually written: the
@@ -534,7 +547,9 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
     budget = _PER_FILE_MAX_BYTES - len(header.encode("utf-8"))
     if budget < 0:  # the note alone does not fit: drop it rather than break the cap
         header, budget = "", _PER_FILE_MAX_BYTES
-    return (header + "".join(_tail_within(scrubbed, budget))).encode("utf-8")
+    final = _tail_within(scrubbed, budget)
+    cut = cut or len(final) < len(scrubbed)
+    return (header + "".join(final)).encode("utf-8"), cut
 
 
 def _tail_within(lines, limit: int):
@@ -768,7 +783,11 @@ def _assemble_pack(prep: dict):
             except OSError:
                 log_status.append({"file": name, "status": "unreadable"})
                 continue
-            data = _sanitize_log_bytes(raw, scrubber) if sanitize else raw
+            if sanitize:
+                data, capped = _sanitize_log(raw, scrubber)
+                was_cut = was_cut or capped
+            else:
+                data = raw
             zf.writestr(name, data)
             if fp in prep["app_logs"]:
                 # From the same bytes that went into the archive, so the digest can

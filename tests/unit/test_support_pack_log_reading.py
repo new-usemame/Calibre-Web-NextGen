@@ -206,6 +206,36 @@ class TestInBuiltPack:
         assert "from the first read" in files["tracebacks.txt"]  # describes what the archive holds
         assert "rewritten" not in files["calibre-web.log"] and "rewritten" not in files["tracebacks.txt"]
 
+    def test_a_log_over_the_cap_but_within_the_read_bound_is_reported_as_cut(self, pack, monkeypatch):
+        # Read whole (it is under the read bound), then trimmed to the cap when written:
+        # the manifest has to say so, or a log that lost its head looks complete.
+        (pack / "calibre-web.log").write_text(_numbered_lines(60_000))  # about 3.6 MB
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", 1_000_000)  # read bound is 4x: 4 MB
+        _names, files = self._build(True)
+        entry = self._logs(files)["calibre-web.log"]
+        assert entry["cut_to_tail"] is True and entry["bytes"] <= 1_000_000
+        assert "line 059999" in files["calibre-web.log"] and "line 000000" not in files["calibre-web.log"]
+
+    def test_a_log_that_fits_is_not_reported_as_cut_even_when_routine_lines_are_counted(self, pack):
+        noise = '[2026-11-20 19:31:44,123]  INFO {apscheduler.executors.default:156} Job "j" executed successfully\n' * 50
+        (pack / "calibre-web.log").write_text(noise + "[2026-11-20 19:33:00,000]  INFO {x:1} kept\n")
+        _names, files = self._build(True)
+        entry = self._logs(files)["calibre-web.log"]
+        assert entry["cut_to_tail"] is False          # nothing was lost to the size cap...
+        assert "kept" in files["calibre-web.log"]     # ...the routine lines are counted, and say so
+        assert "Omitted 50 routine" in files["calibre-web.log"].splitlines()[0]
+
+    def test_the_cut_is_reported_when_scrubbing_pushes_the_result_over_the_cap(self, pack, monkeypatch):
+        # Under the cap as read, over it once an address becomes a longer placeholder.
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", 5_000)
+        lines = "".join(f"[2026-11-20 19:00:00,000]  INFO {{x:1}} user a{i:03d}@b.co" + "\n" for i in range(80))
+        assert len(lines.encode()) < 5_000
+        (pack / "calibre-web.log").write_text(lines)
+        monkeypatch.setattr(debug_info, "_LogScrubber", lambda **kw: (lambda line: line.replace("@b.co", "@" + "x" * 40)))
+        _names, files = self._build(True)
+        entry = self._logs(files)["calibre-web.log"]
+        assert entry["cut_to_tail"] is True and entry["bytes"] <= 5_000
+
     def test_a_huge_log_is_bounded_when_read_and_when_written(self, pack, monkeypatch):
         (pack / "calibre-web.log").write_text(_numbered_lines(60_000))  # about 3.6 MB
         monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", 10_000)

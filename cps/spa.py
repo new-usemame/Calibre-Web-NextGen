@@ -114,13 +114,20 @@ _SPA_CHOICE_PARAM = "cwng_switch"
 _SPA_CHOICE_VALUE = "spa"
 
 
-def prefer_spa_cookie_path():
-    """Scope the preference cookie to the app's mount prefix (request.script_root),
-    or '/' at the domain root. Two CWNG instances on different subpaths of one
-    host must not share the cookie, and the path must match between set and
-    delete or the browser keeps both — so both go through here. Mirrors how Flask
-    scopes the session cookie (which also follows SCRIPT_NAME)."""
+def mount_cookie_path():
+    """The ``Path`` for a cookie that belongs to this app: its (sanitised) mount
+    prefix (request.script_root), or '/' at the domain root. Two CWNG instances
+    on different subpaths of one host must not share a cookie, and the path must
+    match between set and delete or the browser keeps both — so both go through
+    here. Mirrors how Flask scopes the session cookie (which also follows
+    SCRIPT_NAME)."""
     return _mount_prefix() or "/"
+
+
+def prefer_spa_cookie_path():
+    """Scope the preference cookie to the app's mount prefix (see
+    ``mount_cookie_path``)."""
+    return mount_cookie_path()
 
 
 def stamp_prefer_spa_cookie(resp):

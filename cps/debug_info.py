@@ -23,6 +23,7 @@ from flask_babel.speaklater import LazyString
 
 from . import logger, config, constants, support_pack_state
 from .about import collect_stats
+from .spa import mount_cookie_path
 from .services import parallel
 
 log = logger.create()
@@ -933,17 +934,30 @@ def _requested_token():
     return token if _PACK_TOKEN_PATTERN.fullmatch(token) else None
 
 
+def _is_attachment_get(response) -> bool:
+    """True only for a GET that is answering with the attachment itself.
+
+    The cookie says "your download started", so it must not go out on a HEAD
+    (which sends the headers and no file), nor on a partial or error answer.
+    """
+    return request.method == "GET" and response.status_code == 200
+
+
 def _send_zip(memory_zip, filename: str, token=None):
     version = importlib.metadata.version("flask")
     if int(version.split('.')[0]) < 2:
         response = send_file(memory_zip, as_attachment=True, attachment_filename=filename)
     else:
         response = send_file(memory_zip, as_attachment=True, download_name=filename)
-    if token:
+    if token and _is_attachment_get(response):
         # Readable by the page's script on purpose (not HttpOnly): it carries only
-        # a random token the page itself made up.
+        # a random token the page itself made up. Scoped to the app's mount path,
+        # not "/", so that two instances on one host do not see each other's
+        # token. It has to be the mount path rather than the download route: a
+        # cookie is only visible to pages under its Path, and the page that
+        # watches for it is not under /admin/debug.
         response.set_cookie(PACK_TOKEN_COOKIE, token, max_age=PACK_TOKEN_COOKIE_SECONDS,
-                            path="/", samesite="Lax", secure=request.is_secure)
+                            path=mount_cookie_path(), samesite="Lax", secure=request.is_secure)
     return response
 
 

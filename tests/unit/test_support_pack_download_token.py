@@ -14,14 +14,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from cps import debug_info
+from cps import debug_info, spa
 
 pytestmark = pytest.mark.unit
 
 
 class _Response:
-    def __init__(self):
+    def __init__(self, status_code=200):
         self.cookies = []
+        self.status_code = status_code
 
     def set_cookie(self, name, value, **kwargs):
         self.cookies.append((name, value, kwargs))
@@ -32,16 +33,18 @@ def served(monkeypatch):
     """Run an endpoint with a fake request and a recording response."""
     state = {"response": None}
 
-    def run(endpoint, args, secure=False, busy=False):
+    def run(endpoint, args, secure=False, busy=False, method="GET", status=200, script_root=""):
         monkeypatch.setattr(debug_info, "has_request_context", lambda: True)
-        monkeypatch.setattr(debug_info, "request", SimpleNamespace(args=args, is_secure=secure))
+        monkeypatch.setattr(debug_info, "request", SimpleNamespace(args=args, is_secure=secure, method=method))
+        # The mount prefix is read (and sanitised) by spa, which has its own request.
+        monkeypatch.setattr(spa, "request", SimpleNamespace(script_root=script_root))
         if busy:
             def raise_busy(_sanitize):
                 raise debug_info.PackBusy()
             monkeypatch.setattr(debug_info, "_get_pack", raise_busy)
         else:
             monkeypatch.setattr(debug_info, "_get_pack", lambda _sanitize: b"zip")
-        state["response"] = _Response()
+        state["response"] = _Response(status)
         monkeypatch.setattr(debug_info, "send_file", lambda *a, **kw: state["response"])
         return getattr(debug_info, endpoint)()
 
@@ -104,3 +107,34 @@ class TestCookieOnDownload:
         run, state = served
         _body, status, _headers = run(endpoint, {"dl_token": TOKEN}, busy=True)
         assert status == 429 and state["response"].cookies == []
+
+    def test_a_head_request_gets_no_cookie(self, served, endpoint):
+        # HEAD answers with the headers and no file: nothing has started downloading.
+        run, state = served
+        assert run(endpoint, {"dl_token": TOKEN}, method="HEAD") is state["response"]
+        assert state["response"].cookies == []
+
+    @pytest.mark.parametrize("status", [206, 304, 416])
+    def test_only_the_attachment_itself_gets_the_cookie(self, served, endpoint, status):
+        run, state = served
+        run(endpoint, {"dl_token": TOKEN}, status=status)
+        assert state["response"].cookies == []
+
+    @pytest.mark.parametrize("script_root, expected", [
+        ("", "/"),
+        ("/calibre", "/calibre"),
+        ("/books/cwng", "/books/cwng"),
+        ("/calibre/", "/calibre"),
+    ])
+    def test_the_cookie_is_scoped_to_the_mount_path_not_the_root(self, served, endpoint, script_root, expected):
+        run, state = served
+        run(endpoint, {"dl_token": TOKEN}, script_root=script_root)
+        assert state["response"].cookies[0][2]["path"] == expected
+
+    @pytest.mark.parametrize("script_root", ["//evil.example", "/a b", "/x;path=/", "/../up", "calibre"])
+    def test_an_unexpected_prefix_falls_back_to_the_root_path(self, served, endpoint, script_root):
+        # The prefix is request-derived (X-Script-Name / X-Forwarded-Prefix) and goes
+        # into a Set-Cookie header, so it is sanitised the way the SPA shell's is.
+        run, state = served
+        run(endpoint, {"dl_token": TOKEN}, script_root=script_root)
+        assert state["response"].cookies[0][2]["path"] == "/"

@@ -18,6 +18,16 @@ from flask import Flask, jsonify, request
 import cps.readingservices as rs
 
 
+@pytest.fixture(autouse=True)
+def _kobo_store_proxy_on(monkeypatch):
+    """These cases pin forwarding, which only happens with the store proxy on.
+
+    With it off, checkforchanges is answered locally (#2958,
+    test_2958_proxy_off_checkforchanges.py).
+    """
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", True, raising=False)
+
+
 ACK = "I_UNDERSTAND_THIS_CAPTURES_PRIVATE_READING_DATA"
 OWNED = "9e5251ad-d530-4e58-9121-8b8336099fdd"
 FOREIGN = "kobo-store-content"
@@ -265,6 +275,35 @@ def test_real_checkforchanges_route_captures_actual_filtered_upstream_and_device
     ]
     assert all("secret" not in json.dumps(record).lower() for _ in [0])
     assert capture.enabled() is True
+
+
+@pytest.mark.unit
+def test_checkforchanges_capture_records_local_suppression_with_store_proxy_off(
+    monkeypatch, tmp_path,
+):
+    _, root = _enable(monkeypatch, tmp_path)
+    monkeypatch.setattr(rs.config, "config_kobo_proxy", False)
+    monkeypatch.setattr(rs, "_capture_authority_status", lambda _ownership: None)
+
+    def unexpected_proxy(**_kwargs):
+        pytest.fail("store proxy is off")
+
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", unexpected_proxy)
+    response = _check_app(monkeypatch).test_client().post(
+        "/api/v3/content/checkforchanges",
+        json=[{"ContentId": OWNED}, {"ContentId": FOREIGN}],
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == []
+    [record] = _records(root)
+    assert record["upstream_request"] is None
+    assert record["upstream_response"] is None
+    assert record["device_response"]["body"]["data"].encode() == response.get_data()
+    assert [(item["content_id"], item["action"]) for item in record["decisions"]] == [
+        (OWNED, "suppressed"),
+        (FOREIGN, "suppressed"),
+    ]
 
 
 @pytest.mark.unit

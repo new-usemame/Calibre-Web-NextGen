@@ -17,7 +17,7 @@ from ..cw_login import current_user
 from ..cw_babel import sanitize_locale_for_write
 from .options import locale_options, book_language_options
 from ..usermanagement import login_required_if_no_ano
-from ..helper import (valid_email, check_email, check_username, valid_password,
+from ..helper import (send_test_mail, valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
 from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slug, theme_code
 from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
@@ -306,6 +306,13 @@ def _ui_config_payload():
     }
 
 
+def _mail_configured():
+    try:
+        return bool(config.get_mail_server_configured())
+    except Exception:
+        return False
+
+
 def _mail_payload():
     """Mail settings for the SPA form. The password is WRITE-ONLY — never
     returned; only whether one is set."""
@@ -319,6 +326,12 @@ def _mail_payload():
         "mail_filename_template": getattr(config, "mail_filename_template", "") or "",
         "mail_server_type": config.mail_server_type,
         "has_password": bool(getattr(config, "mail_password_e", None)),
+        # What the rest of the app gates on (Send to e-reader, password reset),
+        # so the form can say whether the saved settings actually count (#2771).
+        "mail_configured": _mail_configured(),
+        # Gmail OAuth is authorised only on the classic page; the form can only
+        # offer to leave it for SMTP, so it needs to know whether it is live.
+        "gmail_authorised": bool(getattr(config, "mail_gmail_token", None)),
     }
 
 
@@ -348,6 +361,8 @@ def admin_update_mail():
             validate_mail_filename_template(template)
         except ValueError as error:
             return _err("invalid_request", str(error), 400)
+    if "mail_server_type" in data and type(data["mail_server_type"]) not in (int, str):
+        return _err("invalid_request", "mail_server_type must be 0 (SMTP) or 1 (Gmail OAuth)", 400)
     numeric = {}
     for key in ("mail_port", "mail_use_ssl", "mail_server_type"):
         if key in data:
@@ -355,6 +370,8 @@ def admin_update_mail():
                 numeric[key] = int(data[key])
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
+    if "mail_server_type" in numeric and numeric["mail_server_type"] not in (0, 1):
+        return _err("invalid_request", "mail_server_type must be 0 (SMTP) or 1 (Gmail OAuth)", 400)
     if "mail_size_mb" in data:
         try:
             numeric["mail_size"] = int(data["mail_size_mb"]) * 1024 * 1024
@@ -374,6 +391,26 @@ def admin_update_mail():
     except Exception as ex:
         return _err("db_error", "Could not save mail settings: %s" % ex, 500)
     return jsonify(_mail_payload())
+
+
+@api_v1.route("/admin/mailsettings/test", methods=["POST"])
+@login_required_if_no_ano
+def admin_send_test_mail():
+    """Queue a test email to the signed-in admin's own address (#2771), as the
+    classic page's "Save and Send Test Email" does. Never takes a recipient, so
+    it cannot be used to send mail to anyone else."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    if not _mail_configured():
+        return _err("mail_not_configured", "Mail is not configured yet", 409)
+    if not current_user.email:
+        return _err("email_required", "Set your own email address on the Account page first", 409)
+    result = send_test_mail(current_user.email, current_user.name)
+    if result is not None:
+        return _err("send_failed", "There was an error sending the test email: %s" % result, 500)
+    return jsonify({"ok": True, "email": current_user.email,
+                    "message": "Test email queued for %s, check Tasks for the result" % current_user.email}), 202
 
 
 @api_v1.route("/admin/config")

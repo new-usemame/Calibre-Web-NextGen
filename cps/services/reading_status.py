@@ -34,7 +34,7 @@ def update_automatic_read_status(book_read, status, *, observed_clock=None,
     """
     table = ub.ReadBook.__table__
     fields = ("read_status", "last_modified", "times_started_reading",
-              "last_time_started_reading", "read_status_choice_at")
+              "last_time_started_reading", "read_status_choice_at", "read_finished_at")
     if require_newer_clock and observed_clock is None:
         ub.session.expire(book_read, fields)
         return False
@@ -61,6 +61,10 @@ def update_automatic_read_status(book_read, status, *, observed_clock=None,
     # the ORM column's onupdate default. Paused rows never match the statement.
     result = ub.session.execute(update(table).where(*conditions).values(
         read_status=status,
+        read_finished_at=case(
+            (and_(changed, status == ub.ReadBook.STATUS_FINISHED), clock),
+            (status != ub.ReadBook.STATUS_FINISHED, None),
+            else_=table.c.read_finished_at),
         last_modified=clock if touch_unchanged else case(
             (changed, clock), else_=table.c.last_modified),
         times_started_reading=case(

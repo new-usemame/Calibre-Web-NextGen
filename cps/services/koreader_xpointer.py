@@ -321,6 +321,48 @@ def spine_solid_texts(epub_path) -> Optional[tuple]:
     return _resolve(epub_path, run)
 
 
+# Elements whose text CrossPoint does not count (VisibleTextUtils.h).
+_UNCOUNTED = frozenset({"head", "style", "script", "title", "rp"})
+
+
+def solid_index_of_visible_offset(epub_path, fragment: int,
+                                  offset: int) -> Optional[tuple]:
+    """``(member, solid index)`` of a CrossPoint text offset, or None.
+
+    ``offset`` is CrossPoint's position counter in DocFragment ``fragment``:
+    every code point of the <body> character data, whitespace-only text
+    included, outside the elements of ``_UNCOUNTED``
+    (ChapterHtmlSlimParser::characterData). The solid index is the number of
+    non-whitespace characters before that point, as ``spine_solid_texts``
+    counts them.
+    """
+    def run(book):
+        item = next((i for i in book.items if i.fragment == fragment), None)
+        chapter = _parsed_chapter(book, item) if item is not None else None
+        if chapter is None:
+            return None
+        seen = solid = 0
+
+        def walk(el, hidden):
+            nonlocal seen, solid
+            for child in _raw_children(el):
+                if isinstance(child, str):
+                    if not hidden and seen + len(child) > offset:
+                        return solid + len(child[:offset - seen].translate(_NO_SPACE))
+                    if not hidden:
+                        seen += len(child)
+                    solid += len(child.translate(_NO_SPACE))
+                elif isinstance(child.tag, str):
+                    found = walk(child, hidden or _local(child) in _UNCOUNTED)
+                    if found is not None:
+                        return found
+            return None
+
+        index = walk(chapter.body, False)
+        return None if index is None else (item.member, index)
+    return _resolve(epub_path, run)
+
+
 def xpointer_at_solid_index(epub_path, member: str, index: int,
                             expected: str, *, after: bool = False) -> Optional[str]:
     """XPointer of the ``index``-th non-whitespace character of ``member``.

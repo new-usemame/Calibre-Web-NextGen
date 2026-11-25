@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
+import copy
+import pytest
 import importlib.util
 import pathlib
 import sys
@@ -209,7 +211,7 @@ def _load_editbooks_module(delete_key_calls):
     cps.calibre_db = calibre_db
     cps.db = db
 
-    for name in ("constants", "isoLanguages", "gdriveutils", "uploader"):
+    for name in ("constants", "isoLanguages", "gdriveutils", "hierarchy", "uploader"):
         module = _install_stub(f"cps.{name}")
         setattr(cps, name, module)
 
@@ -275,7 +277,7 @@ def _load_editbooks_module(delete_key_calls):
             "InvalidRequestError": Exception,
         },
     )
-    _install_stub("sqlalchemy.orm")
+    _install_stub("sqlalchemy.orm", {"with_parent": lambda *args, **kwargs: None})
     _install_stub("sqlalchemy.orm.exc", {"StaleDataError": Exception})
     _install_stub("sqlalchemy.sql")
     _install_stub("sqlalchemy.sql.expression", {"func": SimpleNamespace()})
@@ -389,6 +391,56 @@ def _load_duplicates_module(delete_key_calls, *, user_data_commit_result=True):
     sys.modules["cps.duplicates"] = module
     spec.loader.exec_module(module)
     return module, calibre_books, calls
+
+
+@pytest.mark.parametrize('change', ['none', 'new-book', 'strategy', 'edition', 'empty-preview'])
+def test_execute_resolution_only_deletes_the_reviewed_plan(change):
+    """A late import, strategy change or edition edit must require another preview.
+
+    Drives the route through the real planner and deletion orchestrator. A stale
+    plan must fail before backups, user-data migration, tombstones or deletion.
+    """
+    module, books, calls = _load_duplicates_module([])
+    books.update({
+        i: SimpleNamespace(id=i, title='Dune', timestamp=datetime(2024, 1, i),
+                           data=[], path=f'Dune {i}', publishers=[], pubdate=None)
+        for i in (1, 2)
+    })
+    groups = [{'group_hash': 'dune', 'title': 'Dune', 'author': 'Frank Herbert',
+               'books': list(books.values())}]
+    module._get_duplicate_groups_for_resolution = lambda user_id: groups
+    module.request.json = {'strategy': 'newest'}
+    module.request.get_json = lambda **kwargs: module.request.json
+    preview = copy.deepcopy(module.preview_resolution()['args'][0]['preview'])
+    assert preview[0]['kept_book_id'] == 2
+    assert preview[0]['deleted_book_ids'] == [1]
+    assert not any(isinstance(call, tuple) for call in calls), calls
+
+    strategy = 'newest'
+    if change == 'new-book':
+        books[3] = SimpleNamespace(id=3, title='Dune', timestamp=datetime(2024, 1, 3),
+                                   data=[], path='Dune 3', publishers=[], pubdate=None)
+        groups[0]['books'].append(books[3])
+    elif change == 'strategy':
+        strategy = 'oldest'
+    elif change == 'edition':
+        books[1].publishers = [SimpleNamespace(name='A different translation')]
+    elif change == 'empty-preview':
+        preview = []
+    module.request.json = {'strategy': strategy, 'expected_preview': preview}
+    with patch('os.path.exists', return_value=False), patch('os.makedirs') as mkdir:
+        result = module.execute_resolution()['args'][0]
+    deletions = [call for call in calls if isinstance(call, tuple) and call[0] == 'whole']
+    if change == 'none':
+        assert result['success'] is True, result
+        assert deletions == [('whole', 1)]
+    else:
+        assert result['success'] is False, result
+        assert result['deleted_count'] == 0
+        assert deletions == []
+        assert not any(isinstance(call, tuple) for call in calls), calls
+        mkdir.assert_not_called()
+    assert not module._AUTO_RESOLVE_LOCK.locked()
 
 
 def test_delete_book_from_table_whole_book_refreshes_only_the_affected_groups():

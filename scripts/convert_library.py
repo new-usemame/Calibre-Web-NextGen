@@ -775,7 +775,9 @@ class LibraryConverter:
 
     def set_library_permissions(self):
         label = f"[convert-library]: ({self.current_book}/{len(self.to_convert)})"
-        if service_user.chown_to_service_user(self.library_dir, label, log=print_and_log):
+        if service_user.chown_to_service_user(
+            self.library_dir, label, log=print_and_log, skip_matching=True
+        ):
             print_and_log(f"{label} Successfully set ownership of new files in {self.library_dir}.")
 
 

@@ -89,7 +89,8 @@ def _device_annotations_predicate(device):
     Both branches produce a boolean even for NULL provenance, so negating this
     predicate also finds legacy rows outside the device's original sources.
     """
-    legacy_sources = ("koreader", "textquote") if device.kind == "koreader" else ()
+    legacy_sources = (("koreader", "textquote", "crosspoint")
+                      if device.kind == "koreader" else ())
     return or_(
         and_(ub.Annotation.origin_device_id.isnot(None),
              ub.Annotation.origin_device_id == device.id),
@@ -295,7 +296,8 @@ def apply_push(annotations, *, user, book, session, commit,
             allowed.append(payload)
     annotations = allowed
     placed = _place_quotes(annotations, epub_path,
-                           _anchored_elsewhere(annotations, user=user, book=book, session=session))
+                           _anchored_elsewhere(annotations, user=user, book=book, session=session,
+                                               authority=authority))
     if placed is not None:
         annotations, summary["resolved"], summary["unresolved"] = placed
     if rejected_quotes:
@@ -340,12 +342,14 @@ def _has_native_anchor(payload) -> bool:
     return bool(payload.get("start_xpointer") or payload.get("start_kobospan"))
 
 
-def _anchored_elsewhere(annotations, *, user, book, session) -> set:
+def _anchored_elsewhere(annotations, *, user, book, session, authority) -> set:
     """Ids of quoted rows another reader already anchors: never re-placed.
 
     A client may send back a quote for another reader's highlight (an edited
     note). Placing it would replace that reader's own anchor -- a web CFI, a
-    KoboSpan -- with the client's idea of the words.
+    KoboSpan -- with the client's idea of the words. A CrossPoint clipping is
+    another reader's row for every push without the ``crosspoint`` authority
+    of the clippings route, also when it has no anchor.
     """
     ids = {
         payload.get("annotation_id") for payload in annotations
@@ -354,14 +358,17 @@ def _anchored_elsewhere(annotations, *, user, book, session) -> set:
     }
     if not ids:
         return set()
+    from ...services.annotation_portable import QUOTE_SOURCES
+    own = QUOTE_SOURCES if "crosspoint" in authority else QUOTE_SOURCES - {"crosspoint"}
     rows = session.query(ub.Annotation).filter(
         ub.Annotation.user_id == user.id, ub.Annotation.book_id == book.id,
         ub.Annotation.annotation_id.in_(sorted(ids)),
-        ub.Annotation.source != "textquote",
+        ~ub.Annotation.source.in_(sorted(own)),
     ).all()
     return {
         row.annotation_id for row in rows
-        if row.start_xpointer or row.start_container_path or row.cfi_range
+        if row.source == "crosspoint"
+        or row.start_xpointer or row.start_container_path or row.cfi_range
     }
 
 
@@ -737,8 +744,20 @@ def push_annotations():
         delete_source = "koreader"
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
+        existing_source = None
+        if isinstance(payload, dict) and payload.get("source") == "crosspoint":
+            aid = payload.get("annotation_id")
+            if isinstance(aid, str):
+                # Legacy pulls include shared CrossPoint clippings. Accept an
+                # echo of this book's existing row, never creation without the
+                # firmware layout sidecar that only the clippings route owns.
+                existing_source = ub.session.query(ub.Annotation.source).filter(
+                    ub.Annotation.user_id == user.id,
+                    ub.Annotation.book_id == book.id,
+                    ub.Annotation.annotation_id == aid.strip(),
+                ).scalar()
         error = validate_portable_payload(
-            payload, book_uuid=getattr(book, "uuid", None),
+            payload, book_uuid=getattr(book, "uuid", None), existing_source=existing_source,
         )
         if error:
             return _reject(user, document, "invalid_annotation",

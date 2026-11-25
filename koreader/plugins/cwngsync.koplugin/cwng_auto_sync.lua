@@ -50,6 +50,7 @@ local ANNOTATION_WATERMARK_KEY = "cwasync_pushed_annotation_ids"
 -- After waking, the device takes a few seconds to rejoin Wi-Fi by itself.
 local ONLINE_RETRY_DELAYS = { 3, 10, 30 }
 local ONLINE_DEBOUNCE = 20
+local DELIVERY_CHECK_INTERVAL = 5 * 60
 
 -- One delivery run at a time, whichever plugin instance (library or reader)
 -- started it.
@@ -383,6 +384,30 @@ function AutoSync:flushPending(on_done)
     nextEntry()
 end
 
+-- Checking the delivery queue scans the device and uploads its inventory.
+-- A tiny timestamp on disk shares the cooldown across book opens and restarts.
+function AutoSync:checkDeliveriesIfDue()
+    -- Wi-Fi may have disconnected while the pending reading updates flushed.
+    if not NetworkMgr:isConnected() then return end
+    local owner = require("ffi/sha2").md5(self:accountOwner())
+    local path = require("datastorage"):getSettingsDir() .. "/cwngsync_delivery_" .. owner
+    local now = os.time()
+    local stamp = io.open(path, "rb")
+    if stamp then
+        local bytes = stamp:read(20)
+        stamp:close()
+        local last = tonumber(bytes)
+        if last and now >= last and now - last < DELIVERY_CHECK_INTERVAL then return end
+    end
+    -- A read-only/full settings directory must still allow a delivery check.
+    stamp = io.open(path, "wb")
+    if stamp then
+        stamp:write(tostring(now))
+        stamp:close()
+    end
+    self:collectDeliveries(false, false)
+end
+
 -- The device is online: deliver what is owed, then bring things in.
 function AutoSync:onDeviceOnline(force)
     if not self:isConfigured() or not NetworkMgr:isConnected() then return end
@@ -399,7 +424,7 @@ function AutoSync:onDeviceOnline(force)
         end
         if library then self:syncLibrary({}) end
         self:syncDeviceCapabilities(false, false)
-        self:collectDeliveries(false, false)
+        self:checkDeliveriesIfDue()
     end)
 end
 

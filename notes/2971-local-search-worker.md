@@ -17,15 +17,14 @@ Both versions returned the same ordered first-page IDs and the same complete sel
 
 ## Reproduce
 
-The local runtime image was `calibre-web-nextgen:metadata-date-dev` (linux/amd64 image ID `7897679d921c88272d8d1a11a4401fabaa67a104b48561cac4d9e5cd02fe3c18`). The worktree supplies the application source. From this branch, run the two measurements sequentially:
+Build a development image from this branch, then run the same benchmark with the worker off and on. These commands exercise the current trial defaults. The historical comparison above used the inline route at `04e065dae` and a four-slot worker with immediate rejection at capacity.
 
 ```sh
-baseline_dir=$(mktemp -d)
-git show 04e065dae:cps/api/books.py > "$baseline_dir/books.py"
-docker run --rm --network none -v "$PWD:/src:ro" -v "$baseline_dir/books.py:/src/cps/api/books.py:ro" -w /src \
-  --entrypoint python3 calibre-web-nextgen:metadata-date-dev scripts/bench_catalog_search_worker.py
+docker build -t cwng-search-dev .
+docker run --rm --network none -v "$PWD:/src:ro" -w /src \
+  --entrypoint python3 cwng-search-dev scripts/bench_catalog_search_worker.py
 docker run --rm --network none -v "$PWD:/src:ro" -w /src -e CWNG_EXPERIMENTAL_SEARCH_WORKER=1 \
-  --entrypoint python3 calibre-web-nextgen:metadata-date-dev scripts/bench_catalog_search_worker.py
+  --entrypoint python3 cwng-search-dev scripts/bench_catalog_search_worker.py
 ```
 
 The final JSON line contains the ordered page IDs, the idle samples and all ten [search, overlap] pairs in milliseconds, plus burst outcomes. The benchmark creates temporary databases and uses the fixture accounts only inside its disposable container.
@@ -34,7 +33,7 @@ The final JSON line contains the ordered page IDs, the idle samples and all ten 
 
 The route resolves the user's filters and sort on the request greenlet. A single native worker evaluates the count and ordered ID selection in one read transaction on a private SQLite connection with both real databases attached read-only. Reusing the default engine would share the serialized StaticPool connection with the request thread. The worker returns plain IDs. Page hydration, filtering again by the original predicates, and serialization run on the request greenlet. The feature is opt-in and scoped to search on file-backed gevent deployments, for regular pages of 1–500 items and the existing select-all path.
 
-The initial prototype admits four requests including the active search. Beyond that it returns HTTP 503 with a one-second retry hint. The burst comparison includes this load shedding. The single-search comparison has no rejections. Hydration can still execute parts of the search predicate on the hub.
+The initial prototype admitted four requests including the active search. Beyond that it returned HTTP 503 with a one-second retry hint. The burst comparison includes this load shedding. The single-search comparison has no rejections. Hydration can still execute parts of the search predicate on the hub.
 
 The refreshed Python impact map reconciled the GET route to `list_books` and resolved its direct calls to `_catalog_book_query`, `_join_sort`, `_selection_response`, and `_rows_to_items` with high confidence. It reported 306 blind spots in the module, led by unknown receivers or attributes (224) and ambiguous attribute names (46), including ORM query chains. It excludes frontend and template consumers. Historical recall ranges from 12.5% on raw co-changes to 80% on curated module-level pairs. The HTTP measurements exercise paths the static map cannot resolve.
 
@@ -49,10 +48,10 @@ docker run --rm --network none -v "$PWD:/src:ro" -w /src \
   -e CWNG_EXPERIMENTAL_SEARCH_WORKER=1 \
   -e CWNG_EXPERIMENTAL_SEARCH_THREADS=1 -e CWNG_EXPERIMENTAL_SEARCH_ADMISSION=8 \
   -e CWNG_EXPERIMENTAL_SEARCH_SINGLE_SCAN=1 \
-  --entrypoint python3 calibre-web-nextgen:metadata-date-dev scripts/stress_catalog_search_worker.py
+  --entrypoint python3 cwng-search-dev scripts/stress_catalog_search_worker.py
 ```
 
-The admission limit includes active and waiting searches. With the single-scan flag, a default-sort page gets its IDs and exact total from one query using SQLite's window count over distinct visible books. An out-of-range page still computes its exact total. Other sorts and select-all use the original worker queries. Each request reads current database state and there is no cross-request cache.
+The worker defaults off. When enabled, the trial defaults are one thread and eight admitted searches, including searches queued for the thread. A request that finds all slots occupied waits cooperatively for up to 250 ms. If no slot opens, it receives HTTP 503 with a one-second retry hint. The measurements below predate this grace period. With the single-scan flag, a default-sort page gets its IDs and exact total from one query using SQLite's window count over distinct visible books. An out-of-range page still computes its exact total. Other sorts and select-all use the original worker queries. Each request reads current database state and there is no cross-request cache.
 
 ### Results on the 126,000-book fixture
 

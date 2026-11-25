@@ -12,6 +12,8 @@ class SearchBusy(Exception):
     pass
 
 
+# Give an already-admitted search a short chance to finish during bursts.
+_ADMISSION_WAIT_SECONDS = 0.25
 _pool = None
 _admission = None
 
@@ -57,12 +59,12 @@ def select_page(session, count, page, environ, *, combined=None):
     global _pool, _admission
     if _pool is None:
         workers = int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_THREADS", "1"))
-        admitted = int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_ADMISSION", "4"))
+        admitted = int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_ADMISSION", "8"))
         if not 1 <= workers <= admitted <= 32:
             raise ValueError("Expected 1 <= search threads <= search admission <= 32")
         _pool = ThreadPool(workers)
         _admission = BoundedSemaphore(admitted)
-    if not _admission.acquire(blocking=False):
+    if not _admission.acquire(timeout=_ADMISSION_WAIT_SECONDS):
         raise SearchBusy
     try:
         return _pool.apply(_read, (paths, count, page, combined))

@@ -112,7 +112,7 @@ def scenario(root):
         result = {"phase": phase, "seconds": seconds,
                   "worker": os.environ.get("CWNG_EXPERIMENTAL_SEARCH_WORKER") == "1",
                   "threads": int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_THREADS", "1")),
-                  "admission": int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_ADMISSION", "4")),
+                  "admission": int(os.environ.get("CWNG_EXPERIMENTAL_SEARCH_ADMISSION", "8")),
                   "single_scan": os.environ.get("CWNG_EXPERIMENTAL_SEARCH_SINGLE_SCAN") == "1",
                   "probe_path": probe_path}
         deadline = start + seconds

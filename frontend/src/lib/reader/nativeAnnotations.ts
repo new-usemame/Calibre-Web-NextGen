@@ -123,6 +123,18 @@ function exactRange(document: Document, nodes: Text[], start: number, end: numbe
   return null;
 }
 
+/** epub.js loads chapters as XML (application/xhtml+xml) but the rendition shows
+ * the serialized section through an HTML-parsed iframe. The HTML parser adds
+ * implied elements (<table><tr> gains a <tbody>), which shifts CFI steps. Build
+ * ranges and CFIs in the same DOM the rendition will resolve them against.
+ */
+function renderedDocument(document: Document): Document {
+  if (!/xml/i.test(document.contentType)) return document;
+  try {
+    return new DOMParser().parseFromString(new XMLSerializer().serializeToString(document), 'text/html');
+  } catch { return document; }
+}
+
 export async function resolveNativeAnnotations(
   book: Book, rows: NativeAnnotation[], cancelled: () => boolean = () => false,
 ): Promise<Map<string, string>> {
@@ -147,7 +159,7 @@ export async function resolveNativeAnnotations(
       let nodes: Text[];
       let text: string;
       try {
-        document = await book.load(section.url);
+        document = renderedDocument(await book.load(section.url));
         ({ nodes, text } = readingText(document));
       } catch { complete = false; continue; }
       if (cancelled()) return new Map();

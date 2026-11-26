@@ -11,13 +11,16 @@ const webCfi = 'epubcfi(/6/2!/4/2[existing],/1:0,/1:20)';
 const foreignCfi = 'epubcfi(/6/4!/4/2[wrapper]/2[kobo.15.1],/1:15,/1:63)';
 const initialBookmark = 'epubcfi(/6/2!/4/2[existing]/1:0)';
 
-async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false) {
+const tableQuote = 'Alpha1893';
+
+async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false, table = false) {
+  const text = table ? tableQuote : quote;
   const precedingText = longChapter ? Array.from({ length: 40 }, (_, i) =>
     `<p>Paragraph ${i}: The reader continues across the page through a quiet landscape, with another sentence to fill this passage.</p>`,
   ).join('') : '';
   const epub = archive([
     '<p id="existing">Existing web passage remains.</p>' + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : duplicate ? `<p>${quote}</p>` : ''),
-    precedingText + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
+    precedingText + (table ? '<table><tr><td>Alpha</td><td>1893</td></tr></table>' : nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
   ]);
   const list = await (await page.request.get('/api/v1/books?per_page=1')).json();
   const id = list.items[0].id;
@@ -48,8 +51,8 @@ async function openFixture(page: Page, duplicate = false, nativeSpans = false, l
         highlighted_text: overlappingWebCfi ? quote : 'Existing web passage', highlight_color: 'yellow', source: 'webreader' },
       { annotation_id: 'native', cfi_range: foreignCfi, start_kobospan: 'kobo.15.1',
         content_id: nativeSpans ? 'fixture!!OPS/part1/chapter.xhtml' : null,
-        start_offset: 0, end_offset: quote.length,
-        end_kobospan: 'kobo.15.1', highlighted_text: quote, highlight_color: 'yellow', source: 'kobo' },
+        start_offset: 0, end_offset: text.length,
+        end_kobospan: 'kobo.15.1', highlighted_text: text, highlight_color: 'yellow', source: 'kobo' },
     ], devices: {},
   } }));
   await page.route(`**/annotations/${id}/native`, async (route) => {
@@ -93,6 +96,18 @@ test('native highlight maps into the existing EPUB, preserving web highlights an
     expect((write as { bookmark: string }).bookmark.split('!')[0])
       .toBe(initialBookmark.split('!')[0]);
   }
+  expect(errors).toEqual([]);
+});
+
+test('a native highlight inside a table is drawn despite the HTML parser\'s implied tbody (#3045)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await openFixture(page, false, false, false, true);
+  await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
+  const jump = page.getByRole('button', { name: `${tableQuote} kobo`, exact: true });
+  await expect(jump).toBeEnabled();
+  await jump.click();
+  await expect(page.locator('[data-id="native"] rect').first()).toBeAttached();
   expect(errors).toEqual([]);
 });
 

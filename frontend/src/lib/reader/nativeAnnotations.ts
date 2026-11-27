@@ -130,9 +130,10 @@ function exactRange(document: Document, nodes: Text[], start: number, end: numbe
  */
 function renderedDocument(document: Document): Document {
   if (!/xml/i.test(document.contentType)) return document;
-  try {
-    return new DOMParser().parseFromString(new XMLSerializer().serializeToString(document), 'text/html');
-  } catch { return document; }
+  // epub.js serializes the root element, leaving out the XML prolog and
+  // doctype. Passing those to the HTML parser can change the body tree.
+  const markup = new XMLSerializer().serializeToString(document.documentElement);
+  return new DOMParser().parseFromString(markup, 'text/html');
 }
 
 export async function resolveNativeAnnotations(

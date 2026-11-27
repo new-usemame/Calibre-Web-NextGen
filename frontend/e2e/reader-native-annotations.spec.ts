@@ -6,14 +6,14 @@ import ts from 'typescript';
 
 const quote = 'a native passage spans nodes.';
 const builder = fileURLToPath(new URL('../../tests/fixtures/reader_archive.py', import.meta.url));
-const archive = (chapters: string[]) => execFileSync('python3', [builder], { input: JSON.stringify(chapters) });
+const archive = (chapters: string[], prolog = '') => execFileSync('python3', [builder, prolog], { input: JSON.stringify(chapters) });
 const webCfi = 'epubcfi(/6/2!/4/2[existing],/1:0,/1:20)';
 const foreignCfi = 'epubcfi(/6/4!/4/2[wrapper]/2[kobo.15.1],/1:15,/1:63)';
 const initialBookmark = 'epubcfi(/6/2!/4/2[existing]/1:0)';
 
 const tableQuote = 'Alpha1893';
 
-async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false, table = false) {
+async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false, table = false, prolog = '') {
   const text = table ? tableQuote : quote;
   const precedingText = longChapter ? Array.from({ length: 40 }, (_, i) =>
     `<p>Paragraph ${i}: The reader continues across the page through a quiet landscape, with another sentence to fill this passage.</p>`,
@@ -21,7 +21,7 @@ async function openFixture(page: Page, duplicate = false, nativeSpans = false, l
   const epub = archive([
     '<p id="existing">Existing web passage remains.</p>' + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : duplicate ? `<p>${quote}</p>` : ''),
     precedingText + (table ? '<table><tr><td>Alpha</td><td>1893</td></tr></table>' : nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
-  ]);
+  ], prolog);
   const list = await (await page.request.get('/api/v1/books?per_page=1')).json();
   const id = list.items[0].id;
   const bytesRequested: string[] = [];
@@ -109,6 +109,13 @@ test('a native highlight inside a table is drawn despite the HTML parser\'s impl
   await jump.click();
   await expect(page.locator('[data-id="native"] rect').first()).toBeAttached();
   expect(errors).toEqual([]);
+});
+
+test('an XHTML prolog cannot shift an ordinary native highlight in the reader', async ({ page }) => {
+  await openFixture(page, false, false, true, false, '<?publisher value > secondary?>');
+  await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
+  await page.getByRole('button', { name: `${quote} kobo`, exact: true }).click();
+  await expect(page.locator('[data-id="native"] rect').first()).toBeInViewport();
 });
 
 test('ambiguous native quote remains readable without using its foreign CFI', async ({ page }) => {

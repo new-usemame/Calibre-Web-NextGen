@@ -20,6 +20,9 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **More of the app is available in Simplified Chinese.** This includes cover recovery, Hardcover review and custom-value controls. Thanks to @systemannounce in #3042.
+
+
 - **Opening several books in KOReader no longer scans the device library each time.** Automatic delivery checks share a five-minute interval across the reader and file browser. Manual collection stays immediate, and the server processes large inventory reports in batches.
 
 - **Metadata sources now distinguish empty searches from service failures (#3025).** Google Books, Open Library and Deutsche Nationalbibliothek report failures through the existing source status messages. Reported by @Rol3333.

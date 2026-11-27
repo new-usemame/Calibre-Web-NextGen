@@ -644,10 +644,6 @@ msgstr "已更新计划任务设置"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "发生一个未知错误，请稍后再试"
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "标题"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2347,10 +2343,6 @@ msgstr "智能书架"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "整理在智能书架中的书籍"
-
-#: cps/opds.py
-msgid "description"
-msgstr "简介"
 
 #: cps/opds.py
 #, python-format
@@ -5030,9 +5022,10 @@ msgid ""
 "percentage, so the page Hardcover shows changes. The Kobo keeps its own "
 "value."
 msgstr ""
-"默认关闭。启用后，如果此 Kobo 当前存储的是该 KEPUB，系统将同步 CrossPoint 显示的阅读百分比，"
-"而不是 Kobo 报告的整数百分比。KOReader、CrossPoint、Hardcover 和书籍页面都会使用该百分比，"
-"因此 Hardcover 页面显示的阅读进度也会随之变化。Kobo 自身保存的数值不受影响。"
+"默认关闭。启用后，如果此 Kobo 当前存储的是该 KEPUB，系统将同步 CrossPoint 显"
+"示的阅读百分比，而不是 Kobo 报告的整数百分比。KOReader、CrossPoint、"
+"Hardcover 和书籍页面都会使用该百分比，因此 Hardcover 页面显示的阅读进度也会随"
+"之变化。Kobo 自身保存的数值不受影响。"
 
 #: cps/spa_strings.py
 msgid "Books on this device"
@@ -5056,8 +5049,8 @@ msgid ""
 "ticked here adds no books. An administrator can turn on Sync smart shelves "
 "in the settings."
 msgstr ""
-"此服务器未启用智能书架同步，因此在此勾选智能书架不会向设备添加任何书籍。"
-"管理员可以在设置中开启智能书架同步。"
+"此服务器未启用智能书架同步，因此在此勾选智能书架不会向设备添加任何书籍。管理"
+"员可以在设置中开启智能书架同步。"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5099,8 +5092,8 @@ msgid ""
 "Kobo and in KOReader? Your read status is not changed. A device that still "
 "holds its own position can send it back the next time it syncs."
 msgstr ""
-"要清除您在网页阅读器、Kobo 和 KOReader 中保存的「{title}」阅读位置吗？"
-"您的阅读状态不会改变。仍保留该位置的设备可能会在下次同步时将其重新上传到服务器。"
+"要清除您在网页阅读器、Kobo 和 KOReader 中保存的「{title}」阅读位置吗？您的阅"
+"读状态不会改变。仍保留该位置的设备可能会在下次同步时将其重新上传到服务器。"
 
 #: cps/spa_strings.py
 msgid "Reading position cleared."
@@ -5199,8 +5192,8 @@ msgid ""
 "A value created beside another stays on the same level, so its name cannot "
 "contain a dot. Use the Create new button for a sub-value."
 msgstr ""
-"在另一个值旁边创建的新值会处于同一级别，因此名称中不能包含点号。"
-"若要创建子值，请使用“新建”按钮。"
+"在另一个值旁边创建的新值会处于同一级别，因此名称中不能包含点号。若要创建子"
+"值，请使用“新建”按钮。"
 
 #: cps/spa_strings.py
 msgid "API endpoint"
@@ -7217,16 +7210,16 @@ msgid ""
 "Gmail (OAuth) is selected but not authorised, so mail is switched off. Use "
 "standard SMTP below, or authorise Gmail in the classic settings."
 msgstr ""
-"已选择 Gmail (OAuth)，但尚未完成授权，因此邮件发送已关闭。"
-"请改用下方的标准 SMTP，或在经典版设置中授权 Gmail。"
+"已选择 Gmail (OAuth)，但尚未完成授权，因此邮件发送已关闭。请改用下方的标准 "
+"SMTP，或在经典版设置中授权 Gmail。"
 
 #: cps/spa_strings.py
 msgid ""
 "Mail currently sends through Gmail (OAuth), which is set up in the classic "
 "settings. The SMTP settings below are not used."
 msgstr ""
-"当前通过 Gmail (OAuth) 发送邮件，该服务在经典设置中配置。"
-"下方的 SMTP 设置不会生效。"
+"当前通过 Gmail (OAuth) 发送邮件，该服务在经典设置中配置。下方的 SMTP 设置不会"
+"生效。"
 
 #: cps/spa_strings.py
 msgid "Use standard SMTP instead"
@@ -7295,14 +7288,16 @@ msgid ""
 "the value. To move a value, tick it and press Cut, then tick the value it "
 "should go under and press Paste."
 msgstr ""
-"每项操作都针对其所在行的值。重命名会同时重命名该值下的所有子值。"
-"若要移动某个值，请勾选它并点击“剪切”，再勾选它要移入的目标值，并点击“粘贴”。"
+"每项操作都针对其所在行的值。重命名会同时重命名该值下的所有子值。若要移动某个"
+"值，请勾选它并点击“剪切”，再勾选它要移入的目标值，并点击“粘贴”。"
 
 #: cps/spa_strings.py
 msgid ""
 "Every action is on the row it applies to. To merge, tick two or more values, "
 "then use Merge on the one that should survive."
-msgstr "每项操作都针对其所在行的值。若要合并，请勾选两个或更多值，然后在要保留的值上点击“合并”。"
+msgstr ""
+"每项操作都针对其所在行的值。若要合并，请勾选两个或更多值，然后在要保留的值上"
+"点击“合并”。"
 
 #: cps/spa_strings.py
 msgid "Enter the value to match."
@@ -8994,9 +8989,9 @@ msgid ""
 "rule covers stay as they are. Nothing changes in the library until you apply "
 "the preview."
 msgstr ""
-"每个字段对应一个映射。规则可将某个值转换为另一个值（重命名）、多个值（拆分）或不保留任何值（移除）；"
-"匹配时不区分大小写和重音符号。未被规则覆盖的值将保持不变。"
-"在应用预览结果之前，书库不会发生任何更改。"
+"每个字段对应一个映射。规则可将某个值转换为另一个值（重命名）、多个值（拆分）"
+"或不保留任何值（移除）；匹配时不区分大小写和重音符号。未被规则覆盖的值将保持"
+"不变。在应用预览结果之前，书库不会发生任何更改。"
 
 #: cps/spa_strings.py
 msgid "Only values without a rule"
@@ -10985,7 +10980,9 @@ msgstr "所选列不可用。导入前请选择其他目标，或禁用文件夹
 msgid ""
 "The selected values are removed from {count} book(s). The books are kept — "
 "they simply lose the value. There is no undo."
-msgstr "所选值将从 {count} 本书中移除。书籍本身会保留，只是不再包含该值。此操作无法撤销。"
+msgstr ""
+"所选值将从 {count} 本书中移除。书籍本身会保留，只是不再包含该值。此操作无法撤"
+"销。"
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -11084,7 +11081,9 @@ msgstr "无法刷新这些设置，显示内容可能已过期。"
 msgid ""
 "These values are folded into {name}. Their books keep a value, but the "
 "values themselves are gone. There is no undo."
-msgstr "这些值将合并到 {name} 中。相关书籍仍会保留一个值，但原有值将被删除。此操作无法撤销。"
+msgstr ""
+"这些值将合并到 {name} 中。相关书籍仍会保留一个值，但原有值将被删除。此操作无"
+"法撤销。"
 
 #: cps/spa_strings.py cps/templates/index.html cps/web.py
 msgid "This Discover source is unavailable. Choose another source."
@@ -12399,7 +12398,9 @@ msgstr "查找书籍所在文件夹中有 cover.jpg、但被标记为无封面�
 msgid ""
 "A cover that was removed on purpose in the book editor also looks like this. "
 "Select only the books whose cover you want back."
-msgstr "在书籍编辑器中被你主动移除封面的书籍也会出现在这里。所以请只选择你想恢复封面的书籍。"
+msgstr ""
+"在书籍编辑器中被你主动移除封面的书籍也会出现在这里。所以请只选择你想恢复封面"
+"的书籍。"
 
 #: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid "Scan library"
@@ -12464,9 +12465,8 @@ msgid ""
 "library themselves. Not available once an account already syncs books to a "
 "Kobo."
 msgstr ""
-"选择「我的书库」时适用。"
-"用户需要自行从全局书库中添加图书。"
-"如果账号已将图书同步到 Kobo，则无法使用此功能。"
+"选择「我的书库」时适用。用户需要自行从全局书库中添加图书。如果账号已将图书同"
+"步到 Kobo，则无法使用此功能。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12474,14 +12474,13 @@ msgid ""
 "Give {name} an empty My Library? They start with no books and add what they "
 "want from the global library."
 msgstr ""
-"要为 {name} 创建一个空的「我的书库」吗？"
-"其中不会包含任何图书，用户可以自行从全局书库中添加所需的图书。"
+"要为 {name} 创建一个空的「我的书库」吗？其中不会包含任何图书，用户可以自行从"
+"全局书库中添加所需的图书。"
 
 #: cps/spa_strings.py
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
-msgstr ""
-"需要「浏览全局书库」权限，否则用户无法自行添加书籍。"
+msgstr "需要「浏览全局书库」权限，否则用户无法自行添加书籍。"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
@@ -14392,7 +14391,9 @@ msgstr "移除 {name}？书籍会保留，只会移除该值。此操作无法�
 msgid ""
 "Renaming renames everything below the value. To move one, tick it and press "
 "Cut, then tick the value it should go under and press Paste."
-msgstr "重命名会同时重命名该值下的所有内容。若要移动某个值，请勾选它并点击“剪切”，再勾选它要移入的目标值，并点击“粘贴”。"
+msgstr ""
+"重命名会同时重命名该值下的所有内容。若要移动某个值，请勾选它并点击“剪切”，再"
+"勾选它要移入的目标值，并点击“粘贴”。"
 
 #: cps/templates/cc_value_editor.html
 msgid ""
@@ -15658,9 +15659,8 @@ msgid ""
 "without that preference infer the hierarchy from their values. Choose an "
 "explicit mode to override it for this website."
 msgstr ""
-"自动：遵循 Calibre 中的层级偏好设置。"
-"对于没有该偏好设置的旧书库，会根据值推断层级。"
-"选择明确的模式可覆盖此设置，仅对本网站生效。"
+"自动：遵循 Calibre 中的层级偏好设置。对于没有该偏好设置的旧书库，会根据值推断"
+"层级。选择明确的模式可覆盖此设置，仅对本网站生效。"
 
 #: cps/templates/config_view_edit.html
 msgid "Always a hierarchy"
@@ -16415,8 +16415,9 @@ msgid ""
 "This matches Calibre's own 'Preserve cover aspect ratio' option. Applies to "
 "covers written from now on; KEPUB files are not changed."
 msgstr ""
-"封面与元数据写入服务将新封面写入 EPUB 时，封面页会保留图片的原始宽高比，避免拉伸图片来填满屏幕。"
-"此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。仅对之后写入的封面生效，KEPUB 文件不受影响。"
+"封面与元数据写入服务将新封面写入 EPUB 时，封面页会保留图片的原始宽高比，避免"
+"拉伸图片来填满屏幕。此设置与 Calibre 自带的「保留封面图片比例」选项效果一致。"
+"仅对之后写入的封面生效，KEPUB 文件不受影响。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -18361,16 +18362,16 @@ msgid ""
 "Reading progress, read status and annotations only reach Hardcover for books "
 "that carry a Hardcover identifier. These %(total)s book(s) have none."
 msgstr ""
-"只有带有 Hardcover 标识符的书籍，阅读进度、已读状态和批注才能同步到 Hardcover。"
-"这 %(total)s 本书均没有该标识符。"
+"只有带有 Hardcover 标识符的书籍，阅读进度、已读状态和批注才能同步到 "
+"Hardcover。这 %(total)s 本书均没有该标识符。"
 
 #: cps/templates/hardcover_missing_ids.html
 msgid ""
 "Searches Hardcover again for every book listed here, including those waiting "
 "for review. Rejected books are skipped."
 msgstr ""
-"重新搜索此处列出的所有书籍的 Hardcover ID，包括正在等待审核的书籍。"
-"已拒绝的书籍将跳过。"
+"重新搜索此处列出的所有书籍的 Hardcover ID，包括正在等待审核的书籍。已拒绝的书"
+"籍将跳过。"
 
 #: cps/templates/hardcover_missing_ids.html
 msgid "Match again now"
@@ -18380,13 +18381,16 @@ msgstr "立即重新匹配"
 msgid ""
 "Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
-msgstr "Hardcover 同步已禁用。请在“基本配置”中启用，或设置 HARDCOVER_SYNC_ENABLED。"
+msgstr ""
+"Hardcover 同步已禁用。请在“基本配置”中启用，或设置 HARDCOVER_SYNC_ENABLED。"
 
 #: cps/templates/hardcover_missing_ids.html
 msgid ""
 "No Hardcover token available. Set HARDCOVER_TOKEN environment variable or "
 "configure in Basic Configuration."
-msgstr "没有可用的 Hardcover 令牌。请设置 HARDCOVER_TOKEN 环境变量，或在“基本配置”中进行配置。"
+msgstr ""
+"没有可用的 Hardcover 令牌。请设置 HARDCOVER_TOKEN 环境变量，或在“基本配置”中"
+"进行配置。"
 
 #: cps/templates/hardcover_missing_ids.html
 #, python-format
@@ -19931,9 +19935,9 @@ msgid ""
 "and adds what they want from the global library, so they need the global-"
 "browse role. Not available for an account that already syncs books to a Kobo."
 msgstr ""
-"仅在上方选择「我的书库」时生效。"
-"用户的书库初始为空，需要自行从全局书库中添加所需书籍，因此必须拥有「浏览全局书库」权限。"
-"已向 Kobo 同步过书籍的账号无法使用此功能。"
+"仅在上方选择「我的书库」时生效。用户的书库初始为空，需要自行从全局书库中添加"
+"所需书籍，因此必须拥有「浏览全局书库」权限。已向 Kobo 同步过书籍的账号无法使"
+"用此功能。"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -20228,6 +20232,12 @@ msgstr "向 OPDS 开放选定书架"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "显示已读、未读栏目"
+
+#~ msgid "title"
+#~ msgstr "标题"
+
+#~ msgid "description"
+#~ msgstr "简介"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "从您的书库中随机挑选"

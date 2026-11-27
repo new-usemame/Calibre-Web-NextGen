@@ -649,11 +649,6 @@ msgstr ""
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Neznámá chyba. Opakujte prosím později."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Název"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2380,11 +2375,6 @@ msgstr "Chytré police"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Knihy uspořádané v chytrých policích"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Popis"
 
 #: cps/opds.py
 #, python-format
@@ -20051,6 +20041,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Zobrazit výběr sérií"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Název"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Popis"
 
 #~ msgid "Categories"
 #~ msgstr "Kategorie"

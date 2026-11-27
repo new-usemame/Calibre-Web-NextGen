@@ -505,7 +505,9 @@ msgstr ""
 
 #: cps/admin.py cps/spa_strings.py
 msgid "Select at least one book to restore."
-msgstr "Wählen Sie mindestens ein Buch aus, dessen Cover Sie wiederherstellen möchten."
+msgstr ""
+"Wählen Sie mindestens ein Buch aus, dessen Cover Sie wiederherstellen "
+"möchten."
 
 #: cps/admin.py cps/spa_strings.py
 msgid "The selected books do not match this preview. Scan the library again."
@@ -705,10 +707,6 @@ msgid "Oops! An unknown error occurred. Please try again later."
 msgstr ""
 "Ups! Es ist ein unbekannter Fehler aufgetreten. Bitte später erneut "
 "versuchen."
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "Titel"
 
 #: cps/admin.py
 #, python-format
@@ -2546,10 +2544,6 @@ msgstr "Intelligente Regale"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Bücher in intelligenten Regalen"
-
-#: cps/opds.py
-msgid "description"
-msgstr "Beschreibung"
 
 #: cps/opds.py
 #, python-format
@@ -7766,7 +7760,9 @@ msgstr "Geben Sie den Wert ein, der zugeordnet werden soll."
 
 #: cps/spa_strings.py
 msgid "Enter what it becomes, or choose Drop."
-msgstr "Geben Sie mindestens einen Zielwert ein oder aktivieren Sie „Diesen Wert verwerfen“."
+msgstr ""
+"Geben Sie mindestens einen Zielwert ein oder aktivieren Sie „Diesen Wert "
+"verwerfen“."
 
 #: cps/spa_strings.py
 msgid ""
@@ -13300,8 +13296,8 @@ msgstr ""
 msgid ""
 "Needs the global-browse role: without it the user could not add any books."
 msgstr ""
-"Benötigt die Rolle „Globale Bibliothek durchsuchen“: Ohne sie könnte der Benutzer "
-"keine Bücher hinzufügen."
+"Benötigt die Rolle „Globale Bibliothek durchsuchen“: Ohne sie könnte der "
+"Benutzer keine Bücher hinzufügen."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Start My Library empty"
@@ -13922,7 +13918,8 @@ msgstr "Wählen Sie mindestens einen Wert zum Zusammenführen aus"
 
 #: cps/api/cc_values.py
 msgid "Choose the value to merge into"
-msgstr "Wählen Sie den Wert aus, in den die anderen zusammengeführt werden sollen"
+msgstr ""
+"Wählen Sie den Wert aus, in den die anderen zusammengeführt werden sollen"
 
 #: cps/api/cc_values.py
 msgid "Pick valid values to merge"
@@ -21305,8 +21302,8 @@ msgid ""
 msgstr ""
 "Gilt nur, wenn oben „Meine Bibliothek“ gewählt wird. Der Benutzer startet "
 "ohne Bücher und fügt aus der globalen Bibliothek hinzu, was er möchte, daher "
-"benötigt er die Rolle „Globale Bibliothek durchsuchen“. Nicht verfügbar für ein Konto, "
-"das bereits Bücher mit einem Kobo synchronisiert."
+"benötigt er die Rolle „Globale Bibliothek durchsuchen“. Nicht verfügbar für "
+"ein Konto, das bereits Bücher mit einem Kobo synchronisiert."
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -21612,6 +21609,12 @@ msgstr "Ausgewählte Regale für OPDS freigeben"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
+
+#~ msgid "title"
+#~ msgstr "Titel"
+
+#~ msgid "description"
+#~ msgstr "Beschreibung"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Ein paar zufällige Titel aus Ihrer Bibliothek"

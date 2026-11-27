@@ -645,11 +645,6 @@ msgstr ""
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Tapahtui tuntematon virhe. Yritä myöhemmin uudelleen."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Otsikko"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2373,11 +2368,6 @@ msgstr "Älykkäät hyllyt"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Älykkäisiin hyllyihin järjestetyt kirjat"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Kuvaus"
 
 #: cps/opds.py
 #, python-format
@@ -20032,6 +20022,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Näytä sarjavalinta"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Otsikko"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Kuvaus"
 
 #~ msgid "Categories"
 #~ msgstr "Kategoriat"

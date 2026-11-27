@@ -662,11 +662,6 @@ msgstr ""
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Προέκυψε ένα άγνωστο σφάλμα. Παρακαλούμε δοκίμασε ξανά αργότερα."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Τίτλος"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2420,11 +2415,6 @@ msgstr "Έξυπνα ράφια"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Βιβλία οργανωμένα σε έξυπνα ράφια"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Περιγραφή"
 
 #: cps/opds.py
 #, python-format
@@ -20121,6 +20111,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Προβολή επιλογών σειράς"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Τίτλος"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Περιγραφή"
 
 #~ msgid "Categories"
 #~ msgstr "Κατηγορίες"

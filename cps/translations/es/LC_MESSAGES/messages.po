@@ -702,10 +702,6 @@ msgstr ""
 "¡Ups! Ha ocurrido un error desconocido. Por favor, vuelva a intentarlo más "
 "tarde."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "título"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2517,10 +2513,6 @@ msgstr "Estanterías inteligentes"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Libros organizados en estanterías inteligentes"
-
-#: cps/opds.py
-msgid "description"
-msgstr "descripción"
 
 #: cps/opds.py
 #, python-format
@@ -20827,6 +20819,12 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#~ msgid "title"
+#~ msgstr "título"
+
+#~ msgid "description"
+#~ msgstr "descripción"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Una selección aleatoria de tu biblioteca"

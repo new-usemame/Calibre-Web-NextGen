@@ -640,11 +640,6 @@ msgstr ""
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Bilinmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyiniz."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Başlık"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2370,11 +2365,6 @@ msgstr "Akıllı raflar"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Akıllı raflarda düzenlenmiş kitaplar"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Açıklama"
 
 #: cps/opds.py
 #, python-format
@@ -20029,6 +20019,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Seri seçimini göster"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Başlık"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Açıklama"
 
 #~ msgid "Categories"
 #~ msgstr "Kategoriler"

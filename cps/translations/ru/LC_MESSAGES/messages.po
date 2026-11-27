@@ -700,10 +700,6 @@ msgstr "Настройки запланированных заданий обн�
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Неизвестная ошибка. Пожалуйста, попробуйте позже."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "название"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2518,10 +2514,6 @@ msgstr "Смарт-полки"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Книги на смарт-полках"
-
-#: cps/opds.py
-msgid "description"
-msgstr "описание"
 
 #: cps/opds.py
 #, python-format
@@ -21086,6 +21078,12 @@ msgstr "Показывать выбранные полки в OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
+
+#~ msgid "title"
+#~ msgstr "название"
+
+#~ msgid "description"
+#~ msgstr "описание"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Несколько случайных книг из вашей библиотеки"

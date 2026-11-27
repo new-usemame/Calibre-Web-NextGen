@@ -1157,7 +1157,7 @@ msgstr "O arquivo excede %(max)d MB."
 #: cps/annotations.py cps/templates/annotations_view.html
 #, python-format
 msgid "Annotations: %(title)s"
-msgstr "Anotações: %(título)s"
+msgstr "Anotações: %(title)s"
 
 #: cps/constants.py
 msgid "Czech"
@@ -1503,7 +1503,7 @@ msgstr ""
 msgid ""
 "⛔ Neither the Ingest Service or the Metadata Change Detector are running"
 msgstr ""
-"⛔ Nem o serviço de ingestão nem o detetor de alterações de metadados estão em "execução"
+"⛔ Nem o serviço de ingestão nem o detetor de alterações de metadados estão em execução"
 
 #: cps/cwa_functions.py
 msgid "An Error has occurred"
@@ -2935,7 +2935,7 @@ msgstr "Erro ao abrir estante. A estante não existe ou não está acessível"
 #: cps/shelf.py
 #, python-format
 msgid "Invalid order mode: %(mode)s"
-msgstr "Modo de pedido inválido: %(mode)s""
+msgstr "Modo de pedido inválido: %(mode)s"
 
 #: cps/shelf.py
 msgid "Invalid payload: 'order' must be a list"
@@ -2956,7 +2956,7 @@ msgstr "Nome (A → Z)"
 
 #: cps/shelf.py
 msgid "Name (Z → A)"
-msgstr "Nome (Z → A)""
+msgstr "Nome (Z → A)"
 
 #: cps/shelf.py
 msgid "Book count (most → fewest)"
@@ -3047,7 +3047,7 @@ msgid ""
 "warnings; {failed} failed."
 msgstr ""
 "{succeeded} livro(s) eliminado(s) permanentemente; {warnings} eliminado(s) com avisos "
-"de limpeza; {failed} falharam.
+"de limpeza; {failed} falharam."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3324,7 +3324,7 @@ msgid ""
 "Delete \"{title}\" from the global library? The book and all its files are "
 "permanently erased for every member. This cannot be undone."
 msgstr ""
-"Eliminar "{title}" da biblioteca global? O livro e todos os respetivos ficheiros são "
+"Eliminar \"{title}\" da biblioteca global? O livro e todos os respetivos ficheiros são "
 "apagados permanentemente para todos os membros. Esta ação não pode ser anulada."
 
 #: cps/spa_strings.py
@@ -3466,7 +3466,7 @@ msgstr "Pesquisar por “{query}” na biblioteca global, em vez disso"
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
-msgstr "Configurar "Minha Biblioteca" para todos os utilizadores"
+msgstr "Configurar \"Minha Biblioteca\" para todos os utilizadores"
 
 #: cps/spa_strings.py
 msgid ""
@@ -4045,7 +4045,7 @@ msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
 msgstr ""
-"Eliminar "{title}"? Isto remove permanentemente o livro e todos os respetivos ficheiros da "
+"Eliminar \"{title}\"? Isto remove permanentemente o livro e todos os respetivos ficheiros da "
 "sua biblioteca. Esta ação não pode ser anulada."
 
 #: cps/spa_strings.py
@@ -4248,7 +4248,7 @@ msgstr "Perfil guardado."
 
 #: cps/spa_strings.py
 msgid "Public shelf"
-msgstr Estante pública
+msgstr "Estante pública"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/detail.html
@@ -19518,8 +19518,8 @@ msgid "Exclude Extensions"
 msgstr "Excluir extensões"
 
 #: cps/templates/search_form.html
-msgid ""A sua pontuação acima"
-msgstr ""
+msgid "Your rating above"
+msgstr "A sua pontuação acima"
 
 #: cps/templates/search_form.html
 msgid "Rating Above"

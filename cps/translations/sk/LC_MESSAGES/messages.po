@@ -688,10 +688,6 @@ msgstr "Nastavenia naplánovaných úloh boli aktualizované"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Vyskytla sa neočakávaná chyba. Prosím, skúste to opäť neskôr."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "názov"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2486,10 +2482,6 @@ msgstr "Inteligentné police"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Knihy usporiadané v inteligentných policiach"
-
-#: cps/opds.py
-msgid "description"
-msgstr "popis"
 
 #: cps/opds.py
 #, python-format
@@ -20942,6 +20934,12 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid "title"
+#~ msgstr "názov"
+
+#~ msgid "description"
+#~ msgstr "popis"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Niekoľko náhodných kníh z vašej knižnice"

@@ -678,10 +678,6 @@ msgstr "Inställningarna för schemalagda uppgifter har uppdaterats"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ett okänt fel uppstod. Försök igen senare."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titel"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2460,10 +2456,6 @@ msgstr "Smarta hyllor"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Böcker ordnade i smarta hyllor"
-
-#: cps/opds.py
-msgid "description"
-msgstr "beskrivning"
 
 #: cps/opds.py
 #, python-format
@@ -20639,6 +20631,12 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "title"
+#~ msgstr "titel"
+
+#~ msgid "description"
+#~ msgstr "beskrivning"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Några slumpmässiga val från ditt bibliotek"

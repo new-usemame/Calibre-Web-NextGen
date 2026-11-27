@@ -664,11 +664,6 @@ msgstr "Налаштування запланованих завдань оно�
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ой! Сталася невідома помилка. Спробуйте ще раз пізніше."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Заголовок"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2407,11 +2402,6 @@ msgstr "Розумні полиці"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Книги, упорядковані на розумних полицях"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Опис"
 
 #: cps/opds.py
 #, python-format
@@ -20061,6 +20051,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Показувати вибір серії"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Заголовок"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Опис"
 
 #~ msgid "Categories"
 #~ msgstr "Категорії"

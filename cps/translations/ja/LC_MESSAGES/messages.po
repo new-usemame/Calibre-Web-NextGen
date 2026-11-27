@@ -655,11 +655,6 @@ msgstr "スケジュールタスクの設定を更新しました"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "不明なエラーが発生しました。あとで再試行してください。"
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "タイトル"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2424,11 +2419,6 @@ msgstr "スマート本棚"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "スマート本棚に整理された本"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "詳細"
 
 #: cps/opds.py
 #, python-format
@@ -20177,6 +20167,14 @@ msgstr "選択した本棚をKoboと同期"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "既読/未読セクションを表示"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "タイトル"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "詳細"
 
 #~ msgid "Categories"
 #~ msgstr "カテゴリ"

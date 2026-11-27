@@ -172,7 +172,8 @@ jobs:
   # --------------------------------------------------------------------------------
   build-amd64:
     runs-on: ubuntu-latest
-    # ci-time-budget: allow for cold Docker builds with slow package downloads.
+    # ci-time-budget: keep 60m for cold builds. A 30m cap killed two advancing
+    # package installs (#3032). Warm-build samples omit that cold path.
     # On 2026-11-19 the runtime apt layer took 17m46s and the successful
     # job took 19m36s (run 44479897685, job 135409682143).
     # ci-time-budget 2026-11-23: raise 30 -> 60 min; p50 1.6, p95 2.2, max 2.4 min over 35 main runs; 1 advancing kill(s) after this tool shortened it on 2026-11-20; restoring 60.

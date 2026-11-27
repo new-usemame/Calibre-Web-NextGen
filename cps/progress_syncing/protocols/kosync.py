@@ -2542,6 +2542,7 @@ def update_progress():
     Note:
         Percentage is converted from decimal (0.9411 = 94.11%) to percentage (94.11).
     """
+    data = request.get_json()
     endpoint = "PUT /kosync/syncs/progress/<document>"
     log.debug(endpoint)
     try:
@@ -2553,7 +2554,6 @@ def update_progress():
         if not user:
             raise KOSyncError(ERROR_UNAUTHORIZED_USER, "Unauthorized")
 
-        data = request.get_json()
         if not data:
             raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid request data")
 

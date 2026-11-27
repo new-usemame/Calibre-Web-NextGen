@@ -70,6 +70,7 @@ _PRIVATE_INSTALL_FIELDS = frozenset({
     "config_ldap_cacert_path",
     "config_ldap_cert_path",
     "config_ldap_key_path",
+    "config_limiter_uri",
     "config_logfile",
     "config_rarfile_location",
     "mail_from",
@@ -371,11 +372,11 @@ _PER_FILE_MAX_BYTES = 10 * 1024 * 1024
 _APP_LOG_HEADER = re.compile(r"^\[\d{4}-\d{2}-\d{2} [^\]\r\n]+\] +[A-Z]+ \{[^}]+:\d+\} ")
 _KOSYNC_PAYLOAD_LOG = re.compile(
     r"^(\[[^\]\r\n]+\] +DEBUG \{cps\.(?:progress_syncing\.protocols\.)?kosync:\d+\} "
-    r"(?:GET|PUT) /kosync/syncs/progress/)[^\r\n]*(?: with:| Response:)"
+    r"(?:GET|PUT) /kosync/syncs/progress/)(?!(?:<document>(?: response sent)?|<redacted>)$)"
 )
 
 
-def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
+def _sanitize_log_bytes(raw: bytes, scrubber=None, *, app_log=False) -> bytes:
     """Read a log file, sanitize each line, return the sanitized bytes
     capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the most
     recent content, drop the head if oversize)."""
@@ -383,7 +384,8 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
         return raw
     # Tail-truncate first so we never burn CPU sanitizing bytes we'd
     # drop anyway.
-    if len(raw) > _PER_FILE_MAX_BYTES:
+    truncated = len(raw) > _PER_FILE_MAX_BYTES
+    if truncated:
         starts_midline = raw[-_PER_FILE_MAX_BYTES - 1] != ord("\n")
         raw = raw[-_PER_FILE_MAX_BYTES:]
         if starts_midline:
@@ -398,11 +400,13 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
         def scrubber(line):
             return _sanitize_log_line(line, install_paths)
     sanitized_lines = []
-    in_progress_payload = False
+    # An application log tail can start inside a legacy multiline record.
+    # Wait for a complete record header when we have dropped its prefix.
+    in_progress_payload = app_log and truncated
     for line in text.splitlines(keepends=True):
         if in_progress_payload and not _APP_LOG_HEADER.match(line):
             continue
-        payload = _KOSYNC_PAYLOAD_LOG.match(line)
+        payload = _KOSYNC_PAYLOAD_LOG.match(line.rstrip("\r\n"))
         in_progress_payload = payload is not None
         if payload:
             line = payload.group(1) + REDACTED_PLACEHOLDER + "\n"
@@ -504,8 +508,8 @@ def _build_debug_zip(sanitize: bool):
     """Build the in-memory debug pack. When ``sanitize`` is True the
     settings file is redacted and every log line is scrubbed for IPs,
     paths, and auth headers."""
-    file_list = glob.glob(logger.get_logfile(config.config_logfile) + '*')
-    file_list.extend(glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*'))
+    app_logs = glob.glob(logger.get_logfile(config.config_logfile) + '*')
+    file_list = app_logs + glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*')
     for element in [logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR]:
         if element in file_list:
             file_list.remove(element)
@@ -534,7 +538,7 @@ def _build_debug_zip(sanitize: bool):
             if sanitize:
                 with open(fp, 'rb') as fd:
                     raw = fd.read()
-                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber))
+                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber, app_log=fp in app_logs))
             else:
                 zf.write(fp, os.path.basename(fp))
     memory_zip.seek(0)

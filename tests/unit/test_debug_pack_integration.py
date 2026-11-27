@@ -110,6 +110,7 @@ class TestBuildDebugZipSanitized:
             "config_calibre_dir": "/srv/Private Reader",
             "config_logfile": "/srv/private-logs/cwng.log",
             "config_ldap_cacert_path": "/etc/private-certs/ldap.pem",
+            "config_limiter_uri": "redis+unix:///var/run/private-limiter.sock",
         }
         settings.update(private)
         with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
@@ -128,6 +129,8 @@ class TestBuildDebugZipSanitized:
                 "[2026-05-26 12:01:00] DEBUG {cps.progress_syncing.protocols.kosync:2546} "
                 "PUT /kosync/syncs/progress/<document> with: {'device': 'private-device'}\n"
                 "private-continuation\n"
+                "[2026-05-26 12:01:01] DEBUG {cps.progress_syncing.protocols.kosync:1439} "
+                "GET /kosync/syncs/progress/old-request-document\n"
                 "[2026-05-26 12:01:01] DEBUG {cps.progress_syncing.protocols.kosync:1550} "
                 "GET /kosync/syncs/progress/old-document-id Response: {'progress': 'private-position'}\n"
                 "[2026-05-26 12:01:02] INFO {cps.progress_syncing.protocols.kosync:50} "
@@ -135,9 +138,29 @@ class TestBuildDebugZipSanitized:
             )
         with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
             log = zf.read("calibre-web.log").decode("utf-8")
-        for value in ("private-device", "private-continuation", "old-document-id", "private-position"):
+        for value in ("private-device", "private-continuation", "old-request-document",
+                      "old-document-id", "private-position"):
             assert (value in log) is not sanitize
         assert "Progress request completed" in log
+
+    def test_truncated_app_log_starts_at_a_complete_record(self, fake_config_and_logs, monkeypatch):
+        from cps import debug_info
+
+        _, log_path, _, _ = fake_config_and_logs
+        continuation = "private-continued-request\n"
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        # The cut starts in the old request's continuation, followed by a
+        # complete line in that same record. Neither belongs in the archive.
+        partial_record = "private-second-line\n"
+        log_path.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            + continuation + partial_record + next_record,
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(partial_record + next_record) + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read("calibre-web.log").decode("utf-8") == next_record
 
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip

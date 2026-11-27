@@ -29,6 +29,7 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("A large library then arrives about 100 books per sync, so it can take many syncs to finish. Forcing another full sync part-way through starts again from the beginning.")
 _("Allow direct DRM-free MOBI 6 books")
 _("Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in.")
 

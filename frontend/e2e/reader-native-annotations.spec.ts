@@ -11,16 +11,20 @@ const webCfi = 'epubcfi(/6/2!/4/2[existing],/1:0,/1:20)';
 const foreignCfi = 'epubcfi(/6/4!/4/2[wrapper]/2[kobo.15.1],/1:15,/1:63)';
 const initialBookmark = 'epubcfi(/6/2!/4/2[existing]/1:0)';
 
-const tableQuote = 'Alpha1893';
+const tableMarkup = '<table border="1"><tr><td>Alpha</td><td>1893</td></tr></table>';
+const tableFixtures = [
+  { name: 'inside the table', chapter: tableMarkup, text: 'Alpha1893' },
+  { name: 'from a paragraph into the table', chapter: '<p>Before</p>' + tableMarkup, text: 'BeforeAlpha' },
+];
 
-async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false, table = false, prolog = '') {
-  const text = table ? tableQuote : quote;
+async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false, table?: (typeof tableFixtures)[number], prolog = '') {
+  const text = table?.text ?? quote;
   const precedingText = longChapter ? Array.from({ length: 40 }, (_, i) =>
     `<p>Paragraph ${i}: The reader continues across the page through a quiet landscape, with another sentence to fill this passage.</p>`,
   ).join('') : '';
   const epub = archive([
     '<p id="existing">Existing web passage remains.</p>' + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : duplicate ? `<p>${quote}</p>` : ''),
-    precedingText + (table ? '<table><tr><td>Alpha</td><td>1893</td></tr></table>' : nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
+    precedingText + (table ? table.chapter : nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
   ], prolog);
   const list = await (await page.request.get('/api/v1/books?per_page=1')).json();
   const id = list.items[0].id;
@@ -99,20 +103,42 @@ test('native highlight maps into the existing EPUB, preserving web highlights an
   expect(errors).toEqual([]);
 });
 
-test('a native highlight inside a table is drawn despite the HTML parser\'s implied tbody (#3045)', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await openFixture(page, false, false, false, true);
-  await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
-  const jump = page.getByRole('button', { name: `${tableQuote} kobo`, exact: true });
-  await expect(jump).toBeEnabled();
-  await jump.click();
-  await expect(page.locator('[data-id="native"] rect').first()).toBeAttached();
-  expect(errors).toEqual([]);
-});
+for (const table of tableFixtures) {
+  test(`a native highlight ${table.name} is visible despite implied tbody (#3045)`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await openFixture(page, false, false, true, table);
+    await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
+    const jump = page.getByRole('button', { name: `${table.text} kobo`, exact: true });
+    await expect(jump).toBeEnabled();
+    await jump.click();
+    await expect.poll(async () => {
+      const firstCell = page.frameLocator('iframe[title="Book content"]').locator('td').first();
+      const cellBox = await firstCell.boundingBox();
+      if (!cellBox) return false;
+      const textBox = await firstCell.evaluate(cell => {
+        const range = cell.ownerDocument.createRange();
+        range.selectNodeContents(cell);
+        const { x, y, width } = range.getBoundingClientRect();
+        const bounds = cell.getBoundingClientRect();
+        return { xOffset: x - bounds.x, yOffset: y - bounds.y, width };
+      });
+      const targetX = cellBox.x + textBox.xOffset;
+      const targetY = cellBox.y + textBox.yOffset;
+      const marks = await page.locator('[data-id="native"] rect').evaluateAll(rects => rects.map(rect => {
+        const { x, y, width } = rect.getBoundingClientRect();
+        return { x, y, width };
+      }));
+      return marks.some(mark => mark.width > 0 && Math.abs(mark.x - targetX) < 2
+        && Math.abs(mark.y - targetY) < 2 && Math.abs(mark.width - textBox.width) < 2);
+    }, { message: 'The highlight paints the matched text in the first table cell' }).toBe(true);
+    await expect(page.locator('[data-id="native"] rect:not([width="0"])').first()).toBeInViewport();
+    expect(errors).toEqual([]);
+  });
+}
 
 test('an XHTML prolog cannot shift an ordinary native highlight in the reader', async ({ page }) => {
-  await openFixture(page, false, false, true, false, '<?publisher value > secondary?>');
+  await openFixture(page, false, false, true, undefined, '<?publisher value > secondary?>');
   await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
   await page.getByRole('button', { name: `${quote} kobo`, exact: true }).click();
   await expect(page.locator('[data-id="native"] rect').first()).toBeInViewport();

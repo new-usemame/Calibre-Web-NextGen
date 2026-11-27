@@ -6558,12 +6558,12 @@ msgstr "封面已从选取的结果更新。"
 
 #: cps/spa_strings.py cps/templates/cc_value_editor.html
 msgid "Create a value just below this one"
-msgstr "在此值下方创建子值"
+msgstr "在此值正下方创建同级值"
 
 #: cps/spa_strings.py cps/templates/cc_value_editor.html
 #, python-brace-format
 msgid "Create a value just below {name}"
-msgstr "在 {name} 下方创建子值"
+msgstr "在 {name} 正下方创建同级值"
 
 #: cps/spa_strings.py
 msgid "Covered by a rule"
@@ -6609,7 +6609,7 @@ msgstr "已创建 {name}"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Created {name} just below {anchor}"
-msgstr "已在 {anchor} 下方创建 {name}"
+msgstr "已在 {anchor} 正下方创建同级值 {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12106,7 +12106,7 @@ msgstr "上方筛选条件隐藏了 {count} 个值"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{deleted} books in {groups} groups would be deleted."
-msgstr "将删除 {groups} 组中的 {deleted} 本书。"
+msgstr "按此方案，{groups} 组中的 {deleted} 本书会被删除。"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12393,7 +12393,7 @@ msgstr "替换图片"
 msgid ""
 "Find books that have a cover.jpg in their folder but are marked as having no "
 "cover, so the cover is never shown."
-msgstr "查找书籍文件中存在 cover.jpg、但却意外被标记为没有封面的书籍。所以这些书籍封面没有显示。"
+msgstr "查找书籍所在文件夹中有 cover.jpg、但被标记为无封面而未显示封面的书籍。"
 
 #: cps/spa_strings.py cps/templates/cover_flag_repair.html
 msgid ""

@@ -188,6 +188,26 @@ class TestBuildDebugZipSanitized:
             assert zf.read(app_name).decode("utf-8") == next_record
             assert zf.read(access_name).decode("utf-8").endswith(access_record)
 
+    def test_app_rotation_keeps_its_format_when_it_matches_an_access_path(
+            self, fake_config_and_logs, monkeypatch):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        app_log = directory / "server.log"
+        rotated = directory / "server.log.1"
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        rotated.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            "private-continued-request\nprivate-second-line\n" + next_record,
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(app_log))
+        monkeypatch.setattr(debug_info.config, "config_access_logfile", str(rotated))
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(next_record) + len("private-second-line\n") + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read(rotated.name).decode("utf-8") == next_record
+
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip
 

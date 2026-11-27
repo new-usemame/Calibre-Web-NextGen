@@ -386,6 +386,9 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None, *, app_log=False) -> bytes:
     # drop anyway.
     truncated = len(raw) > _PER_FILE_MAX_BYTES
     if truncated:
+        # An application rollover can land at a configured access path.
+        # Prefer a real application header in the file to its filename.
+        app_log = app_log or bool(_APP_LOG_HEADER.match(raw[:512].decode("utf-8", errors="replace")))
         starts_midline = raw[-_PER_FILE_MAX_BYTES - 1] != ord("\n")
         raw = raw[-_PER_FILE_MAX_BYTES:]
         if starts_midline:

@@ -660,11 +660,6 @@ msgstr "Innstillinger for planlagte oppgaver er oppdatert"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "En ukjent feil oppstod. Prøv igjen senere."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Tittel"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2414,11 +2409,6 @@ msgstr "Smarte hyller"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Bøker ordnet i smarte hyller"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Beskrivelse"
 
 #: cps/opds.py
 #, python-format
@@ -20098,6 +20088,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Vis serieutvalg"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Tittel"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Beskrivelse"
 
 #~ msgid "Categories"
 #~ msgstr "Kategorier"

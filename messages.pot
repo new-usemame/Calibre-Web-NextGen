@@ -7,7 +7,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Calibre-Web Automated v4.0.8\n"
+"Project-Id-Version: Calibre-Web Automated dev\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
@@ -17,7 +17,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.19.0\n"
 
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
@@ -630,10 +630,6 @@ msgstr ""
 
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
-msgstr ""
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
 msgstr ""
 
 #: cps/admin.py
@@ -2307,10 +2303,6 @@ msgstr ""
 
 #: cps/opds.py
 msgid "Books organized in smart shelves"
-msgstr ""
-
-#: cps/opds.py
-msgid "description"
 msgstr ""
 
 #: cps/opds.py

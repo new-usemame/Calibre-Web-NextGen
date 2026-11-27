@@ -688,10 +688,6 @@ msgstr "Zaktualizowano ustawienia zaplanowanych zadań"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Wystąpił nieznany błąd. Spróbuj ponownie później."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "tytuł"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2483,10 +2479,6 @@ msgstr "Inteligentne półki"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Książki uporządkowane na inteligentnych półkach"
-
-#: cps/opds.py
-msgid "description"
-msgstr "opis"
 
 #: cps/opds.py
 #, python-format
@@ -20450,6 +20442,12 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid "title"
+#~ msgstr "tytuł"
+
+#~ msgid "description"
+#~ msgstr "opis"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Kilka losowych propozycji z Twojej biblioteki"

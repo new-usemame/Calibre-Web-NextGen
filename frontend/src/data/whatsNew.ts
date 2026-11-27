@@ -56,6 +56,52 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.75',
+    date: '2026-11-27',
+    items: [
+      {
+        title: 'Pick up where you left off after a Kobo download',
+        body: 'When a Kobo download needs an on-demand KEPUB conversion, the next sync can restore the shared reading position for that book.',
+        category: 'Sync',
+      },
+      {
+        title: 'Open books in KOReader with fewer library scans',
+        body: 'Automatic delivery shares an inventory check across the reader and file browser for five minutes. You can still collect books immediately with a manual check.',
+        category: 'Sync',
+      },
+      {
+        title: 'Keep Kobo Store requests working with the proxy on',
+        body: 'Store requests that Calibre-Web NextGen does not recognise are forwarded to the Kobo Store when the proxy is enabled.',
+        category: 'Sync',
+      },
+      {
+        title: 'Keep shared metadata when deleting books',
+        body: 'Deleting a book preserves single-value text and choice fields that other books still use. Removing metadata also takes less work on large libraries.',
+        category: 'Library',
+      },
+      {
+        title: 'See when a metadata source is unavailable',
+        body: 'Google Books, Open Library and Deutsche Nationalbibliothek now show a source error when a lookup fails.',
+        category: 'Library',
+      },
+      {
+        title: 'Watch the admin log with fewer routine messages',
+        body: 'Successful thumbnail jobs for individual books now log at DEBUG. Batch summaries and failures are still visible at the default level.',
+        category: 'Admin',
+      },
+      {
+        title: 'Avoid extra ownership updates during ingest',
+        body: 'Ingest and library conversion skip permission writes for files and directories that already have the right owner and group.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Use more of the app in Portuguese and Chinese',
+        body: 'European Portuguese now covers more of Hardcover review, shelves and annotations. Simplified Chinese adds wording for cover recovery and custom-value controls.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.74',
     date: '2026-11-23',
     items: [

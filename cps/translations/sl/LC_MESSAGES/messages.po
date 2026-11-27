@@ -677,11 +677,6 @@ msgstr "Posodobljene nastavitve načrtovanih opravil"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ups! Zgodila se je neznana napaka. Prosimo, poskusite znova pozneje."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Naslov"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2466,11 +2461,6 @@ msgstr "Pametne police"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Knjige, urejene v pametne police"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Opis"
 
 #: cps/opds.py
 #, python-format
@@ -20278,6 +20268,14 @@ msgstr "Usklajevanje izbrane police s Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Prikaži razdelek Prebrano/neprebrano"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Naslov"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Opis"
 
 #~ msgid "Categories"
 #~ msgstr "Kategorije"

@@ -653,10 +653,6 @@ msgstr "تم تحديث إعدادات المهام المجدولة"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "عفواً! حدث خطأ غير معروف. يُرجى المحاولة لاحقًا."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "العنوان"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2355,10 +2351,6 @@ msgstr "رفوف ذكية"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "كتب منظّمة في رفوف ذكية"
-
-#: cps/opds.py
-msgid "description"
-msgstr "الوصف"
 
 #: cps/opds.py
 #, python-format
@@ -19729,6 +19721,12 @@ msgstr "عرض الرفوف المحددة عبر OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "إظهار قسم المقروء/غير المقروء"
+
+#~ msgid "title"
+#~ msgstr "العنوان"
+
+#~ msgid "description"
+#~ msgstr "الوصف"
 
 #~ msgid "Categories"
 #~ msgstr "الفئات"

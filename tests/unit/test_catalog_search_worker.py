@@ -2,6 +2,9 @@
 """The gevent catalog worker must paginate the same visible books as Flask."""
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
+import shutil
+import sqlite3
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -126,3 +129,43 @@ def test_full_admission_waits_for_slot_then_times_out(search, monkeypatch):
     release = gevent.spawn(admission.release)
     assert search().status_code == 200
     release.get()
+
+
+@pytest.mark.parametrize("params", [{"select_all": 1}, {"page": 1}])
+def test_search_uses_current_visibility_after_worker_wait(search, monkeypatch, params):
+    monkeypatch.setenv("CWNG_EXPERIMENTAL_SEARCH_WORKER", "1")
+    select_page = worker.select_page
+
+    def hide_after_query_is_built(*args, **kwargs):
+        ub.session.add(ub.UserHiddenBook(user_id=1, book_id=1))
+        ub.session.commit()
+        return select_page(*args, **kwargs)
+
+    monkeypatch.setattr(worker, "select_page", hide_after_query_is_built)
+    queued = search(**params)
+    monkeypatch.delenv("CWNG_EXPERIMENTAL_SEARCH_WORKER")
+    inline = search(**params)
+    assert queued.status_code == 200
+    assert queued.get_json() == inline.get_json()
+    assert queued.get_json()["total"] == 3
+    assert 1 not in queued.get_json().get("ids", queued.get_json().get("items"))
+
+
+def test_search_rejects_results_across_metadata_replacement(search, monkeypatch, tmp_path):
+    monkeypatch.setenv("CWNG_EXPERIMENTAL_SEARCH_WORKER", "1")
+    read = worker._read
+
+    def replace_before_worker_opens(paths, *args):
+        live = Path(paths["calibre"])
+        replacement = tmp_path / "replacement.db"
+        shutil.copyfile(live, replacement)
+        with sqlite3.connect(replacement) as conn:
+            conn.execute("DELETE FROM books WHERE id <> 4")
+        replacement.replace(live)
+        return read(paths, *args)
+
+    monkeypatch.setattr(worker, "_read", replace_before_worker_opens)
+    response = search(select_all=1)
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+    assert "ids" not in response.get_json()

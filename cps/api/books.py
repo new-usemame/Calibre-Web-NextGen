@@ -9,7 +9,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 
-from flask import Response, current_app, jsonify, request
+from flask import Response, current_app, g, jsonify, request
 from flask_babel import get_locale
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import String, and_, bindparam, cast, false, func, literal, or_, select
@@ -24,7 +24,7 @@ from .. import (
 )
 from ..annotations import count_user_annotations
 from ..cw_login import current_user
-from ..services import user_cover, discover_source
+from ..services import catalog_search_worker, user_cover, discover_source
 from ..shelf import sort_shelves_for_user
 from ..helper import edit_book_read_status, canonical_read_status, \
     book_ids_with_read_status, read_statuses_for_books, set_explicit_book_read_status, \
@@ -34,7 +34,7 @@ from ..sort_orders import READ_DATE_SORTS, RECENT_SORT
 from ..personal_ratings import PERSONAL_RATING_SORTS, personal_score, ratings_for_books
 from ..custom_column_sort import (resolve_magic_shelf_sort, custom_sort_options,
                                   load_configured_columns)
-from ..usermanagement import login_required_if_no_ano
+from ..usermanagement import _fresh_user, login_required_if_no_ano
 
 log = logger.create()
 
@@ -516,6 +516,11 @@ def _catalog_visibility(show_hidden=False, *, allow_archived=False, viewing_tag_
         viewing_tag_id=viewing_tag_id,
         extra_filter=or_(~_export_ids_filter(archived_ids), _export_ids_filter(hidden_ids)),
     )
+
+
+def _catalog_query_signature(id_query):
+    compiled = id_query.statement.compile(dialect=id_query.session.get_bind().dialect)
+    return compiled.string, compiled.params
 
 
 def _tag_group_filter(path):
@@ -1273,8 +1278,9 @@ def list_books():
 
     if search or tag_path is not None:
         offset = (page - 1) * per_page
-        try:
-            query = _catalog_book_query(
+
+        def build_query():
+            return _join_sort(_catalog_book_query(
                 search=search,
                 author_id=author_id,
                 series_id=series_id,
@@ -1289,16 +1295,43 @@ def list_books():
                             ("read", "unread", "in_progress", "did_not_finish", "on_hold",
                              "favorites", "rated", "archived") else None),
                 show_hidden=show_hidden if tag_path is None else False,
-            )
-        except BookExportRequestError as exc:
-            return jsonify({"error": {"code": exc.code, "message": exc.message}}), exc.status
-        query = _join_sort(query, sort_context)
-        id_query = query.with_entities(db.Books.id)
-        counts = id_query.order_by(None).distinct()
-        result = None
-        worker_enabled = os.environ.get("CWNG_EXPERIMENTAL_SEARCH_WORKER") == "1"
-        if worker_enabled and search and (select_all or 0 < per_page <= 500):
-            from ..services import catalog_search_worker
+            ), sort_context)
+
+        def render_query(query, worker_page=None):
+            entries = None
+            if worker_page is not None:
+                total, ids = worker_page.total, worker_page.ids
+                if select_all:
+                    return _selection_response(ids, total)
+                rows = query.filter(db.Books.id.in_(ids)).all() if ids else []
+                by_id = {row.Books.id: row for row in rows}
+                if len(by_id) == len(ids):
+                    entries = [by_id[book_id] for book_id in ids]
+            if entries is None:
+                # Recompute the whole page and total together if a live
+                # predicate made any of the worker's IDs disappear.
+                id_query = query.with_entities(db.Books.id)
+                total = id_query.order_by(None).distinct().count()
+                if select_all:
+                    ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
+                    return _selection_response(ids, total)
+                entries = query.order_by(*order).offset(offset).limit(per_page).all()
+            entries = calibre_db.order_authors(entries, list_return=True, combined=True)
+            return jsonify(_with_sort({
+                "items": to_items(entries),
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+            }, sort_context))
+
+        try:
+            query = build_query()
+            worker_enabled = os.environ.get("CWNG_EXPERIMENTAL_SEARCH_WORKER") == "1"
+            if not (worker_enabled and search and (select_all or 0 < per_page <= 500)):
+                return render_query(query)
+
+            id_query = query.with_entities(db.Books.id)
+            counts = id_query.order_by(None).distinct()
             combined = None
             if (not select_all and sort_context["sort"] == "new"
                     and os.environ.get("CWNG_EXPERIMENTAL_SEARCH_SINGLE_SCAN") == "1"):
@@ -1308,37 +1341,38 @@ def list_books():
                 combined = select(matches.c.id, func.count().over()).order_by(
                     matches.c.timestamp.desc(), matches.c.id.desc()
                 ).offset(offset).limit(per_page)
-            try:
-                result = catalog_search_worker.select_page(
-                    query.session, select(func.count()).select_from(counts.subquery()),
-                    id_query.order_by(*order).offset(offset).limit(per_page).statement, request.environ,
-                    combined=combined,
-                )
-            except catalog_search_worker.SearchBusy:
-                return jsonify({"error": {"code": "search_busy",
-                                         "message": "Please retry the search."}}), 503, {"Retry-After": "1"}
-        if result is None:
-            total = counts.count()
-            if select_all:
-                ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
-                return _selection_response(ids, total)
-            entries = query.order_by(*order).offset(offset).limit(per_page).all()
-        else:
-            total, ids = result
-            if select_all:
-                return _selection_response(ids, total)
-            # Keep visibility and all other predicates live during hydration.
-            # Use the worker's page order even for sort keys that have ties.
-            rows = query.filter(db.Books.id.in_(ids)).all() if ids else []
-            by_id = {row.Books.id: row for row in rows}
-            entries = [by_id[i] for i in ids if i in by_id]
-        entries = calibre_db.order_authors(entries, list_return=True, combined=True)
-        return jsonify(_with_sort({
-            "items": to_items(entries),
-            "page": page,
-            "per_page": per_page,
-            "total": total,
-        }, sort_context))
+            # With a language, tag, or custom-column policy, a metadata edit
+            # can change access while leaving the predicate's parameters intact.
+            watch_metadata = bool(calibre_db.config.config_restricted_column
+                                  or current_user.filter_language() != "all"
+                                  or current_user.list_allowed_tags() != [""]
+                                  or current_user.list_denied_tags() != [""])
+            worker_page = catalog_search_worker.select_page(
+                query.session, select(func.count()).select_from(counts.subquery()),
+                id_query.order_by(*order).offset(offset).limit(per_page).statement, request.environ,
+                combined=combined, calibre_db=calibre_db, watch_metadata=watch_metadata,
+            )
+            if worker_page is None:
+                return render_query(query)
+            with worker_page.validate_source():
+                viewer = getattr(current_user, "_get_current_object", lambda: current_user)()
+                if _fresh_user(viewer) is None:
+                    raise catalog_search_worker.SearchBusy
+                # Re-read the canonical predicates, including empty sets that
+                # might have gained their first hide or membership.
+                g.pop("_user_library_filter_cache", None)
+                current_query = build_query()
+                if show_hidden:
+                    hidden_ids = _hidden_book_ids()
+                if (worker_page.metadata_changed or _catalog_query_signature(id_query)
+                        != _catalog_query_signature(current_query.with_entities(db.Books.id))):
+                    return render_query(current_query)
+                return render_query(current_query, worker_page)
+        except BookExportRequestError as exc:
+            return jsonify({"error": {"code": exc.code, "message": exc.message}}), exc.status
+        except catalog_search_worker.SearchBusy:
+            return jsonify({"error": {"code": "search_busy",
+                                     "message": "Please retry the search."}}), 503, {"Retry-After": "1"}
 
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
 

@@ -56,7 +56,7 @@ msgid ""
 "Error: Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
 msgstr ""
-"Erro: A sincronização de capa está desativada. Ative-a na Configuração Básica ou por meio de "
+"Erro: A sincronização do Hardcover está desativada. Ative-a na Configuração Básica ou por meio de "
 "HARDCOVER_SYNC_ENABLED."
 
 #: cps/admin.py
@@ -64,14 +64,14 @@ msgid ""
 "Error: No Hardcover token available. Set HARDCOVER_TOKEN environment "
 "variable or configure in Basic Configuration."
 msgstr ""
-"Erro: Nenhum token de capa (Hardcover) disponível. Defina a variável de ambiente "
+"Erro: Nenhum token do Hardcover disponível. Defina a variável de ambiente "
 "HARDCOVER_TOKEN ou realize a configuração em Configuração Básica."
 
 #: cps/admin.py
 msgid ""
 "Success! Hardcover auto-fetch task started. Check Tasks panel for progress."
 msgstr ""
-"Sucesso! A tarefa de pesquisa automática de edições de capa foi iniciada. Verifique o painel de tarefas para acompanhar o progresso."
+"Sucesso! A tarefa de pesquisa automática do Hardcover foi iniciada. Verifique o painel de tarefas para acompanhar o progresso."
 
 #: cps/admin.py
 #, python-format
@@ -81,7 +81,7 @@ msgstr "Erro ao iniciar a tarefa de pesquisa automática do Hardcover: %(error)s
 #: cps/admin.py cps/templates/admin.html
 #: cps/templates/hardcover_missing_ids.html
 msgid "Review Hardcover Matches"
-msgstr "Analisar correspondências em edições de capa"
+msgstr "Analisar correspondências do Hardcover"
 
 #: cps/admin.py
 #, python-format
@@ -2943,7 +2943,7 @@ msgstr "Payload inválido: 'order' deve ser uma lista"
 
 #: cps/shelf.py
 msgid "Could not save order"
-msgstr "Não foi possível guardar o pedido"
+msgstr "Não foi possível guardar a ordem das estantes"
 
 #: cps/shelf.py cps/templates/layout.html
 #, fuzzy
@@ -4276,7 +4276,7 @@ msgstr "Progresso de leitura"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Red"
-msgstr "Lido"
+msgstr "Vermelho"
 
 #: cps/spa_strings.py
 msgid "Registration failed."

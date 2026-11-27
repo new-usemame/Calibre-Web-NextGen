@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 
-def archive(chapters):
+def archive(chapters, chapter_prolog=''):
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w") as book:
         book.writestr("mimetype", "application/epub+zip")
@@ -23,7 +23,7 @@ def archive(chapters):
             href = f"part{index}/chapter.xhtml"
             manifest.append(f'<item id="c{index}" href="{href}" media-type="application/xhtml+xml"/>')
             spine.append(f'<itemref idref="c{index}"/>')
-            book.writestr(f"OPS/{href}", '<html xmlns="http://www.w3.org/1999/xhtml">'
+            book.writestr(f"OPS/{href}", chapter_prolog + '<html xmlns="http://www.w3.org/1999/xhtml">'
                           '<head><title>Reader fixture</title></head><body>' + chapter + '</body></html>')
         book.writestr("OPS/package.opf", '<package xmlns="http://www.idpf.org/2007/opf" '
                       'version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
@@ -34,4 +34,4 @@ def archive(chapters):
 
 
 if __name__ == "__main__":
-    sys.stdout.buffer.write(archive(json.load(sys.stdin)))
+    sys.stdout.buffer.write(archive(json.load(sys.stdin), sys.argv[1] if len(sys.argv) > 1 else ''))

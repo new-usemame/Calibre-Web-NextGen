@@ -1819,6 +1819,9 @@ export function Reader({ id }: { id: string }) {
           applyDocumentTheme(view.contents.document, appearance.theme);
           applyDocumentTypography(view.contents.document, appearance);
           view.expand();
+          // epub.js attaches annotations before this hook. Typography can
+          // move their text without changing the iframe's outer dimensions.
+          view.pane?.render();
         });
 
         // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no

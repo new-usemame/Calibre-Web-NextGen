@@ -162,6 +162,32 @@ class TestBuildDebugZipSanitized:
         with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
             assert zf.read("calibre-web.log").decode("utf-8") == next_record
 
+    @pytest.mark.parametrize(("app_name", "access_name"), [
+        ("server.log", "server.log.access"), ("server.log.app", "server.log"),
+    ])
+    def test_log_type_follows_the_more_specific_path(self, fake_config_and_logs, monkeypatch,
+                                                     app_name, access_name):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        app_log = directory / app_name
+        access_log = directory / access_name
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        app_log.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            "private-continued-request\nprivate-second-line\n" + next_record,
+            encoding="utf-8",
+        )
+        access_record = '"GET /api/v1/books HTTP/1.1" 200 10\n'
+        access_log.write_text(access_record * 4, encoding="utf-8")
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(app_log))
+        monkeypatch.setattr(debug_info.config, "config_access_logfile", str(access_log))
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(next_record) + len("private-second-line\n") + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read(app_name).decode("utf-8") == next_record
+            assert zf.read(access_name).decode("utf-8").endswith(access_record)
+
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip
 

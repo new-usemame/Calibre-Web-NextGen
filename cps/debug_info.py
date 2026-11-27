@@ -508,11 +508,17 @@ def _build_debug_zip(sanitize: bool):
     """Build the in-memory debug pack. When ``sanitize`` is True the
     settings file is redacted and every log line is scrubbed for IPs,
     paths, and auth headers."""
-    app_logs = glob.glob(logger.get_logfile(config.config_logfile) + '*')
-    file_list = app_logs + glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*')
-    for element in [logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR]:
-        if element in file_list:
-            file_list.remove(element)
+    log_sources = (
+        (logger.get_accesslogfile(config.config_access_logfile), False),
+        (logger.get_logfile(config.config_logfile), True),
+    )
+    log_files = {}
+    # Both rotation globs can match a file when their names overlap.
+    # Process the more specific path last so it decides the file's format.
+    for log_path, app_log in sorted(log_sources, key=lambda source: len(source[0])):
+        for file_path in glob.glob(glob.escape(log_path) + '*'):
+            if file_path not in (logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR):
+                log_files[file_path] = app_log
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
@@ -534,11 +540,11 @@ def _build_debug_zip(sanitize: bool):
             zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
-        for fp in file_list:
+        for fp, app_log in log_files.items():
             if sanitize:
                 with open(fp, 'rb') as fd:
                     raw = fd.read()
-                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber, app_log=fp in app_logs))
+                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber, app_log=app_log))
             else:
                 zf.write(fp, os.path.basename(fp))
     memory_zip.seek(0)

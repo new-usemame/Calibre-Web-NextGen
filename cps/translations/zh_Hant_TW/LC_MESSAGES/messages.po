@@ -638,11 +638,6 @@ msgstr "計劃任務設定已更新"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "發生一個未知錯誤，請稍後再試。"
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "標題"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2334,10 +2329,6 @@ msgstr "智慧書架"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "整理在智慧書架中的書籍"
-
-#: cps/opds.py
-msgid "description"
-msgstr "簡介"
 
 #: cps/opds.py
 #, python-format
@@ -19852,6 +19843,13 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "標題"
+
+#~ msgid "description"
+#~ msgstr "簡介"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "從你的書庫中隨機挑選"

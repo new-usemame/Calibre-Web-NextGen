@@ -469,7 +469,9 @@ msgstr "O arquivo é maior que %(max)d MB."
 
 #: cps/admin.py
 msgid "This preview is invalid or expired. Upload the device database again."
-msgstr "Esta prévisualização é inválida ou expirou. Carregue o banco de dados do dispositivo novamente."
+msgstr ""
+"Esta prévisualização é inválida ou expirou. Carregue o banco de dados do "
+"dispositivo novamente."
 
 #: cps/admin.py
 msgid "Select at least one book to archive."
@@ -702,11 +704,6 @@ msgstr "Foram atualizadas as configurações de tarefas agendadas"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ocorreu um erro desconhecido. Por favor, tente novamente mais tarde."
-
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Título"
 
 #: cps/admin.py
 #, python-format
@@ -2534,11 +2531,6 @@ msgstr "Estantes inteligentes"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Livros organizados em estantes inteligentes"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Descrição"
 
 #: cps/opds.py
 #, python-format
@@ -5647,7 +5639,9 @@ msgstr "Também em {names}"
 
 #: cps/spa_strings.py
 msgid "An administrator has not added a book source, or none is switched on."
-msgstr "Um administrador não adicionou uma fonte de livros, ou nenhuma delas está ativada."
+msgstr ""
+"Um administrador não adicionou uma fonte de livros, ou nenhuma delas está "
+"ativada."
 
 #: cps/spa_strings.py
 msgid ""
@@ -5944,7 +5938,8 @@ msgstr "Livros"
 
 #: cps/spa_strings.py
 msgid "Books assigned a value in this column will appear here."
-msgstr "Os livros aos quais for atribuído um valor nesta coluna aparecerão aqui."
+msgstr ""
+"Os livros aos quais for atribuído um valor nesta coluna aparecerão aqui."
 
 #: cps/spa_strings.py
 msgid "Books awaiting authority"
@@ -7772,7 +7767,9 @@ msgstr "Ecrã inteiro"
 
 #: cps/spa_strings.py
 msgid "Full sync requested. Sync your Kobo to receive your library again."
-msgstr "Sincronização completa solicitada. Sincronize o seu Kobo para receber a sua biblioteca novamente."
+msgstr ""
+"Sincronização completa solicitada. Sincronize o seu Kobo para receber a sua "
+"biblioteca novamente."
 
 #: cps/spa_strings.py
 msgid "Generate a new link"
@@ -7963,7 +7960,8 @@ msgstr "Como os campos de múltiplos valores devem ser aplicados?"
 
 #: cps/spa_strings.py
 msgid "How switching between the global library and My Library works"
-msgstr "Como funciona a alternância entre a biblioteca global e a Minha Biblioteca"
+msgstr ""
+"Como funciona a alternância entre a biblioteca global e a Minha Biblioteca"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "ISBN added to the form. Save changes to keep it."
@@ -8272,7 +8270,9 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Leave blank to show any number of books. The minimum is inclusive."
-msgstr "Deixe em branco para exibir qualquer quantidade de livros. O valor mínimo está incluído."
+msgstr ""
+"Deixe em branco para exibir qualquer quantidade de livros. O valor mínimo "
+"está incluído."
 
 #: cps/spa_strings.py
 msgid ""
@@ -10512,7 +10512,9 @@ msgstr "A Mostrar {shown} de {total} anotações."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} books from the latest device inventory."
-msgstr "A Mostrar {shown} de {total} livros do inventário mais recente do dispositivo."
+msgstr ""
+"A Mostrar {shown} de {total} livros do inventário mais recente do "
+"dispositivo."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -20332,6 +20334,14 @@ msgstr "Sincronizar com Kobo as estantes selecionadas"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar secção de lidos/não lidos"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Título"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Descrição"
 
 #~ msgid "Categories"
 #~ msgstr "Categorias"

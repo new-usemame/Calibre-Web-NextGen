@@ -678,10 +678,6 @@ msgstr "Az ütemezett feladatok beállításai frissültek"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ismeretlen hiba történt. Később próbálja újra!"
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "cím"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2450,10 +2446,6 @@ msgstr "Intelligens polcok"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Intelligens polcokra rendezett könyvek"
-
-#: cps/opds.py
-msgid "description"
-msgstr "leírás"
 
 #: cps/opds.py
 #, python-format
@@ -20305,6 +20297,12 @@ msgstr "Kiválasztott polcok szinkronizációja Kobo eszközzel"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Olvasott/olvasatlan mutatása"
+
+#~ msgid "title"
+#~ msgstr "cím"
+
+#~ msgid "description"
+#~ msgstr "leírás"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Néhány véletlenszerű könyv a könyvtáradból"

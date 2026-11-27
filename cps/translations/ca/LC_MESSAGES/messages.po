@@ -698,10 +698,6 @@ msgstr "S'ha actualitzat la configuració de les tasques programades"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "S'ha produït un error desconegut. Torneu-ho a provar més tard."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "Títol"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2535,10 +2531,6 @@ msgstr "Prestatges intel·ligents"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Llibres organitzats en prestatges intel·ligents"
-
-#: cps/opds.py
-msgid "description"
-msgstr "Descripció"
 
 #: cps/opds.py
 #, python-format
@@ -21253,6 +21245,12 @@ msgstr "Mostra els prestatges seleccionats a OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra la secció de llibres llegits i no llegits"
+
+#~ msgid "title"
+#~ msgstr "Títol"
+
+#~ msgid "description"
+#~ msgstr "Descripció"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Algunes seleccions aleatòries de la vostra biblioteca"

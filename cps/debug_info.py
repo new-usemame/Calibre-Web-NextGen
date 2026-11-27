@@ -56,6 +56,27 @@ _KNOWN_SECRET_FIELDS = frozenset({
     "mail_password_e",
 })
 
+# A sanitized archive can be shared outside the installation. These settings
+# identify mail infrastructure or reveal where files are kept on that host.
+_PRIVATE_INSTALL_FIELDS = frozenset({
+    "config_access_logfile",
+    "config_binariesdir",
+    "config_calibre_dir",
+    "config_calibre_split_dir",
+    "config_certfile",
+    "config_converterpath",
+    "config_kepubifypath",
+    "config_keyfile",
+    "config_ldap_cacert_path",
+    "config_ldap_cert_path",
+    "config_ldap_key_path",
+    "config_logfile",
+    "config_rarfile_location",
+    "mail_from",
+    "mail_login",
+    "mail_server",
+})
+
 # Substring matches for unknown/future fields. If the field name contains
 # any of these as a whole token (case-insensitive), redact the value.
 _SECRET_SUBSTRINGS = (
@@ -79,7 +100,7 @@ _LONG_TOKEN_PATTERN = re.compile(r"\b[A-Za-z0-9+/=_\-]{40,}\b")
 
 
 def _looks_sensitive(field_name: str) -> bool:
-    if field_name in _KNOWN_SECRET_FIELDS:
+    if field_name in _KNOWN_SECRET_FIELDS or field_name in _PRIVATE_INSTALL_FIELDS:
         return True
     lower = field_name.lower()
     return any(s in lower for s in _SECRET_SUBSTRINGS)
@@ -108,9 +129,8 @@ def _redact_value(value, *, aggressive=False):
 
 
 def _redact_for_export(settings_dict):
-    """Return a copy of ``settings_dict`` with every known-secret field
-    placeholder-replaced and every JWT-shaped value scrubbed for
-    defense-in-depth.
+    """Return settings with secrets and private install fields replaced
+    and JWT-shaped string values scrubbed.
 
     A field whose name LOOKS sensitive is only redacted if its value is
     a non-empty string — booleans and integers can't be credentials, and
@@ -345,6 +365,16 @@ class _LogScrubber:
 _PER_FILE_MAX_BYTES = 10 * 1024 * 1024
 
 
+# Older versions printed whole KOReader progress requests and responses.
+# Keep the method and route in shared archives, omitting the payload and any
+# continuation lines before the next formatted application log record.
+_APP_LOG_HEADER = re.compile(r"^\[\d{4}-\d{2}-\d{2} [^\]\r\n]+\] +[A-Z]+ \{[^}]+:\d+\} ")
+_KOSYNC_PAYLOAD_LOG = re.compile(
+    r"^(\[[^\]\r\n]+\] +DEBUG \{cps\.(?:progress_syncing\.protocols\.)?kosync:\d+\} "
+    r"(?:GET|PUT) /kosync/syncs/progress/)[^\r\n]*(?: with:| Response:)"
+)
+
+
 def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
     """Read a log file, sanitize each line, return the sanitized bytes
     capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the most
@@ -354,7 +384,10 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
     # Tail-truncate first so we never burn CPU sanitizing bytes we'd
     # drop anyway.
     if len(raw) > _PER_FILE_MAX_BYTES:
+        starts_midline = raw[-_PER_FILE_MAX_BYTES - 1] != ord("\n")
         raw = raw[-_PER_FILE_MAX_BYTES:]
+        if starts_midline:
+            raw = raw.partition(b"\n")[2]
     try:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
@@ -365,7 +398,14 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
         def scrubber(line):
             return _sanitize_log_line(line, install_paths)
     sanitized_lines = []
+    in_progress_payload = False
     for line in text.splitlines(keepends=True):
+        if in_progress_payload and not _APP_LOG_HEADER.match(line):
+            continue
+        payload = _KOSYNC_PAYLOAD_LOG.match(line)
+        in_progress_payload = payload is not None
+        if payload:
+            line = payload.group(1) + REDACTED_PLACEHOLDER + "\n"
         sanitized_lines.append(scrubber(line))
     return "".join(sanitized_lines).encode("utf-8")
 
@@ -511,7 +551,8 @@ _SANITIZED_NOTE = (
     "This debug pack has been sanitized for sharing in public issues.\n"
     "\n"
     "What was removed or replaced:\n"
-    "  * Settings: passwords, OAuth tokens, LDAP bind passwords, API keys.\n"
+    "  * Settings: credentials, SMTP identifiers, and configured file paths.\n"
+    "  * Legacy KOReader progress request and response payloads.\n"
     "  * Logs: public IPs, /config/ and /calibre-library/ paths,\n"
     "          Authorization: Bearer/Basic header values, JWT-shaped tokens,\n"
     "          Kobo sync tokens in /kobo/<token>/ URLs, email addresses\n"

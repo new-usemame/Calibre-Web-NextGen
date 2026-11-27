@@ -1435,7 +1435,7 @@ def get_progress(document: str):
         Percentage is returned as decimal (0.4567 = 45.67%) as expected by KOReader.
         Internally stored as percentage (0-100) in database.
     """
-    endpoint = f"GET /kosync/syncs/progress/{document}"
+    endpoint = "GET /kosync/syncs/progress/<document>"
     log.debug(endpoint)
     try:
         blocked = _require_kosync_enabled()
@@ -1547,7 +1547,7 @@ def get_progress(document: str):
             if anchor:
                 response_data["anchor"] = anchor
 
-        log.debug(endpoint + f" Response: {response_data}")
+        log.debug("%s response sent", endpoint)
 
         return create_sync_response(response_data)
 
@@ -2542,7 +2542,7 @@ def update_progress():
     Note:
         Percentage is converted from decimal (0.9411 = 94.11%) to percentage (94.11).
     """
-    endpoint = f"PUT /kosync/syncs/progress/<document> with: {request.get_json()}"
+    endpoint = "PUT /kosync/syncs/progress/<document>"
     log.debug(endpoint)
     try:
         blocked = _require_kosync_enabled()
@@ -2890,7 +2890,7 @@ def update_progress():
                 log.error(f"Unexpected error updating ReadBook status for book {book_id}: {e}")
                 ub.session.rollback()
 
-        log.debug(endpoint + f" Response: {response_data}")
+        log.debug("%s response sent", endpoint)
 
         return create_sync_response(response_data)
 

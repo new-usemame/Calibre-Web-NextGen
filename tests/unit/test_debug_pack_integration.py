@@ -98,6 +98,47 @@ class TestBuildDebugZipSanitized:
         assert "<library>/" in log_blob
         assert "Bearer <redacted>" in log_blob
 
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_smtp_fields_and_configured_paths_are_private(self, fake_config_and_logs, sanitize):
+        from cps.debug_info import _build_debug_zip
+
+        _, _, _, settings = fake_config_and_logs
+        private = {
+            "mail_server": "smtp.private.test",
+            "mail_login": "login@private.test",
+            "mail_from": "Private Sender <sender@private.test>",
+            "config_calibre_dir": "/srv/Private Reader",
+            "config_logfile": "/srv/private-logs/cwng.log",
+            "config_ldap_cacert_path": "/etc/private-certs/ldap.pem",
+        }
+        settings.update(private)
+        with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
+            exported = json.loads(zf.read("settings.txt"))
+        assert exported["config_port"] == 8083
+        for key, value in private.items():
+            assert exported[key] == ("<redacted>" if sanitize else value), key
+
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_old_progress_payloads_are_private(self, fake_config_and_logs, sanitize):
+        from cps.debug_info import _build_debug_zip
+
+        _, log_path, _, _ = fake_config_and_logs
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(
+                "[2026-05-26 12:01:00] DEBUG {cps.progress_syncing.protocols.kosync:2546} "
+                "PUT /kosync/syncs/progress/<document> with: {'device': 'private-device'}\n"
+                "private-continuation\n"
+                "[2026-05-26 12:01:01] DEBUG {cps.progress_syncing.protocols.kosync:1550} "
+                "GET /kosync/syncs/progress/old-document-id Response: {'progress': 'private-position'}\n"
+                "[2026-05-26 12:01:02] INFO {cps.progress_syncing.protocols.kosync:50} "
+                "Progress request completed\n"
+            )
+        with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
+            log = zf.read("calibre-web.log").decode("utf-8")
+        for value in ("private-device", "private-continuation", "old-document-id", "private-position"):
+            assert (value in log) is not sanitize
+        assert "Progress request completed" in log
+
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip
 

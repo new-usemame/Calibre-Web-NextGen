@@ -95,8 +95,8 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         category: 'Under the hood',
       },
       {
-        title: 'Use more of the app in Simplified Chinese',
-        body: 'The catalog now covers more of the cover recovery, Hardcover review and custom-value controls.',
+        title: 'Use more of the app in Portuguese and Chinese',
+        body: 'European Portuguese now covers more of Hardcover review, shelves and annotations. Simplified Chinese adds wording for cover recovery and custom-value controls.',
         category: 'Under the hood',
       },
     ],

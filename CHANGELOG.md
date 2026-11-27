@@ -20,7 +20,7 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **More of the app is available in Simplified Chinese.** This includes cover recovery, Hardcover review and custom-value controls. Thanks to @systemannounce in #3042.
+- **More of the app is available in European Portuguese and Simplified Chinese.** European Portuguese covers more of Hardcover review, shelves and annotations. Simplified Chinese covers more of cover recovery and custom-value controls. Thanks to @SLLIM20 in #3034 and @systemannounce in #3042.
 
 
 - **Opening several books in KOReader no longer scans the device library each time.** Automatic delivery checks share a five-minute interval across the reader and file browser. Manual collection stays immediate, and the server processes large inventory reports in batches.

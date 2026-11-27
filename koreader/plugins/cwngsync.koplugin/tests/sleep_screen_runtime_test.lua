@@ -190,6 +190,7 @@ install("cwng_home", {})
 install("cwng_setup", {})
 install("cwng_setup_flow", {})
 install("cwng_library_runtime", {
+    accountOwner = function(self) return self.settings.server .. "|" .. self.settings.username end,
     isConfigured = function(self)
         return self.settings and self.settings.server and self.settings.username and self.settings.password
     end,

@@ -23,6 +23,7 @@ is the extracted guard, so there is one answer instead of four.
 """
 
 import importlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -135,6 +136,41 @@ class TestChownToServiceUser:
         assert result is True
         assert captured["command"] == ["chown", "-R", "1000:1000", "--", str(tmp_path)]
         assert captured["check"] is True
+
+    @pytest.mark.unit
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX ownership and symlinks")
+    @pytest.mark.parametrize(("uid_offset", "gid_offset"), [(0, 0), (1, 0), (0, 1)])
+    def test_skip_matching_only_passes_mismatched_entries_to_chown(
+        self, service_user, monkeypatch, tmp_path, uid_offset, gid_offset
+    ):
+        monkeypatch.chdir(tmp_path)
+        library = Path("-library")
+        library.mkdir()
+        (library / "book.epub").touch()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "untouched.epub").touch()
+        (library / "link").symlink_to(outside, target_is_directory=True)
+
+        owner = library.stat()
+        uid, gid = owner.st_uid + uid_offset, owner.st_gid + gid_offset
+        monkeypatch.setattr(service_user, "service_ids", lambda: (uid, gid))
+        monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+        calls = tmp_path / "chown-args"
+        monkeypatch.setenv("CWNG_CHOWN_ARGS", str(calls))
+        recorder = tmp_path / "chown"
+        recorder.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" >> \"$CWNG_CHOWN_ARGS\"\n")
+        recorder.chmod(0o755)
+
+        assert service_user.chown_to_service_user(library, "[test]", skip_matching=True)
+        if uid_offset or gid_offset:
+            args = calls.read_text().splitlines()
+            assert args[:3] == ["-h", "--", f"{uid}:{gid}"]
+            assert {Path(path) for path in args[3:]} == {
+                library, library / "book.epub", library / "link",
+            }
+        else:
+            assert not calls.exists()
 
     def test_non_recursive_for_a_single_log_file(self, service_user, monkeypatch, tmp_path):
         monkeypatch.setattr(service_user, "service_ids", lambda: (1000, 1000))

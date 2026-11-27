@@ -2935,7 +2935,7 @@ msgstr "Erro ao abrir estante. A estante não existe ou não está acessível"
 #: cps/shelf.py
 #, python-format
 msgid "Invalid order mode: %(mode)s"
-msgstr "Modo de pedido inválido: %(mode)s"
+msgstr "Modo de ordenação inválido: %(mode)s"
 
 #: cps/shelf.py
 msgid "Invalid payload: 'order' must be a list"

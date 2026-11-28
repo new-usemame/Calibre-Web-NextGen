@@ -16,6 +16,20 @@ export function showsProjectSupport(me: Me | undefined | null): boolean {
 }
 
 /**
+ * May this user download the sanitised support pack?
+ *
+ * The pack is built by the classic `/admin/debug/support-pack` endpoint, which
+ * is admin-only on the server (`cps/admin.py`). This only decides whether the
+ * Help menu offers the link, so a non-admin never sees a dead end.
+ */
+export function canDownloadSupportPack(me: Me | undefined | null): boolean {
+  return !!me?.role.admin;
+}
+
+/** Classic endpoint that builds the sanitised support pack (same-origin download). */
+export const SUPPORT_PACK_URL = '/admin/debug/support-pack';
+
+/**
  * May this user add book files right now?
  *
  * Two-part gate, mirroring how classic gates its navbar upload button

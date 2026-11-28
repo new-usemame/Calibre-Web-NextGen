@@ -14374,7 +14374,7 @@ msgstr ""
 
 #: cps/templates/admin.html
 msgid "Get Support Pack"
-msgstr ""
+msgstr "Ondersteuningspakket ophalen"
 
 #: cps/templates/admin.html
 msgid ""
@@ -21950,3 +21950,23 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Calibre library rating (1-10)"
 #~ msgstr "Calibre-bibliotheekbeoordeling (1–10)"
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Preparing the pack… this can take a little while. Please don't click again."
+msgstr "Het pakket wordt voorbereid… dit kan even duren. Klik alstublieft niet nogmaals."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Your download has started."
+msgstr "De download is gestart."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "A pack is already being prepared. Please wait a few seconds, then try again."
+msgstr "Er wordt al een pakket voorbereid. Wacht een paar seconden en probeer het daarna opnieuw."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "The pack could not be created. Please try again, or check the logs."
+msgstr "Het pakket kon niet worden gemaakt. Probeer het opnieuw of bekijk de logboeken."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "This is taking longer than expected. If nothing downloads, wait a minute and try again."
+msgstr "Dit duurt langer dan verwacht. Als er niets wordt gedownload, wacht dan een minuut en probeer het opnieuw."

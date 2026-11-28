@@ -188,8 +188,9 @@ class TestBuildDebugZipSanitized:
             assert zf.read(app_name).decode("utf-8") == next_record
             assert zf.read(access_name).decode("utf-8").endswith(access_record)
 
+    @pytest.mark.parametrize("long_payload", [False, True])
     def test_app_rotation_keeps_its_format_when_it_matches_an_access_path(
-            self, fake_config_and_logs, monkeypatch):
+            self, fake_config_and_logs, monkeypatch, long_payload):
         from cps import debug_info
 
         directory, _, _, _ = fake_config_and_logs
@@ -199,7 +200,8 @@ class TestBuildDebugZipSanitized:
         rotated.write_text(
             "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
             "PUT /kosync/syncs/progress/<document> with: private-start\n"
-            "private-continued-request\nprivate-second-line\n" + next_record,
+            + ("long-private-continuation\n" * 100 if long_payload else "")
+            + "private-continued-request\nprivate-second-line\n" + next_record,
             encoding="utf-8",
         )
         monkeypatch.setattr(debug_info.config, "config_logfile", str(app_log))
@@ -226,6 +228,40 @@ class TestBuildDebugZipSanitized:
             assert archive.read(configured.name) == b"active record\n"
             assert archive.read(rotated.name) == b"rotated record\n"
             assert neighboring.name not in archive.namelist()
+
+    @pytest.mark.parametrize("sanitize", [True, False])
+    @pytest.mark.parametrize("document", ["fixture-document", "fixture-title Draft, revision.epub"])
+    def test_pack_masks_identifiers_in_ordinary_koreader_diagnostics(
+            self, fake_config_and_logs, sanitize, document):
+        from urllib.parse import quote
+
+        from cps.debug_info import _build_debug_zip
+
+        _, log_path, access_path, _ = fake_config_and_logs
+        log_path.write_text(
+            "[2026-11-28 12:01:01] DEBUG {cps.kosync:42} "
+            f"Progress found: <KOSyncProgress user=3 doc={document}>\n"
+            "[2026-11-28 12:01:02] INFO {cps.progress_syncing.protocols.kosync:43} "
+            f"Preserved furthest kosync progress: user=3, document={document}, "
+            "incoming=22.00%, accepted=23.00%, incoming_device_id='fixture-device'\n"
+            "[2026-11-28 12:01:03] INFO {cps.kosync:45} "
+            "No book found for checksum: fixture-checksum\n"
+            "[2026-11-28 12:01:04] INFO {cps.web:44} document=public-fixture-line\n",
+            encoding="utf-8",
+        )
+        access_path.write_text(
+            f'"GET /kosync/syncs/progress/{quote(document)} HTTP/1.1" 200 10\n',
+            encoding="utf-8",
+        )
+        with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as archive:
+            text = archive.read(log_path.name) + archive.read(access_path.name)
+        assert (document.encode() in text) is not sanitize
+        assert (b"revision.epub" in text) == (not sanitize and "revision.epub" in document)
+        assert (b"fixture-checksum" in text) is not sanitize
+        assert (b"fixture-device" in text) is not sanitize
+        assert b"accepted=23.00%" in text
+        assert b"document=public-fixture-line" in text
+        assert b"HTTP/1.1" in text
 
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip

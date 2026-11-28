@@ -13,14 +13,18 @@ import json
 import os
 import re
 import shutil
+import threading
 import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 
-from flask import send_file
+from flask import has_request_context, request, send_file
 from flask_babel.speaklater import LazyString
 
 from . import logger, config, constants, support_pack_state
 from .about import collect_stats
+from .spa import mount_cookie_path
+from .services import parallel
 
 log = logger.create()
 
@@ -219,6 +223,21 @@ _BASIC_PATTERN = re.compile(r"(Basic\s+)\S+", re.IGNORECASE)
 # segments intact.
 _KOBO_TOKEN_PATTERN = re.compile(r"(/kobo/)[0-9A-Za-z_\-]{16,}")
 
+# KOReader progress URLs and diagnostics carry document and device references.
+_KOSYNC_DOCUMENT_URL = re.compile(r"""(/kosync/syncs/progress/)[^/?\s"'<>]+""")
+_KOSYNC_LOG_SOURCE = re.compile(
+    r"^\[[^\]\r\n]+\] +[A-Z]+ \{cps\.(?:progress_syncing\.protocols\.)?kosync:\d+\} "
+)
+_KOSYNC_DOCUMENT_FIELD = re.compile(
+    r"(\b(?:doc=|document=|document_checksum:\s*|checksum:\s*|book by checksum ))"
+    r"[^\r\n]*?"
+    # Preserve only the structured suffixes emitted after document values.
+    r"(?=(?:>|, book_id: [\w-]+|, progress=[0-9.+-]+%|"
+    r", incoming=[0-9.+-]+%, accepted=[0-9.+-]+%, incoming_device_id=<device>)?\r?$)"
+)
+_KOSYNC_DEVICE_FIELD = re.compile(r"(\bincoming_device_id=)[^\r\n]*")
+
+
 # Email addresses (SMTP errors, login failures, send-to-eReader logs).
 _EMAIL_PATTERN = re.compile(
     r"[\w.%+\-]+(?:@|%40)[\w\-]+(?:\.[\w\-]+)*\.[^\W\d_]{2,}"
@@ -303,6 +322,10 @@ def _sanitize_log_line(line: str, install_paths=()) -> str:
     line = _BASIC_PATTERN.sub(r"\1<redacted>", line)
     # Kobo auth token in the URL path.
     line = _KOBO_TOKEN_PATTERN.sub(r"\1<token>", line)
+    line = _KOSYNC_DOCUMENT_URL.sub(r"\1<document>", line)
+    if _KOSYNC_LOG_SOURCE.match(line):
+        line = _KOSYNC_DEVICE_FIELD.sub(r"\1<device>", line)
+        line = _KOSYNC_DOCUMENT_FIELD.sub(r"\1<document>", line)
     return line
 
 
@@ -376,36 +399,188 @@ _KOSYNC_PAYLOAD_LOG = re.compile(
 )
 
 
+# APScheduler logs a "Running job" / "executed successfully" pair at INFO on
+# every run, and some jobs run every 5 seconds (#2673). Current releases keep
+# the executor logger at WARNING, but older rotated logs still hold the
+# pairs, and they come back at DEBUG, which is the level reporters are asked
+# to reproduce at. They are the bulk of such a log and say nothing a
+# maintainer needs, so the sanitised pack counts them instead of carrying
+# them. Failures, warnings and missed runs do not match and are kept.
+_ROUTINE_SCHEDULER_MARKER = "INFO {apscheduler.executors.default:"
+_LOG_TIMESTAMP_PATTERN = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+# Bound the work on a pathological file: past this many times the cap, only the
+# tail is even looked at.
+_RAW_READ_FACTOR = 4
+_LOG_HEADER_PEEK_BYTES = 512
+
+
+# --- tracebacks digest -------------------------------------------------------
+#
+# Tracebacks are already in the log files. In a long log they are a handful of
+# lines among thousands, so ``tracebacks.txt`` lifts them out: one entry per
+# place an exception was raised, with how often and when, and the most recent
+# full traceback. It is built from the text that goes into the pack (already
+# scrubbed in the sanitised one), so it cannot carry anything the logs do not.
+_TRACEBACK_HEADER = "Traceback (most recent call last):"
+_TRACEBACK_FRAME = re.compile(r'^\s*File "(?P<file>[^"]+)", line (?P<line>\d+), in (?P<func>\S+)', re.MULTILINE)
+MAX_TRACEBACK_GROUPS = 20
+_MAX_TRACEBACK_CHARS = 6000
+_MAX_TRACEBACKS_FILE_BYTES = 64 * 1024
+
+
+def _extract_tracebacks(text: str):
+    """Yield ``(timestamp, traceback text, exception line)`` for each traceback.
+
+    A traceback is the header, the indented frame lines under it, and the first
+    unindented line after them (the exception). The timestamp is the most recent
+    log record's, since the traceback follows its record's message line."""
+    if _TRACEBACK_HEADER not in text:
+        return
+    lines = text.splitlines()
+    timestamp = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stamp = _LOG_TIMESTAMP_PATTERN.match(line)
+        if stamp:
+            timestamp = stamp.group(1)
+        if line.startswith(_TRACEBACK_HEADER):
+            end = index + 1
+            while end < len(lines) and lines[end].startswith((" ", "\t")):
+                end += 1
+            last = min(end, len(lines) - 1)
+            yield timestamp, "\n".join(lines[index:last + 1]), lines[last]
+            index = last
+        index += 1
+
+
+def _traceback_site(block: str, exception_line: str) -> str:
+    """Where it was raised: ``ExceptionType @ file.py:LINE in function``."""
+    exc_type = exception_line.split(":", 1)[0].strip() or "unknown"
+    frame = None
+    for match in _TRACEBACK_FRAME.finditer(block):
+        frame = match
+    if frame is None:
+        return exc_type
+    name = os.path.basename(frame.group("file"))
+    return f"{exc_type} @ {name}:{frame.group('line')} in {frame.group('func')}"
+
+
+def _clip_traceback(block: str) -> str:
+    """Keep the top and the tail of an over-long traceback: the entry point and
+    the failing frames matter, the middle of a deep recursion does not."""
+    if len(block) <= _MAX_TRACEBACK_CHARS:
+        return block
+    head, tail = block[:1200], block[-(_MAX_TRACEBACK_CHARS - 1200):]
+    return f"{head}\n  ... [{len(block) - _MAX_TRACEBACK_CHARS:,} characters omitted] ...\n{tail}"
+
+
+class _TracebackDigest:
+    def __init__(self):
+        self._groups = {}
+        self._total = 0
+
+    def feed(self, text: str) -> None:
+        for timestamp, block, exception_line in _extract_tracebacks(text):
+            self._total += 1
+            site = _traceback_site(block, exception_line)
+            group = self._groups.setdefault(site, {
+                "count": 0, "first": None, "last": None, "exception": "", "block": "",
+            })
+            group["count"] += 1
+            if timestamp:
+                group["first"] = timestamp if group["first"] is None or timestamp < group["first"] else group["first"]
+            # The sample is the most recent occurrence; without timestamps, the latest one fed.
+            if not timestamp or group["last"] is None or timestamp >= group["last"]:
+                group["last"] = timestamp or group["last"]
+                group["exception"] = exception_line.strip()[:300]
+                group["block"] = _clip_traceback(block)
+
+    def render(self, source_label: str) -> str:
+        if not self._total:
+            return (f"No tracebacks were found in the included application logs ({source_label}).\n"
+                    "That is evidence too: if you are chasing an error, it was not logged as one.\n")
+        ordered = sorted(self._groups.items(), key=lambda item: item[1]["last"] or "", reverse=True)
+        shown = ordered[:MAX_TRACEBACK_GROUPS]
+        out = [
+            f"{self._total:,} traceback(s) in {len(self._groups):,} distinct place(s) in the included "
+            f"application logs ({source_label}).\n",
+            "One entry per place the exception was raised, most recently seen first, with the most "
+            "recent full traceback.\n",
+        ]
+        if len(ordered) > len(shown):
+            out.append(f"Showing the {len(shown)} most recent; {len(ordered) - len(shown)} older place(s) omitted.\n")
+        for number, (site, group) in enumerate(shown, 1):
+            span = f", first {group['first']}, last {group['last']}" if group["first"] and group["last"] else ""
+            out.append(f"\n== {number}. {site}\nseen {group['count']:,} time(s){span}\n\n{group['block']}\n")
+        text = "".join(out)
+        data = text.encode("utf-8")
+        if len(data) > _MAX_TRACEBACKS_FILE_BYTES:
+            text = data[:_MAX_TRACEBACKS_FILE_BYTES].decode("utf-8", errors="ignore") + "\n[digest truncated]\n"
+        return text
+
+
+def _is_routine_scheduler_line(line: str) -> bool:
+    """A successful-run line from the APScheduler executor, at INFO."""
+    return (_ROUTINE_SCHEDULER_MARKER in line
+            and (" executed successfully" in line or ' Running job "' in line))
+
+
+def _omitted_lines_header(count: int, first_ts, last_ts) -> str:
+    span = f" logged between {first_ts} and {last_ts}" if first_ts and last_ts else ""
+    return (f"[support pack] Omitted {count:,} routine APScheduler per-run lines "
+            f'("Running job" / "executed successfully"){span}. '
+            "Errors, warnings and missed runs are kept.\n")
+
+
+def _starts_with_app_log_header(data: bytes) -> bool:
+    return bool(_APP_LOG_HEADER.match(data[:_LOG_HEADER_PEEK_BYTES].decode("utf-8", errors="replace")))
+
+
 def _sanitize_log_bytes(raw: bytes, scrubber=None, *, app_log=False) -> bytes:
-    """Read a log file, sanitize each line, return the sanitized bytes
-    capped at ``_PER_FILE_MAX_BYTES`` (tail-biased: keep the most
-    recent content, drop the head if oversize)."""
+    """``_sanitize_log`` without the report of whether the head was dropped."""
+    return _sanitize_log(raw, scrubber, app_log=app_log)[0]
+
+
+def _sanitize_log(raw: bytes, scrubber=None, *, app_log=False, was_cut=False):
+    """Read a log file, drop routine scheduler lines, sanitize the rest, and
+    return ``(data, cut)``: the result capped at ``_PER_FILE_MAX_BYTES``
+    (tail-biased: keep the most recent content, drop the head if oversize), and
+    whether the oldest content was dropped to fit that cap.
+
+    ``cut`` is about the size cap only. Routine scheduler lines that are counted
+    instead of carried are announced by the header note, not by ``cut``.
+
+    Order matters. Routine lines are dropped *before* the cap, so the cap
+    spends its budget on lines worth reading rather than on noise, and the cap
+    is applied *before* scrubbing, so no CPU goes on bytes that would be
+    dropped anyway."""
     if not raw:
-        return raw
-    # Tail-truncate first so we never burn CPU sanitizing bytes we'd
-    # drop anyway.
-    truncated = len(raw) > _PER_FILE_MAX_BYTES
-    if truncated:
-        # An application rollover can land at a configured access path.
-        # Prefer a real application header in the file to its filename.
-        app_log = app_log or bool(_APP_LOG_HEADER.match(raw[:512].decode("utf-8", errors="replace")))
-        starts_midline = raw[-_PER_FILE_MAX_BYTES - 1] != ord("\n")
-        raw = raw[-_PER_FILE_MAX_BYTES:]
-        if starts_midline:
-            raw = raw.partition(b"\n")[2]
+        return raw, was_cut
+    app_log = app_log or _starts_with_app_log_header(raw)
+    cut = was_cut
+    if len(raw) > _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:
+        cut = True
+        raw = raw[-_PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:]
+        newline = raw.find(b"\n")
+        if newline != -1:
+            raw = raw[newline + 1:]  # the first line is cut mid-way
     try:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
-        return raw
+        return raw[-_PER_FILE_MAX_BYTES:], True
     if scrubber is None:
         install_paths = _install_path_patterns()
 
         def scrubber(line):
             return _sanitize_log_line(line, install_paths)
-    sanitized_lines = []
-    # An application log tail can start inside a legacy multiline record.
-    # Wait for a complete record header when we have dropped its prefix.
-    in_progress_payload = app_log and truncated
+
+    kept = []
+    omitted = 0
+    first_ts = last_ts = None
+    # A bounded read can start in an old multiline progress record.
+    # Keep nothing from its orphaned continuation before a complete header.
+    in_progress_payload = app_log and cut
     for line in text.splitlines(keepends=True):
         if in_progress_payload and not _APP_LOG_HEADER.match(line):
             continue
@@ -413,9 +588,64 @@ def _sanitize_log_bytes(raw: bytes, scrubber=None, *, app_log=False) -> bytes:
         in_progress_payload = payload is not None
         if payload:
             line = payload.group(1) + REDACTED_PLACEHOLDER + "\n"
-        sanitized_lines.append(scrubber(line))
-    return "".join(sanitized_lines).encode("utf-8")
+        if _is_routine_scheduler_line(line):
+            omitted += 1
+            stamp = _LOG_TIMESTAMP_PATTERN.match(line)
+            if stamp:
+                ts = stamp.group(1)
+                first_ts = ts if first_ts is None or ts < first_ts else first_ts
+                last_ts = ts if last_ts is None or ts > last_ts else last_ts
+            continue
+        kept.append(line)
 
+    # Cap what is left before scrubbing, so no CPU goes on lines that would be
+    # dropped anyway, counted in bytes.
+    within_cap = _tail_within(kept, _PER_FILE_MAX_BYTES)
+    cut = cut or len(within_cap) < len(kept)
+    kept = within_cap
+
+    # Scrubbing can make a line longer (a short address becomes "<email_1>") and
+    # the omission note adds bytes, so cap again on what is actually written: the
+    # file in the archive is never over the limit, whatever redaction did.
+    scrubbed = [scrubber(line) for line in kept]
+    header = _omitted_lines_header(omitted, first_ts, last_ts) if omitted else ""
+    budget = _PER_FILE_MAX_BYTES - len(header.encode("utf-8"))
+    if budget < 0:  # the note alone does not fit: drop it rather than break the cap
+        header, budget = "", _PER_FILE_MAX_BYTES
+    final = _tail_within(scrubbed, budget)
+    cut = cut or len(final) < len(scrubbed)
+    return (header + "".join(final)).encode("utf-8"), cut
+
+
+def _tail_within(lines, limit: int):
+    """The longest run of whole lines, from the end, that fits in ``limit`` bytes."""
+    total = 0
+    start = len(lines)
+    for index in range(len(lines) - 1, -1, -1):
+        total += len(lines[index].encode("utf-8", errors="replace"))
+        if total > limit:
+            break
+        start = index
+    return lines[start:]
+
+
+def _read_log_tail(path: str, limit: int):
+    """Return the bounded tail, whether it was cut, and the file's log format.
+
+    Read the header through the same handle as the tail. A rotated application
+    log can share an access log's path, and its tail can start inside a record.
+    A log that disappears before opening is reported by the caller.
+    """
+    with open(path, "rb") as fd:
+        size = os.fstat(fd.fileno()).st_size
+        if size <= limit:
+            data = fd.read(size)
+            return data, False, _starts_with_app_log_header(data)
+        app_header = _starts_with_app_log_header(fd.read(_LOG_HEADER_PEEK_BYTES))
+        fd.seek(size - limit)
+        data = fd.read(limit)
+    newline = data.find(b"\n")
+    return (data[newline + 1:] if newline != -1 else data), True, app_header
 
 # ---------------------------------------------------------------------------
 # Existing entry points (kept verbatim where unchanged).
@@ -445,6 +675,34 @@ def assemble_logfiles(file_name):
         return send_file(wfd,
                          as_attachment=True,
                          download_name=os.path.basename(file_name))
+
+
+def _resolve_integration_inputs() -> dict:
+    """Live inputs for the per-integration sections (``support_pack_integrations``).
+
+    Each lookup is independent and best-effort: an input that cannot be read
+    is omitted, and its section reports it as unavailable.
+    """
+    inputs = {}
+    try:
+        inputs["mail_settings"] = {
+            "configured": config.get_mail_server_configured(),
+            "server_type": config.mail_server_type,
+            "port": config.mail_port,
+            "encryption": config.mail_use_ssl,
+            "max_attachment_bytes": config.mail_size,
+        }
+    except Exception:  # pylint: disable=broad-except
+        pass
+    try:
+        from .services.worker import WorkerThread
+        inputs["worker_tasks"] = [
+            (type(queued.task).__name__, queued.task.stat)
+            for queued in WorkerThread.get_instance().tasks
+        ]
+    except Exception:  # pylint: disable=broad-except
+        pass
+    return inputs
 
 
 def _resolve_state_paths() -> dict:
@@ -507,10 +765,15 @@ def _known_usernames():
         return None
 
 
-def _build_debug_zip(sanitize: bool):
-    """Build the in-memory debug pack. When ``sanitize`` is True the
-    settings file is redacted and every log line is scrubbed for IPs,
-    paths, and auth headers."""
+def _prepare_pack(sanitize: bool) -> dict:
+    """Everything the pack needs from live application state.
+
+    Runs on the request greenlet, on purpose. The database session, the
+    config object and the worker's task list are not safe to touch from the
+    offload thread while other requests use them, so they are read here, into
+    plain data. ``_assemble_pack`` then does the heavy file work on that data
+    and nothing else.
+    """
     log_sources = (
         (logger.get_accesslogfile(config.config_access_logfile), False),
         (logger.get_logfile(config.config_logfile), True),
@@ -528,33 +791,89 @@ def _build_debug_zip(sanitize: bool):
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
-    state_files = support_pack_state.collect_all(_resolve_state_paths(), sanitized=sanitize)
-    scrubber = None
-    note = _SANITIZED_NOTE
+    names = None
     if sanitize:
         settings_dict = _redact_for_export(settings_dict)
         names = _known_usernames()
-        scrubber = _LogScrubber(known_names=names or ())
-        if names is None:
+    return {
+        "sanitize": sanitize,
+        "log_files": log_files,
+        "settings": settings_dict,
+        "libs": libs_dict,
+        "paths": _resolve_state_paths(),
+        "integrations": _resolve_integration_inputs(),
+        "names": names,
+    }
+
+
+def _assemble_pack(prep: dict):
+    """Build the in-memory zip from ``_prepare_pack``'s data.
+
+    Pure file and SQLite work, so it is safe to run on the offload pool, which
+    is where the endpoints run it: reading, scrubbing and compressing logs is
+    seconds of CPU on a Raspberry Pi, and gevent here is not monkey-patched, so
+    doing it on the request greenlet froze every other request until it
+    finished.
+    """
+    sanitize = prep["sanitize"]
+    state_files = support_pack_state.collect_all(
+        prep["paths"], sanitized=sanitize, integrations=prep["integrations"]
+    )
+    scrubber = None
+    note = _SANITIZED_NOTE
+    if sanitize:
+        scrubber = _LogScrubber(known_names=prep["names"] or ())
+        if prep["names"] is None:
             note += _USERNAME_LOOKUP_FAILED_NOTE
 
     memory_zip = BytesIO()
+    log_status = []
     with zipfile.ZipFile(memory_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('settings.txt', json.dumps(settings_dict, sort_keys=True, indent=2))
-        zf.writestr('libs.txt', json.dumps(libs_dict, sort_keys=True, indent=2, cls=lazyEncoder))
+        zf.writestr('settings.txt', json.dumps(prep["settings"], sort_keys=True, indent=2))
+        zf.writestr('libs.txt', json.dumps(prep["libs"], sort_keys=True, indent=2, cls=lazyEncoder))
+        # The manifest is written last, once it can say how each log fared.
+        manifest = json.loads(state_files.pop("manifest.json"))
         for state_name, state_bytes in state_files.items():
             zf.writestr(state_name, state_bytes)
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
-        for fp, app_log in log_files.items():
+        digest = _TracebackDigest()
+        for fp, app_log in prep["log_files"].items():
+            name = os.path.basename(fp)
+            try:
+                raw, was_cut, app_header = _read_log_tail(fp, _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR)
+            except FileNotFoundError:
+                # Rotated away between the directory listing and the read.
+                log_status.append({"file": name, "status": "missing"})
+                continue
+            except OSError:
+                log_status.append({"file": name, "status": "unreadable"})
+                continue
+            app_log = app_log or app_header
             if sanitize:
-                with open(fp, 'rb') as fd:
-                    raw = fd.read()
-                zf.writestr(os.path.basename(fp), _sanitize_log_bytes(raw, scrubber, app_log=app_log))
+                data, was_cut = _sanitize_log(raw, scrubber, app_log=app_log, was_cut=was_cut)
             else:
-                zf.write(fp, os.path.basename(fp))
+                data = raw
+            zf.writestr(name, data)
+            if app_log:
+                # From the same bytes that went into the archive, so the digest can
+                # never describe a different version of the file.
+                digest.feed(data.decode("utf-8", errors="replace"))
+            log_status.append({"file": name, "status": "included", "bytes": len(data), "cut_to_tail": was_cut})
+        app_log_path = next((path for path, app_log in prep["log_files"].items() if app_log), None)
+        source_label = (os.path.basename(app_log_path).split(".log")[0] + ".log*"
+                        if app_log_path else "no application log")
+        zf.writestr('tracebacks.txt', digest.render(source_label))
+        manifest["logs"] = log_status
+        zf.writestr('manifest.json', json.dumps(manifest, sort_keys=True, indent=2))
     memory_zip.seek(0)
     return memory_zip
+
+
+def _build_debug_zip(sanitize: bool):
+    """Build the pack synchronously: prepare, then assemble. The endpoints use
+    ``_get_pack`` instead, which assembles off the request greenlet."""
+    return _assemble_pack(_prepare_pack(sanitize))
 
 
 _USERNAME_LOOKUP_FAILED_NOTE = (
@@ -568,22 +887,31 @@ _SANITIZED_NOTE = (
     "\n"
     "What was removed or replaced:\n"
     "  * Settings: credentials, SMTP identifiers, and configured file paths.\n"
-    "  * Legacy KOReader progress request and response payloads.\n"
+    "  * KOReader document and device references and legacy progress payloads.\n"
     "  * Logs: public IPs, /config/ and /calibre-library/ paths,\n"
     "          Authorization: Bearer/Basic header values, JWT-shaped tokens,\n"
     "          Kobo sync tokens in /kobo/<token>/ URLs, email addresses\n"
     "          (<email_1>, <email_2>, ...) and account names (<user_1>, ...).\n"
     "          The same email or account gets the same label throughout this\n"
     "          pack; labels are not stable between packs.\n"
+    "  * Logs: routine APScheduler per-run lines (\"Running job\" and\n"
+    "          \"executed successfully\") are omitted and counted in a note at\n"
+    "          the top of each log file. Failures, warnings and missed runs\n"
+    "          are kept.\n"
     "\n"
     "What was kept:\n"
     "  * Loopback IP (127.0.0.1), timestamps, log levels, error messages,\n"
     "    book titles, request paths, application stack traces.\n"
+    "  * tracebacks.txt lifts the tracebacks out of the application logs, one\n"
+    "    entry per place an exception was raised. It is built from the already\n"
+    "    scrubbed log text, so it holds nothing the logs do not.\n"
     "\n"
     "Each log file is capped at the last 10 MiB so the zip stays small.\n"
     "\n"
-    "manifest.json and state/*.json hold versions, sizes, counts and mount\n"
-    "types only: no paths, IPs, usernames, titles or row contents.\n"
+    "manifest.json and state/*.json hold versions, sizes, counts, mount types\n"
+    "and device kind, model and firmware only. KOReader device references are\n"
+    "scoped to this pack. The summaries omit paths, IPs, usernames, email\n"
+    "addresses, titles and row contents.\n"
     "\n"
     "If you'd rather not share even the sanitized version, the Download Debug\n"
     "Package button (next to this one) generates an UNREDACTED pack for\n"
@@ -591,29 +919,148 @@ _SANITIZED_NOTE = (
 )
 
 
-def send_debug():
-    """Unsanitized debug pack — admin/internal use only."""
-    memory_zip = _build_debug_zip(sanitize=False)
+class PackBusy(Exception):
+    """A pack is already being built."""
+
+
+# One pack at a time, across both kinds. The flag is guarded by a real lock
+# that is only held for the two assignments, never across the build, so
+# taking it cannot block the hub.
+_pack_state_lock = threading.Lock()
+_pack_in_progress = False
+
+PACK_BUSY_RETRY_SECONDS = 10
+
+
+def _get_pack(sanitize: bool) -> bytes:
+    """Build a pack without freezing the app, one at a time.
+
+    * Off the hub: inputs are read here on the request greenlet, and the file
+      work runs on the shared offload pool (``parallel.run_blocking``), so
+      every other request keeps being served while a pack builds.
+    * Single-flight: a second request while one is building raises
+      ``PackBusy`` straight away instead of queueing another build behind it.
+      Before this, fifteen clicks meant fifteen serial builds on the one
+      thread everything shares, a reverse-proxy 504, and an app that stayed
+      frozen until it was restarted.
+    """
+    global _pack_in_progress
+    with _pack_state_lock:
+        if _pack_in_progress:
+            raise PackBusy()
+        _pack_in_progress = True
+    # Once the native worker starts, it owns the gate. Cancelling the
+    # request stops its wait, but the worker still has to finish the archive.
+    worker_started = False
+    abandoned = False
+
+    def assemble():
+        global _pack_in_progress
+        nonlocal worker_started
+        with _pack_state_lock:
+            if abandoned:
+                return None
+            worker_started = True
+        try:
+            return _assemble_pack(prep).getvalue()
+        finally:
+            with _pack_state_lock:
+                _pack_in_progress = False
+
+    try:
+        prep = _prepare_pack(sanitize)
+        return parallel.run_blocking(assemble)
+    except BaseException:
+        with _pack_state_lock:
+            if not worker_started:
+                abandoned = True
+                _pack_in_progress = False
+        raise
+
+
+def _busy_response():
+    """429 with ``Retry-After``: the same pack is already being prepared."""
+    body = json.dumps({
+        "success": False,
+        "busy": True,
+        "message": "A support pack is already being prepared. Please wait a few seconds, "
+                   "then try again.",
+    })
+    return body, 429, {"Content-Type": "application/json",
+                       "Retry-After": str(PACK_BUSY_RETRY_SECONDS)}
+
+
+def _pack_filename(stem: str, now=None) -> str:
+    """``YYYYMMDD-HHMMSSZ-<stem>.zip``, stamped in UTC, timestamp first.
+
+    Several packs from the same instance land in one Downloads folder (and in
+    one issue), so the name says when each was made, and leading with the
+    stamp makes a folder listing sort chronologically. UTC, because the pack
+    is read by people in other timezones and ``manifest.json`` records
+    ``generated_at_utc``; the ``Z`` says so.
+    """
+    moment = now if now is not None else datetime.now(timezone.utc)
+    return f"{moment:%Y%m%d-%H%M%S}Z-{stem}.zip"
+
+
+# Download-start signal for the pages that offer the pack. A page generates a
+# random token, requests the normal download URL with ``?dl_token=<token>``, and
+# watches for this cookie. It appears only on a successful download, so the page
+# can tell "started" from "busy" or "failed" without holding the file in memory:
+# saving from a blob: URL is blocked by this app's CSP in Firefox (#2710).
+PACK_TOKEN_COOKIE = "cwng_pack_token"
+PACK_TOKEN_COOKIE_SECONDS = 60
+_PACK_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{8,64}")
+
+
+def _requested_token():
+    """The page's download token, if the request carries a well-formed one."""
+    if not has_request_context():
+        return None
+    token = request.args.get("dl_token", "")
+    return token if _PACK_TOKEN_PATTERN.fullmatch(token) else None
+
+
+def _is_attachment_get(response) -> bool:
+    """True only for a GET that is answering with the attachment itself.
+
+    The cookie says "your download started", so it must not go out on a HEAD
+    (which sends the headers and no file), nor on a partial or error answer.
+    """
+    return request.method == "GET" and response.status_code == 200
+
+
+def _send_zip(memory_zip, filename: str, token=None):
     version = importlib.metadata.version("flask")
     if int(version.split('.')[0]) < 2:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         attachment_filename="Calibre-Web-NextGen-debug-pack.zip")
+        response = send_file(memory_zip, as_attachment=True, attachment_filename=filename)
     else:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         download_name="Calibre-Web-NextGen-debug-pack.zip")
+        response = send_file(memory_zip, as_attachment=True, download_name=filename)
+    if token and _is_attachment_get(response):
+        # Readable by the page's script on purpose (not HttpOnly): it carries only
+        # a random token the page itself made up. Scoped to the app's mount path,
+        # not "/", so that two instances on one host do not see each other's
+        # token. It has to be the mount path rather than the download route: a
+        # cookie is only visible to pages under its Path, and the page that
+        # watches for it is not under /admin/debug.
+        response.set_cookie(PACK_TOKEN_COOKIE, token, max_age=PACK_TOKEN_COOKIE_SECONDS,
+                            path=mount_cookie_path(), samesite="Lax", secure=request.is_secure)
+    return response
+
+
+def _send_pack(sanitize: bool, stem: str):
+    try:
+        data = _get_pack(sanitize)
+    except PackBusy:
+        return _busy_response()
+    return _send_zip(BytesIO(data), _pack_filename(stem), _requested_token())
+
+
+def send_debug():
+    """Unsanitized debug pack — admin/internal use only."""
+    return _send_pack(False, "Calibre-Web-NextGen-debug-pack")
 
 
 def send_debug_sanitized():
     """Sanitized debug pack — safe to share in public issues."""
-    memory_zip = _build_debug_zip(sanitize=True)
-    version = importlib.metadata.version("flask")
-    if int(version.split('.')[0]) < 2:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         attachment_filename="Calibre-Web-NextGen-support-pack.zip")
-    else:
-        return send_file(memory_zip,
-                         as_attachment=True,
-                         download_name="Calibre-Web-NextGen-support-pack.zip")
+    return _send_pack(True, "Calibre-Web-NextGen-support-pack")

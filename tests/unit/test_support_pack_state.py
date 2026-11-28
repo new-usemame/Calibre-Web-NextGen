@@ -238,7 +238,8 @@ class TestCollectAll:
         assert manifest["kind"] == "cwng-support-pack" and manifest["sanitized"] is True
         assert manifest["generated_at_utc"].endswith("+00:00")
         assert {s["file"] for s in manifest["sections"]} == {
-            "state/runtime.json", "state/storage.json", "state/databases.json", "state/background.json"}
+            "state/runtime.json", "state/storage.json", "state/databases.json", "state/background.json",
+            "state/devices.json", "state/koreader.json", "state/email.json"}
         assert all(s["ok"] for s in manifest["sections"])
         for section in manifest["sections"]:
             assert section["bytes"] == len(files[section["file"]])

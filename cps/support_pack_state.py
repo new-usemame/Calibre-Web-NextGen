@@ -458,8 +458,8 @@ def _encode(section: dict) -> tuple:
 def _section_ok(value) -> bool:
     """Include nested failures in the manifest's per-section status."""
     if isinstance(value, dict):
-        if ("error" in value or value.get("timed_out") or value.get("truncated")
-                or value.get("quick_check") == "failed"):
+        if ("error" in value or value.get("unavailable") or value.get("timed_out")
+                or value.get("truncated") or value.get("quick_check") == "failed"):
             return False
         if "row_counts" in value and any(count is None for count in value["row_counts"].values()):
             return False
@@ -469,13 +469,36 @@ def _section_ok(value) -> bool:
     return True
 
 
-def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None) -> dict:
+def _koreader_enabled(cwa_db_path):
+    """Look up the flag without initializing or writing the live CWA database."""
+    if not cwa_db_path or not os.path.isfile(cwa_db_path):
+        return None
+    try:
+        conn = _open_readonly(cwa_db_path)
+        try:
+            row = conn.execute("SELECT koreader_sync_enabled FROM cwa_settings LIMIT 1").fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+    return bool(row[0]) if row is not None and row[0] is not None else None
+
+
+def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None,
+                integrations=None) -> dict:
     """Return ``{archive filename: bytes}`` for the manifest and every section.
 
     ``paths`` keys: ``config``, ``library``, ``ingest`` (directories),
     ``library_books`` (directory, split libraries only) and ``app_db``,
     ``cwa_db``, ``metadata_db`` (files). Any may be ``None``.
+
+    ``integrations`` carries the live inputs for the per-integration sections
+    such as mail settings and worker tasks. Missing keys report that input
+    as unavailable. The KOReader setting is read from the CWA database.
     """
+    from . import support_pack_integrations as integ
+
+    inputs = integrations or {}
     collectors = {
         "state/runtime.json": lambda: collect_runtime(environ),
         "state/storage.json": lambda: collect_storage(
@@ -492,6 +515,13 @@ def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, envir
         ),
         "state/background.json": lambda: collect_background(
             paths.get("cwa_db"), paths.get("ingest"), scheduler
+        ),
+        "state/devices.json": lambda: integ.collect_devices(paths.get("app_db")),
+        "state/koreader.json": lambda: integ.collect_koreader(
+            paths.get("app_db"), _koreader_enabled(paths.get("cwa_db"))
+        ),
+        "state/email.json": lambda: integ.collect_email(
+            inputs.get("mail_settings"), inputs.get("worker_tasks"), paths.get("app_db")
         ),
     }
     files: dict = {}

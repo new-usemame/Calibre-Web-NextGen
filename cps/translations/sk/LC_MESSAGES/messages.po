@@ -392,7 +392,7 @@ msgstr ""
 "Calibre-Web NextGen vyhľadá aktualizované obálky a aktualizuje ich náhľady, "
 "môže to chvíľu trvať?"
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -687,10 +687,6 @@ msgstr "Nastavenia naplánovaných úloh boli aktualizované"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Vyskytla sa neočakávaná chyba. Prosím, skúste to opäť neskôr."
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "názov"
 
 #: cps/admin.py
 #, python-format
@@ -2488,10 +2484,6 @@ msgid "Books organized in smart shelves"
 msgstr "Knihy usporiadané v inteligentných policiach"
 
 #: cps/opds.py
-msgid "description"
-msgstr "popis"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr "Knihy od autora %(name)s"
@@ -2928,6 +2920,13 @@ msgstr "Upravené (najstaršie → nedávne)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Ručne (presuňte nižšie)"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"
@@ -20942,6 +20941,12 @@ msgstr "Sprístupniť vybrané police cez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Zobraziť sekciu Prečítané/Neprečítané"
+
+#~ msgid "title"
+#~ msgstr "názov"
+
+#~ msgid "description"
+#~ msgstr "popis"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Niekoľko náhodných kníh z vašej knižnice"

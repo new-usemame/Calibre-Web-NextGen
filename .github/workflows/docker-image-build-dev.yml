@@ -172,11 +172,12 @@ jobs:
   # --------------------------------------------------------------------------------
   build-amd64:
     runs-on: ubuntu-latest
-    # ci-time-budget: keep the 30-minute cap for cold Docker builds.
+    # ci-time-budget: keep 60m for cold builds. A 30m cap killed two advancing
+    # package installs (#3032). Warm-build samples omit that cold path.
     # On 2026-11-19 the runtime apt layer took 17m46s and the successful
     # job took 19m36s (run 44479897685, job 135409682143).
-    # ci-time-budget 2026-11-20: shorten 60 -> 30 min; p50 1.7, p95 8.0, max 19.6 min over 40 main runs; p95 8.0 min is 13% of the 60-min limit.
-    timeout-minutes: 30
+    # ci-time-budget 2026-11-23: raise 30 -> 60 min; p50 1.6, p95 2.2, max 2.4 min over 35 main runs; 1 advancing kill(s) after this tool shortened it on 2026-11-20; restoring 60.
+    timeout-minutes: 60
     needs: [classify, alias-image-neutral-commit, ensure-mirror]
     if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:

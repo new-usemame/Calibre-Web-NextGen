@@ -17,7 +17,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.19.0\n"
 
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
@@ -367,7 +367,7 @@ msgid ""
 "Thumbnails, this may take a while?"
 msgstr ""
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force"
 " a full sync with your Kobo Reader?"
@@ -630,10 +630,6 @@ msgstr ""
 
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
-msgstr ""
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
 msgstr ""
 
 #: cps/admin.py
@@ -2310,10 +2306,6 @@ msgid "Books organized in smart shelves"
 msgstr ""
 
 #: cps/opds.py
-msgid "description"
-msgstr ""
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr ""
@@ -2733,6 +2725,13 @@ msgstr ""
 
 #: cps/shelf.py
 msgid "Manual (drag below)"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take "
+"many syncs to finish. Forcing another full sync part-way through starts "
+"again from the beginning."
 msgstr ""
 
 #: cps/spa_strings.py

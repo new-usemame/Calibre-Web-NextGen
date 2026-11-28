@@ -381,7 +381,7 @@ msgid ""
 "Thumbnails, this may take a while?"
 msgstr ""
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -668,11 +668,6 @@ msgstr "Actualizouse a configuración das tarefas programadas"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Sucedeu un erro descoñecido. Por favor volva a intentalo máis tarde."
-
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Título"
 
 #: cps/admin.py
 #, python-format
@@ -2420,11 +2415,6 @@ msgid "Books organized in smart shelves"
 msgstr "Libros organizados en andeis intelixentes"
 
 #: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Descrición"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr ""
@@ -2857,6 +2847,13 @@ msgstr ""
 
 #: cps/shelf.py
 msgid "Manual (drag below)"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -20094,6 +20091,14 @@ msgstr "sincronizar andeis seleccionados con Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar selección lidos/non lidos"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Título"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Descrición"
 
 #~ msgid "Categories"
 #~ msgstr "Categorías"

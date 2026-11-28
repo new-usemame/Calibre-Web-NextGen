@@ -95,17 +95,10 @@ class TestRedactorDefenseInDepth:
         assert long_token not in json.dumps(out)
 
     def test_long_random_string_in_innocuous_field_preserved(self):
-        # Calibre book paths, SHA-256 hashes, long URLs etc. are >=40
-        # chars but legitimate diagnostic content. Container testing
-        # caught these being blanked when the aggressive pattern ran
-        # on every field. Now only sensitive-named fields trigger it.
-        long_path = "/library/Some Long Author Name With Many Words/Book Title.epub"
+        # Keep long diagnostic values such as checksums when the field
+        # does not carry credentials or describe the host installation.
         sha256 = "a" * 64
-        out = _redactor()({
-            "config_calibre_dir": long_path,
-            "some_checksum_diagnostic": sha256,
-        })
-        assert out["config_calibre_dir"] == long_path
+        out = _redactor()({"some_checksum_diagnostic": sha256})
         assert out["some_checksum_diagnostic"] == sha256
 
 

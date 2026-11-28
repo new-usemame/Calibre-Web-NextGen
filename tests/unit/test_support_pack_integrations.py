@@ -97,7 +97,8 @@ class TestDevices:
         out = integ.collect_devices(app_db)
         kobo = out["devices"][0]
         assert re.fullmatch(r"dev_[0-9a-f]{8}", kobo["ref"])
-        assert kobo["ref"] == "dev_" + hashlib.sha256(PUBLIC_ID.encode()).hexdigest()[:8]
+        next_kobo = integ.collect_devices(app_db)["devices"][0]
+        assert next_kobo["ref"] != kobo["ref"]
         assert (kobo["kind"], kobo["model"], kobo["platform"], kobo["firmware_version"]) == (
             "kobo", "Kobo Clara BW", "Kobo", "4.38.23171")
         assert kobo["active"] is True and kobo["share_place"] is True and kobo["align_percent"] is False
@@ -123,7 +124,9 @@ class TestDevices:
         devices = integ.collect_devices(str(path))["devices"]
         kor, kobo, unnamed = devices
         assert kor["model"] is None
-        assert kor["model_ref"] == "mdl_" + hashlib.sha256(b"Sams Kindle").hexdigest()[:8]
+        assert re.fullmatch(r"mdl_[0-9a-f]{8}", kor["model_ref"])
+        next_kor = integ.collect_devices(str(path))["devices"][0]
+        assert next_kor["model_ref"] != kor["model_ref"]
         assert kobo["model"] == "Kobo Clara BW" and kobo["model_ref"] is None
         assert unnamed["model"] is None and unnamed["model_ref"] is None
         assert "Sams Kindle" not in json.dumps(devices)
@@ -193,7 +196,9 @@ class TestKoreader:
         assert out["newest_sync_at"] == "2026-11-18T12:00:00Z"
         assert out["rows_without_client_clock"] == 2 and out["rows_with_browser_position"] == 1
         by_ref = {d["ref"]: d for d in out["devices"]}
-        kos = by_ref["kos_" + hashlib.sha256(KOSYNC_DEVICE_ID.encode()).hexdigest()[:8]]
+        kos, = (row for ref, row in by_ref.items() if re.fullmatch(r"kos_[0-9a-f]{8}", ref))
+        next_refs = {row["ref"] for row in integ.collect_koreader(app_db)["devices"]}
+        assert kos["ref"] not in next_refs
         assert kos["documents"] == 2 and kos["last_sync_at"] == "2026-11-18T12:00:00Z"
         assert by_ref["unidentified"]["documents"] == 1
 
@@ -258,8 +263,7 @@ class TestEmail:
 @pytest.mark.unit
 class TestInPack:
     def _inputs(self):
-        return {"mail_settings": TestEmail.SETTINGS, "worker_tasks": [("TaskEmail", 3)],
-                "koreader_enabled": True}
+        return {"mail_settings": TestEmail.SETTINGS, "worker_tasks": [("TaskEmail", 3)]}
 
     def test_collect_all_adds_the_three_sections(self, app_db, tmp_path):
         files = sps.collect_all({"app_db": app_db}, sanitized=True, integrations=self._inputs(),
@@ -272,6 +276,22 @@ class TestInPack:
         blob = b"".join(files.values()).decode()
         for canary in CANARIES:
             assert canary not in blob
+
+    @pytest.mark.parametrize("setting", [1, 0, None])
+    def test_archive_reports_koreader_setting_without_creating_a_row(self, app_db, tmp_path, setting):
+        cwa_db = tmp_path / "cwa.db"
+        with sqlite3.connect(cwa_db) as connection:
+            connection.execute("CREATE TABLE cwa_settings (koreader_sync_enabled INTEGER)")
+            if setting is not None:
+                connection.execute("INSERT INTO cwa_settings VALUES (?)", (setting,))
+        before = cwa_db.read_bytes()
+
+        files = sps.collect_all({"app_db": app_db, "cwa_db": str(cwa_db)}, sanitized=True,
+                                scheduler=type("S", (), {"get_jobs": lambda self: []})())
+
+        expected = None if setting is None else bool(setting)
+        assert json.loads(files["state/koreader.json"])["sync_enabled"] is expected
+        assert cwa_db.read_bytes() == before
 
     def test_a_failing_integration_does_not_sink_the_pack(self, app_db, monkeypatch):
         def boom(_path):

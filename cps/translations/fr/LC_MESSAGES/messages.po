@@ -430,7 +430,7 @@ msgstr ""
 "Calibre-Web NextGen va rechercher les couvertures mises à jour et actualiser "
 "les vignettes correspondantes ; cela peut prendre un certain temps ?"
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -739,10 +739,6 @@ msgstr "Paramètres des tâches planifiées mis à jour"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Une erreur inconnue est survenue. Veuillez réessayer plus tard."
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titre"
 
 #: cps/admin.py
 #, python-format
@@ -2620,10 +2616,6 @@ msgid "Books organized in smart shelves"
 msgstr "Livres organisés en étagères intelligentes"
 
 #: cps/opds.py
-msgid "description"
-msgstr "description"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr "Livres de %(name)s"
@@ -3068,6 +3060,17 @@ msgstr "Modifié (du plus ancien au plus récent)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Manuel (glisser vers le bas)"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
+"Une grande bibliothèque arrive alors par lots d’environ 100 livres par "
+"synchronisation ; il peut donc falloir plusieurs synchronisations pour "
+"terminer. Forcer une nouvelle synchronisation complète en cours de route "
+"repart du début."
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"
@@ -21607,6 +21610,12 @@ msgstr "Exposer les étagères sélectionnées dans OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "title"
+#~ msgstr "titre"
+
+#~ msgid "description"
+#~ msgstr "description"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Une sélection aléatoire de votre bibliothèque"

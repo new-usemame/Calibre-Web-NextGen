@@ -103,7 +103,11 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
   };
 
   const forceFullSync = () => {
-    if (!window.confirm(t('Send every book to your Kobo again on its next sync? Books already on it are sent again too.'))) return;
+    if (!window.confirm(
+      t('Send every book to your Kobo again on its next sync? Books already on it are sent again too.')
+      + ' '
+      + t('A large library then arrives about 100 books per sync, so it can take many syncs to finish. Forcing another full sync part-way through starts again from the beginning.'),
+    )) return;
     fullSync.mutate(undefined, {
       onSuccess: () => announce(t('Full sync requested. Sync your Kobo to receive your library again.')),
       onError: () => announce(t('Could not request a full Kobo sync.'), { assertive: true }),

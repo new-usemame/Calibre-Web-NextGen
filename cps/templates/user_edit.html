@@ -351,7 +351,10 @@
           <div class="btn btn-danger" id="config_delete_kobo_token" data-value="{{ content.id }}" data-remote="false" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Delete')}}</div>
         </div>
         <div>
-          <div class="btn btn-default" id="kobo_full_sync" data-value="{% if current_user.role_admin() %}{{ content.id }}{% else %}0{% endif %}" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Force full kobo sync')}}</div>
+          <button type="button" class="btn btn-default" id="kobo_full_sync"
+                  data-value="{% if current_user.role_admin() %}{{ content.id }}{% else %}0{% endif %}"
+                  data-confirm-message="{{ _("Are you sure you want delete Calibre-Web NextGen's sync database to force a full sync with your Kobo Reader?") }} {{ _("A large library then arrives about 100 books per sync, so it can take many syncs to finish. Forcing another full sync part-way through starts again from the beginning.") }}"
+                  {% if not content.remote_auth_token.first() %}style="display: none;"{% endif %}>{{_('Force full kobo sync')}}</button>
         </div>
         {% if current_user.role_admin() or current_user.id == content.id %}
         <div id="kobo_resend_book_block" style="margin-top: 10px;{% if not content.remote_auth_token.first() %} display: none;{% endif %}">

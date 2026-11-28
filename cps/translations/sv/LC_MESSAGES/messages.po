@@ -390,7 +390,7 @@ msgstr ""
 "Calibre-Web NextGen kommer att söka efter uppdaterade omslag och uppdatera "
 "miniatyrbilder av omslag. Detta kan ta en stund."
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -677,10 +677,6 @@ msgstr "Inställningarna för schemalagda uppgifter har uppdaterats"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ett okänt fel uppstod. Försök igen senare."
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titel"
 
 #: cps/admin.py
 #, python-format
@@ -2462,10 +2458,6 @@ msgid "Books organized in smart shelves"
 msgstr "Böcker ordnade i smarta hyllor"
 
 #: cps/opds.py
-msgid "description"
-msgstr "beskrivning"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr ""
@@ -2901,6 +2893,13 @@ msgstr "Ändrad (äldst → senast)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Manuell (dra nedan)"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"
@@ -20639,6 +20638,12 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "title"
+#~ msgstr "titel"
+
+#~ msgid "description"
+#~ msgstr "beskrivning"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Några slumpmässiga val från ditt bibliotek"

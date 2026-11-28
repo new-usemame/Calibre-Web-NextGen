@@ -15,12 +15,11 @@ to paste into a public issue:
   reads. ``display_name`` (user-editable, may hold a person's name),
   ``book_scope``, device identities, document hashes, reading locations and
   every email address are never selected.
-* **Short hashes, not identifiers.** A device is shown as ``dev_<8 hex>`` and
-  an account as ``u1``, ``u2`` (order of first appearance). No tokens, no
-  serials, no names, no addresses.
+* Devices get short references scoped to this export, and accounts get labels
+  in order of first appearance.
 * **Device fields use known values and firmware uses a version format.**
   A Kobo's client-supplied model is shown only when it matches recognized
-  hardware. KOReader labels appear as short hashes.
+  hardware. KOReader labels get export-scoped references.
 * **Read-only, tolerant of older schemas.** ``app.db`` is opened read-only,
   columns and tables that do not exist yet are skipped rather than failing,
   and a failing sub-query degrades to that field only.
@@ -73,10 +72,10 @@ _SERVER_TYPES = {0: "smtp", 1: "gmail_oauth"}
 _ENCRYPTION = {0: "none", 1: "starttls", 2: "ssl"}
 
 
-def short_ref(prefix: str, value) -> str:
-    """Stable 8-hex label for an identifier. Never reversible in practice and
-    never the identifier itself."""
-    digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:8]
+def _short_ref(prefix: str, value, key: bytes) -> str:
+    """Label an identifier consistently within one export."""
+    data = f"{prefix}:{value}".encode("utf-8")
+    digest = hashlib.blake2s(data, key=key, digest_size=4).hexdigest()
     return f"{prefix}_{digest}"
 
 
@@ -213,6 +212,7 @@ def collect_devices(app_db_path) -> dict:
         if isinstance(nudges, Unavailable):
             unavailable["share_place_nudges_pending"] = nudges.reason
 
+        ref_key = os.urandom(16)
         user_labels: dict = {}
         devices = []
         for values in rows:
@@ -230,11 +230,11 @@ def collect_devices(app_db_path) -> dict:
             model_reported = kind in _MODEL_REPORTED_KINDS
             known_models = _KOBO_MODELS if kind == "kobo" else _BROWSER_MODELS
             devices.append({
-                "ref": short_ref("dev", row.get("public_id", device_id)),
+                "ref": _short_ref("dev", row.get("public_id") or device_id, ref_key),
                 "user": user_label,
                 "kind": kind,
                 "model": _known_value(model_raw, known_models) if model_reported else None,
-                "model_ref": (short_ref("mdl", model_raw)
+                "model_ref": (_short_ref("mdl", model_raw, ref_key)
                               if kind == "koreader" and model_raw else None),
                 "platform": _known_value(row.get("platform"), _DEVICE_PLATFORMS),
                 "firmware_version": _firmware_version(row.get("firmware_version")),
@@ -328,9 +328,10 @@ def collect_koreader(app_db_path, sync_enabled=None) -> dict:
             "GROUP BY device_id ORDER BY MAX(timestamp) DESC LIMIT ?",
             (MAX_KOSYNC_DEVICES,),
         ).fetchall()
+        ref_key = os.urandom(16)
         out["devices"] = [
             {
-                "ref": short_ref("kos", device_id) if device_id else "unidentified",
+                "ref": _short_ref("kos", device_id, ref_key) if device_id else "unidentified",
                 "documents": count,
                 "last_sync_at": _utc(last),
             }

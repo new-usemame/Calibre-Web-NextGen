@@ -20,6 +20,7 @@ from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
 from .cw_login import current_user
 from sqlalchemy.exc import OperationalError, IntegrityError, InterfaceError, InvalidRequestError
+from sqlalchemy.orm import with_parent
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.sql.expression import func
 
@@ -1823,8 +1824,10 @@ def delete_whole_book(book_id, book):
                 else:
                     del_cc = getattr(book, cc_string)[0]
                     getattr(book, cc_string).remove(del_cc)
-                    log.debug('remove ' + str(c.id))
-                    calibre_db.session.delete(del_cc)
+                    # text/enumeration values are shared between books: only drop an orphaned row
+                    if c.datatype in ('int', 'datetime', 'comments') or len(del_cc.books) == 0:
+                        log.debug('remove ' + str(c.id))
+                        calibre_db.session.delete(del_cc)
                     calibre_db.session.commit()
         else:
             modify_database_object([u''], getattr(book, cc_string), db.cc_classes[c.id],
@@ -2666,7 +2669,16 @@ def remove_objects(db_book_object, db_session, del_elements):
         for del_element in del_elements:
             db_book_object.remove(del_element)
             changed = True
-            if len(del_element.books) == 0:
+            # Ask the database whether any book still links to this element instead of
+            # loading del_element.books: for a common language or tag that pulls every
+            # linked book (plus all its selectin relationships) into memory, which took
+            # ~40 s per deleted book on a 190k-book library.
+            db_session.flush()
+            still_used = (db_session.query(db.Books.id)
+                          .filter(with_parent(del_element, type(del_element).books))
+                          .limit(1)
+                          .first())
+            if still_used is None:
                 db_session.delete(del_element)
                 db_session.flush()
     return changed

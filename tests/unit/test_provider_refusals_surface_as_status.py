@@ -16,6 +16,9 @@ Providers now raise ``ProviderRefused`` with the status the UI already knows
 the fan-out consumers classify it, and one INFO line per search names every
 source with its outcome.
 """
+import logging
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 import types
 
 import pytest
@@ -65,6 +68,142 @@ def test_google_quota_is_a_rate_limit_refusal_naming_the_key(monkeypatch):
         provider.search("dune")
     assert refused.value.status == "rate_limited"
     assert "API key" in str(refused.value)
+
+
+@pytest.mark.parametrize(("provider_id", "status", "key", "expected"), [
+    ("google", 403, None, "blocked"),
+    ("google", 403, "fixture-google-key", "missing_key"),
+    ("google", 400, "fixture-google-key", "missing_key"),
+    ("google", 503, "fixture-google-key", "blocked"),
+    ("google", 500, "fixture-google-key", "error"),
+    ("openlibrary", 403, None, "blocked"),
+    ("openlibrary", 429, None, "rate_limited"),
+    ("openlibrary", 503, None, "blocked"),
+    ("openlibrary", 500, None, "error"),
+    ("openlibrary", None, None, "error"),
+    ("dnb", 403, None, "blocked"),
+    ("dnb", 429, None, "rate_limited"),
+    ("dnb", 503, None, "blocked"),
+    ("dnb", None, None, "error"),
+])
+def test_provider_http_failures_reach_search_status(monkeypatch, caplog, provider_id, status, key, expected):
+    from cps.metadata_provider import dnb, google, openlibrary
+    from cps.search_metadata import _classify_provider_failure
+    from cps.services.cover_picker import gather_cover_candidates
+
+    provider_class = {"dnb": dnb.DNB, "google": google.Google, "openlibrary": openlibrary.OpenLibrary}
+    monkeypatch.setattr(google, "config", types.SimpleNamespace(config_google_books_api_key=key))
+    provider = provider_class[provider_id]()
+    provider.active = True
+
+    def get(url, **_kwargs):
+        if status is None:
+            raise requests.ConnectionError(f"Connection refused for {url}")
+        response = requests.Response()
+        response.status_code = status
+        response.url = url
+        if status == 400:
+            response._content = b'{"error":{"details":[{"reason":"API_KEY_INVALID"}]}}'
+        return response
+
+    monkeypatch.setattr(requests, "get", get)
+    candidates, statuses = gather_cover_candidates(
+        providers=[provider], query="Quotas", static_cover="", locale="en",
+        classify_failure=_classify_provider_failure,
+    )
+
+    assert candidates == []
+    assert len(statuses) == 1
+    assert statuses[0].status == expected
+    assert statuses[0].message
+    if key:
+        assert key not in caplog.text
+        assert key not in statuses[0].message
+
+
+def test_open_library_no_results_is_distinct_from_invalid_json(monkeypatch):
+    from cps.metadata_provider.openlibrary import OpenLibrary
+    from cps.search_metadata import _classify_provider_failure
+    from cps.services.cover_picker import gather_cover_candidates
+
+    provider = OpenLibrary()
+    provider.active = True
+    response = requests.Response()
+    response.status_code = 200
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: response)
+
+    def outcome(payload):
+        response._content = payload
+        _, statuses = gather_cover_candidates(
+            providers=[provider], query="dune", static_cover="", locale="en",
+            classify_failure=_classify_provider_failure,
+        )
+        return statuses[0].status
+
+    assert outcome(b'{"docs": []}') == "empty"
+    assert outcome(b"not json") == "error"
+
+
+@pytest.mark.parametrize("redirect", [False, True])
+def test_google_key_is_carried_outside_the_logged_request_target(monkeypatch, caplog, redirect):
+    from cps.metadata_provider import google
+    from cps.services.Metadata import ProviderRefused
+
+    key = "fixture-google-key"
+    seen = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append((self.path, self.headers.get("X-Goog-Api-Key")))
+            if redirect and self.path != "/unexpected":
+                self.send_response(302)
+                self.send_header("Location", "/unexpected")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"items":[]}')
+
+    monkeypatch.setattr(google, "config", types.SimpleNamespace(config_google_books_api_key=key))
+    provider = google.Google()
+    provider.active = True
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        monkeypatch.setattr(google.Google, "SEARCH_URL", f"http://127.0.0.1:{server.server_port}/volumes?q=")
+        try:
+            with caplog.at_level(logging.DEBUG, logger="urllib3.connectionpool"):
+                if redirect:
+                    with pytest.raises(ProviderRefused, match="redirect"):
+                        provider.search("dune")
+                else:
+                    assert provider.search("dune") == []
+        finally:
+            server.shutdown()
+            worker.join()
+
+    assert "GET /volumes?q=dune" in caplog.text
+    assert key not in caplog.text
+    assert seen == [("/volumes?q=dune", key)]
+
+
+def test_dnb_keeps_records_after_a_malformed_record(monkeypatch):
+    from cps.metadata_provider.dnb import DNB
+
+    provider = DNB()
+    provider.active = True
+    monkeypatch.setattr(provider, "_execute_query", lambda _query: [1, None, 2])
+
+    def parse(record):
+        if record is None:
+            raise ValueError("malformed MARC record")
+        return {"id": record}
+
+    monkeypatch.setattr(provider, "_parse_marc21_record", parse)
+    monkeypatch.setattr(provider, "_create_meta_record", lambda book, _cover: book["id"])
+
+    assert provider.search("dune") == [1, 2]
 
 
 @pytest.mark.parametrize("key, status, expected", [

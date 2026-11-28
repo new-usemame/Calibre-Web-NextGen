@@ -20,12 +20,9 @@ from urllib.parse import quote
 
 import requests
 
-from cps import constants, logger
+from cps import constants
 from cps.isoLanguages import get_language_name
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
-
-
-log = logger.create()
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 
 
 class OpenLibrary(Metadata):
@@ -66,18 +63,13 @@ class OpenLibrary(Metadata):
         )
         headers = {"User-Agent": constants.USER_AGENT}
 
-        try:
-            response = requests.get(url, headers=headers, timeout=OpenLibrary.REQUEST_TIMEOUT)
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            log.warning("OpenLibrary search failed: %s", exc)
-            return []
+        response = requests.get(url, headers=headers, timeout=OpenLibrary.REQUEST_TIMEOUT)
+        response.raise_for_status()
 
         try:
             payload = response.json()
-        except ValueError as exc:
-            log.warning("OpenLibrary returned invalid JSON: %s", exc)
-            return []
+        except ValueError:
+            raise ProviderRefused("error", "Open Library returned an invalid response.") from None
 
         results: List[MetaRecord] = []
         for doc in payload.get("docs", []) or []:

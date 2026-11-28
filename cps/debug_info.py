@@ -60,6 +60,28 @@ _KNOWN_SECRET_FIELDS = frozenset({
     "mail_password_e",
 })
 
+# A sanitized archive can be shared outside the installation. These settings
+# identify mail infrastructure or reveal where files are kept on that host.
+_PRIVATE_INSTALL_FIELDS = frozenset({
+    "config_access_logfile",
+    "config_binariesdir",
+    "config_calibre_dir",
+    "config_calibre_split_dir",
+    "config_certfile",
+    "config_converterpath",
+    "config_kepubifypath",
+    "config_keyfile",
+    "config_ldap_cacert_path",
+    "config_ldap_cert_path",
+    "config_ldap_key_path",
+    "config_limiter_uri",
+    "config_logfile",
+    "config_rarfile_location",
+    "mail_from",
+    "mail_login",
+    "mail_server",
+})
+
 # Substring matches for unknown/future fields. If the field name contains
 # any of these as a whole token (case-insensitive), redact the value.
 _SECRET_SUBSTRINGS = (
@@ -83,7 +105,7 @@ _LONG_TOKEN_PATTERN = re.compile(r"\b[A-Za-z0-9+/=_\-]{40,}\b")
 
 
 def _looks_sensitive(field_name: str) -> bool:
-    if field_name in _KNOWN_SECRET_FIELDS:
+    if field_name in _KNOWN_SECRET_FIELDS or field_name in _PRIVATE_INSTALL_FIELDS:
         return True
     lower = field_name.lower()
     return any(s in lower for s in _SECRET_SUBSTRINGS)
@@ -112,9 +134,8 @@ def _redact_value(value, *, aggressive=False):
 
 
 def _redact_for_export(settings_dict):
-    """Return a copy of ``settings_dict`` with every known-secret field
-    placeholder-replaced and every JWT-shaped value scrubbed for
-    defense-in-depth.
+    """Return settings with secrets and private install fields replaced
+    and JWT-shaped string values scrubbed.
 
     A field whose name LOOKS sensitive is only redacted if its value is
     a non-empty string — booleans and integers can't be credentials, and
@@ -202,6 +223,21 @@ _BASIC_PATTERN = re.compile(r"(Basic\s+)\S+", re.IGNORECASE)
 # segments intact.
 _KOBO_TOKEN_PATTERN = re.compile(r"(/kobo/)[0-9A-Za-z_\-]{16,}")
 
+# KOReader progress URLs and diagnostics carry document and device references.
+_KOSYNC_DOCUMENT_URL = re.compile(r"""(/kosync/syncs/progress/)[^/?\s"'<>]+""")
+_KOSYNC_LOG_SOURCE = re.compile(
+    r"^\[[^\]\r\n]+\] +[A-Z]+ \{cps\.(?:progress_syncing\.protocols\.)?kosync:\d+\} "
+)
+_KOSYNC_DOCUMENT_FIELD = re.compile(
+    r"(\b(?:doc=|document=|document_checksum:\s*|checksum:\s*|book by checksum ))"
+    r"[^\r\n]*?"
+    # Preserve only the structured suffixes emitted after document values.
+    r"(?=(?:>|, book_id: [\w-]+|, progress=[0-9.+-]+%|"
+    r", incoming=[0-9.+-]+%, accepted=[0-9.+-]+%, incoming_device_id=<device>)?\r?$)"
+)
+_KOSYNC_DEVICE_FIELD = re.compile(r"(\bincoming_device_id=)[^\r\n]*")
+
+
 # Email addresses (SMTP errors, login failures, send-to-eReader logs).
 _EMAIL_PATTERN = re.compile(
     r"[\w.%+\-]+(?:@|%40)[\w\-]+(?:\.[\w\-]+)*\.[^\W\d_]{2,}"
@@ -286,6 +322,10 @@ def _sanitize_log_line(line: str, install_paths=()) -> str:
     line = _BASIC_PATTERN.sub(r"\1<redacted>", line)
     # Kobo auth token in the URL path.
     line = _KOBO_TOKEN_PATTERN.sub(r"\1<token>", line)
+    line = _KOSYNC_DOCUMENT_URL.sub(r"\1<document>", line)
+    if _KOSYNC_LOG_SOURCE.match(line):
+        line = _KOSYNC_DEVICE_FIELD.sub(r"\1<device>", line)
+        line = _KOSYNC_DOCUMENT_FIELD.sub(r"\1<document>", line)
     return line
 
 
@@ -349,6 +389,16 @@ class _LogScrubber:
 _PER_FILE_MAX_BYTES = 10 * 1024 * 1024
 
 
+# Older versions printed whole KOReader progress requests and responses.
+# Keep the method and route in shared archives, omitting the payload and any
+# continuation lines before the next formatted application log record.
+_APP_LOG_HEADER = re.compile(r"^\[\d{4}-\d{2}-\d{2} [^\]\r\n]+\] +[A-Z]+ \{[^}]+:\d+\} ")
+_KOSYNC_PAYLOAD_LOG = re.compile(
+    r"^(\[[^\]\r\n]+\] +DEBUG \{cps\.(?:progress_syncing\.protocols\.)?kosync:\d+\} "
+    r"(?:GET|PUT) /kosync/syncs/progress/)(?!(?:<document>(?: response sent)?|<redacted>)$)"
+)
+
+
 # APScheduler logs a "Running job" / "executed successfully" pair at INFO on
 # every run, and some jobs run every 5 seconds (#2673). Current releases keep
 # the executor logger at WARNING, but older rotated logs still hold the
@@ -361,6 +411,7 @@ _LOG_TIMESTAMP_PATTERN = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 # Bound the work on a pathological file: past this many times the cap, only the
 # tail is even looked at.
 _RAW_READ_FACTOR = 4
+_LOG_HEADER_PEEK_BYTES = 512
 
 
 # --- tracebacks digest -------------------------------------------------------
@@ -482,12 +533,16 @@ def _omitted_lines_header(count: int, first_ts, last_ts) -> str:
             "Errors, warnings and missed runs are kept.\n")
 
 
-def _sanitize_log_bytes(raw: bytes, scrubber=None) -> bytes:
+def _starts_with_app_log_header(data: bytes) -> bool:
+    return bool(_APP_LOG_HEADER.match(data[:_LOG_HEADER_PEEK_BYTES].decode("utf-8", errors="replace")))
+
+
+def _sanitize_log_bytes(raw: bytes, scrubber=None, *, app_log=False) -> bytes:
     """``_sanitize_log`` without the report of whether the head was dropped."""
-    return _sanitize_log(raw, scrubber)[0]
+    return _sanitize_log(raw, scrubber, app_log=app_log)[0]
 
 
-def _sanitize_log(raw: bytes, scrubber=None):
+def _sanitize_log(raw: bytes, scrubber=None, *, app_log=False, was_cut=False):
     """Read a log file, drop routine scheduler lines, sanitize the rest, and
     return ``(data, cut)``: the result capped at ``_PER_FILE_MAX_BYTES``
     (tail-biased: keep the most recent content, drop the head if oversize), and
@@ -501,8 +556,9 @@ def _sanitize_log(raw: bytes, scrubber=None):
     is applied *before* scrubbing, so no CPU goes on bytes that would be
     dropped anyway."""
     if not raw:
-        return raw, False
-    cut = False
+        return raw, was_cut
+    app_log = app_log or _starts_with_app_log_header(raw)
+    cut = was_cut
     if len(raw) > _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:
         cut = True
         raw = raw[-_PER_FILE_MAX_BYTES * _RAW_READ_FACTOR:]
@@ -522,7 +578,16 @@ def _sanitize_log(raw: bytes, scrubber=None):
     kept = []
     omitted = 0
     first_ts = last_ts = None
+    # A bounded read can start in an old multiline progress record.
+    # Keep nothing from its orphaned continuation before a complete header.
+    in_progress_payload = app_log and cut
     for line in text.splitlines(keepends=True):
+        if in_progress_payload and not _APP_LOG_HEADER.match(line):
+            continue
+        payload = _KOSYNC_PAYLOAD_LOG.match(line.rstrip("\r\n"))
+        in_progress_payload = payload is not None
+        if payload:
+            line = payload.group(1) + REDACTED_PLACEHOLDER + "\n"
         if _is_routine_scheduler_line(line):
             omitted += 1
             stamp = _LOG_TIMESTAMP_PATTERN.match(line)
@@ -565,23 +630,22 @@ def _tail_within(lines, limit: int):
 
 
 def _read_log_tail(path: str, limit: int):
-    """Read at most the last ``limit`` bytes of a log: ``(bytes, was_cut)``.
+    """Return the bounded tail, whether it was cut, and the file's log format.
 
-    The cap is applied where the read happens, at the file handle, so a very
-    large log is never pulled into memory only to be cut down afterwards. When the
-    file is bigger than the limit the read starts part-way through it, so the first
-    (partial) line is dropped. Raises ``OSError`` if the file cannot be read, for
-    the caller to record: a log that rotates away between the directory listing
-    and the read must not abort the whole pack."""
+    Read the header through the same handle as the tail. A rotated application
+    log can share an access log's path, and its tail can start inside a record.
+    A log that disappears before opening is reported by the caller.
+    """
     with open(path, "rb") as fd:
         size = os.fstat(fd.fileno()).st_size
         if size <= limit:
-            return fd.read(), False
+            data = fd.read(size)
+            return data, False, _starts_with_app_log_header(data)
+        app_header = _starts_with_app_log_header(fd.read(_LOG_HEADER_PEEK_BYTES))
         fd.seek(size - limit)
         data = fd.read(limit)
     newline = data.find(b"\n")
-    return (data[newline + 1:] if newline != -1 else data), True
-
+    return (data[newline + 1:] if newline != -1 else data), True, app_header
 
 # ---------------------------------------------------------------------------
 # Existing entry points (kept verbatim where unchanged).
@@ -636,11 +700,6 @@ def _resolve_integration_inputs() -> dict:
             (type(queued.task).__name__, queued.task.stat)
             for queued in WorkerThread.get_instance().tasks
         ]
-    except Exception:  # pylint: disable=broad-except
-        pass
-    try:
-        from .progress_syncing.settings import is_koreader_sync_enabled
-        inputs["koreader_enabled"] = bool(is_koreader_sync_enabled())
     except Exception:  # pylint: disable=broad-except
         pass
     return inputs
@@ -715,12 +774,20 @@ def _prepare_pack(sanitize: bool) -> dict:
     plain data. ``_assemble_pack`` then does the heavy file work on that data
     and nothing else.
     """
-    app_logs = glob.glob(logger.get_logfile(config.config_logfile) + '*')
-    access_logs = glob.glob(logger.get_accesslogfile(config.config_access_logfile) + '*')
-    for element in [logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR]:
-        for files in (app_logs, access_logs):
-            if element in files:
-                files.remove(element)
+    log_sources = (
+        (logger.get_accesslogfile(config.config_access_logfile), False),
+        (logger.get_logfile(config.config_logfile), True),
+    )
+    log_files = {}
+    # RotatingFileHandler appends a positive integer to the full log path.
+    # Check that suffix to distinguish a rotation from a neighboring file.
+    for log_path, app_log in sorted(log_sources, key=lambda source: len(source[0])):
+        if log_path in (logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR):
+            continue
+        for file_path in glob.iglob(glob.escape(log_path) + '*'):
+            suffix = file_path[len(log_path):]
+            if not suffix or re.fullmatch(r"\.[1-9][0-9]*", suffix):
+                log_files[file_path] = app_log
 
     settings_dict = config.to_dict()
     libs_dict = collect_stats()
@@ -730,8 +797,7 @@ def _prepare_pack(sanitize: bool) -> dict:
         names = _known_usernames()
     return {
         "sanitize": sanitize,
-        "app_logs": app_logs,
-        "access_logs": access_logs,
+        "log_files": log_files,
         "settings": settings_dict,
         "libs": libs_dict,
         "paths": _resolve_state_paths(),
@@ -772,10 +838,10 @@ def _assemble_pack(prep: dict):
         if sanitize:
             zf.writestr('SANITIZED.txt', note)
         digest = _TracebackDigest()
-        for fp in prep["app_logs"] + prep["access_logs"]:
+        for fp, app_log in prep["log_files"].items():
             name = os.path.basename(fp)
             try:
-                raw, was_cut = _read_log_tail(fp, _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR)
+                raw, was_cut, app_header = _read_log_tail(fp, _PER_FILE_MAX_BYTES * _RAW_READ_FACTOR)
             except FileNotFoundError:
                 # Rotated away between the directory listing and the read.
                 log_status.append({"file": name, "status": "missing"})
@@ -783,20 +849,21 @@ def _assemble_pack(prep: dict):
             except OSError:
                 log_status.append({"file": name, "status": "unreadable"})
                 continue
+            app_log = app_log or app_header
             if sanitize:
-                data, capped = _sanitize_log(raw, scrubber)
-                was_cut = was_cut or capped
+                data, was_cut = _sanitize_log(raw, scrubber, app_log=app_log, was_cut=was_cut)
             else:
                 data = raw
             zf.writestr(name, data)
-            if fp in prep["app_logs"]:
+            if app_log:
                 # From the same bytes that went into the archive, so the digest can
                 # never describe a different version of the file.
                 digest.feed(data.decode("utf-8", errors="replace"))
             log_status.append({"file": name, "status": "included", "bytes": len(data), "cut_to_tail": was_cut})
-        zf.writestr('tracebacks.txt', digest.render(
-            os.path.basename(prep["app_logs"][0]).split(".log")[0] + ".log*"
-            if prep["app_logs"] else "no application log"))
+        app_log_path = next((path for path, app_log in prep["log_files"].items() if app_log), None)
+        source_label = (os.path.basename(app_log_path).split(".log")[0] + ".log*"
+                        if app_log_path else "no application log")
+        zf.writestr('tracebacks.txt', digest.render(source_label))
         manifest["logs"] = log_status
         zf.writestr('manifest.json', json.dumps(manifest, sort_keys=True, indent=2))
     memory_zip.seek(0)
@@ -819,7 +886,8 @@ _SANITIZED_NOTE = (
     "This debug pack has been sanitized for sharing in public issues.\n"
     "\n"
     "What was removed or replaced:\n"
-    "  * Settings: passwords, OAuth tokens, LDAP bind passwords, API keys.\n"
+    "  * Settings: credentials, SMTP identifiers, and configured file paths.\n"
+    "  * KOReader document and device references and legacy progress payloads.\n"
     "  * Logs: public IPs, /config/ and /calibre-library/ paths,\n"
     "          Authorization: Bearer/Basic header values, JWT-shaped tokens,\n"
     "          Kobo sync tokens in /kobo/<token>/ URLs, email addresses\n"
@@ -841,9 +909,9 @@ _SANITIZED_NOTE = (
     "Each log file is capped at the last 10 MiB so the zip stays small.\n"
     "\n"
     "manifest.json and state/*.json hold versions, sizes, counts, mount types\n"
-    "and device kind, model and firmware only (KOReader device labels are\n"
-    "short hashes): no paths, IPs, usernames, email addresses, titles or row\n"
-    "contents.\n"
+    "and device kind, model and firmware only. KOReader device references are\n"
+    "scoped to this pack. The summaries omit paths, IPs, usernames, email\n"
+    "addresses, titles and row contents.\n"
     "\n"
     "If you'd rather not share even the sanitized version, the Download Debug\n"
     "Package button (next to this one) generates an UNREDACTED pack for\n"

@@ -56,6 +56,79 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.75',
+    date: '2026-11-27',
+    items: [
+      {
+        title: 'Pick up where you left off after a Kobo download',
+        body: 'When a Kobo download needs an on-demand KEPUB conversion, the next sync can restore the shared reading position for that book.',
+        category: 'Sync',
+      },
+      {
+        title: 'Open books in KOReader with fewer library scans',
+        body: 'Automatic delivery shares an inventory check across the reader and file browser for five minutes. You can still collect books immediately with a manual check.',
+        category: 'Sync',
+      },
+      {
+        title: 'Keep Kobo Store requests working with the proxy on',
+        body: 'Store requests that Calibre-Web NextGen does not recognise are forwarded to the Kobo Store when the proxy is enabled.',
+        category: 'Sync',
+      },
+      {
+        title: 'Keep shared metadata when deleting books',
+        body: 'Deleting a book preserves single-value text and choice fields that other books still use. Removing metadata also takes less work on large libraries.',
+        category: 'Library',
+      },
+      {
+        title: 'See when a metadata source is unavailable',
+        body: 'Google Books, Open Library and Deutsche Nationalbibliothek now show a source error when a lookup fails.',
+        category: 'Library',
+      },
+      {
+        title: 'Watch the admin log with fewer routine messages',
+        body: 'Successful thumbnail jobs for individual books now log at DEBUG. Batch summaries and failures are still visible at the default level.',
+        category: 'Admin',
+      },
+      {
+        title: 'Avoid extra ownership updates during ingest',
+        body: 'Ingest and library conversion skip permission writes for files and directories that already have the right owner and group.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Use more of the app in Portuguese and Chinese',
+        body: 'European Portuguese now covers more of Hardcover review, shelves and annotations. Simplified Chinese adds wording for cover recovery and custom-value controls.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.74',
+    date: '2026-11-23',
+    items: [
+      {
+        title: 'Read a series in order on a shelf',
+        body: 'Open a shelf in the new interface and choose Series order or Series order (reverse) to sort its books by their volume number.',
+        category: 'Library',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'Use the publication date you find',
+        body: 'When you fetch metadata in the new book editor, choose Published to apply the source’s date or year, then save the book.',
+        category: 'Library',
+      },
+      {
+        title: 'Keep background tasks running after a cancellation',
+        body: 'Cancelling a task before it starts leaves the background queue ready to work through the remaining jobs.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Use more of Calibre-Web NextGen in German',
+        body: 'The German catalog fills 289 translations across areas including library settings, device controls and metadata cleanup.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.73',
     date: '2026-11-22',
     items: [

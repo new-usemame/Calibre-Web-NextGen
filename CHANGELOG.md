@@ -16,6 +16,43 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.75] - 2026-11-27
+
+### Fixed
+
+- **More of the app is available in European Portuguese and Simplified Chinese.** European Portuguese covers more of Hardcover review, shelves and annotations. Simplified Chinese covers more of cover recovery and custom-value controls. Thanks to @SLLIM20 in #3034 and @systemannounce in #3042.
+
+
+- **Opening several books in KOReader no longer scans the device library each time.** Automatic delivery checks share a five-minute interval across the reader and file browser. Manual collection stays immediate, and the server processes large inventory reports in batches.
+
+- **Metadata sources now distinguish empty searches from service failures (#3025).** Google Books, Open Library and Deutsche Nationalbibliothek report failures through the existing source status messages. Reported by @Rol3333.
+
+- **Routine cover thumbnail jobs no longer crowd the INFO log (#3027).** Single-book jobs log their start and successful finish at DEBUG. Batch summaries and cover failures remain visible at the default log level. Reported by @Rol3333.
+
+- **Kobo downloads can restore your shared reading position after on-demand KEPUB conversion.** A completed download now records the converted file so the next sync can send the matching bookmark.
+
+- **Kobo Store calls CWNG has no route for now reach the Kobo Store instead of getting a 404.** With the Kobo Store proxy on, a `/v1/` or `/v2/` store call CWNG doesn't recognise, such as one Kobo adds in a firmware update, is passed to the store and the store's answer comes back. With the proxy off it gets the same empty answer as other store calls. This is one part of the Libby "Network Error" in #2962; the OverDrive calls Libby makes are tracked there separately.
+
+- **Ingest and library conversion avoid redundant ownership writes on large libraries.** Only entries with a different owner or group are handed to chown. Adapted from [CWA #1521](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1521) by @manut999.
+
+- **Deleting books or removing commonly used metadata can finish faster on large libraries.** A lookup for a remaining link replaces loading every book attached to that tag, author, language, series, or publisher. Backported from [CWA #1665](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1665) by @manut999.
+
+- **Deleting a book preserves shared custom-column values on other books.** Single-value text and enumeration entries remain available until their last book is removed. Backported from [CWA #1669](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1669) by @wheezer256.
+
+## [v4.1.74] - 2026-11-23
+
+### Added
+
+- **Sort a shelf by series order in the new UI.** Choose Series order or Series order (reverse) to display books by their series number.
+
+### Fixed
+
+- **Fetched publication dates can now be selected in the new metadata editor.** Choose **Published** to apply a date or year supplied by a metadata provider, then save it with the book.
+
+- **Filled 289 missing German translations.** Thanks to @koddistortion.
+
+- **Background tasks keep running after a queued task is cancelled.** Task history cleanup handles cancelled tasks that never started and have no completion time. Backported from [CWA #1584](https://github.com/crocodilestick/Calibre-Web-Automated/pull/1584) by @meska.
+
 ## [v4.1.73] - 2026-11-22
 
 ### Fixed

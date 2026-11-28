@@ -383,7 +383,7 @@ msgid ""
 "Thumbnails, this may take a while?"
 msgstr ""
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -666,11 +666,6 @@ msgstr "Pengaturan tugas terjadwal diperbarui"
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Terjadi kesalahan yang tidak diketahui. Coba lagi nanti."
-
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Judul"
 
 #: cps/admin.py
 #, python-format
@@ -2410,11 +2405,6 @@ msgid "Books organized in smart shelves"
 msgstr "Buku yang disusun dalam rak pintar"
 
 #: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Deskripsi"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr ""
@@ -2846,6 +2836,13 @@ msgstr ""
 
 #: cps/shelf.py
 msgid "Manual (drag below)"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -20050,6 +20047,14 @@ msgstr "Sinkronkan Rak yang dipilih dengan Kob"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Tampilkan pilihan baca/belum dibaca"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Judul"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Deskripsi"
 
 #~ msgid "Categories"
 #~ msgstr "Kategori"

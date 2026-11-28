@@ -56,28 +56,28 @@ class TestReadLogTail:
     def test_a_small_file_is_read_whole(self, tmp_path):
         path = tmp_path / "a.log"
         path.write_bytes(b"one\ntwo\n")
-        assert debug_info._read_log_tail(str(path), 1000) == (b"one\ntwo\n", False)
+        assert debug_info._read_log_tail(str(path), 1000) == (b"one\ntwo\n", False, False)
 
     def test_exactly_the_limit_is_not_cut(self, tmp_path):
         path = tmp_path / "a.log"
         path.write_bytes(b"x" * 100)
-        data, was_cut = debug_info._read_log_tail(str(path), 100)
-        assert len(data) == 100 and was_cut is False
+        data, was_cut, app_header = debug_info._read_log_tail(str(path), 100)
+        assert len(data) == 100 and was_cut is False and app_header is False
 
     def test_a_big_file_gives_the_tail_starting_on_a_whole_line(self, tmp_path):
         path = tmp_path / "a.log"
         path.write_text(_numbered_lines(2000))
-        data, was_cut = debug_info._read_log_tail(str(path), 1000)
+        data, was_cut, app_header = debug_info._read_log_tail(str(path), 1000)
         lines = data.decode().splitlines()
-        assert was_cut is True and len(data) <= 1000
+        assert was_cut is True and app_header is True and len(data) <= 1000
         assert lines[-1].startswith("[2026-11-20 19:00:00,000]  INFO {x:1} line 001999")
         assert all(line.startswith("[2026-") for line in lines)  # the cut first line is gone
 
     def test_a_tail_with_no_newline_is_returned_as_it_is(self, tmp_path):
         path = tmp_path / "a.log"
         path.write_bytes(b"y" * 500)
-        data, was_cut = debug_info._read_log_tail(str(path), 100)
-        assert data == b"y" * 100 and was_cut is True
+        data, was_cut, app_header = debug_info._read_log_tail(str(path), 100)
+        assert data == b"y" * 100 and was_cut is True and app_header is False
 
     def test_the_read_is_bounded_at_the_handle_not_after(self, tmp_path, monkeypatch):
         path = tmp_path / "a.log"
@@ -85,7 +85,7 @@ class TestReadLogTail:
         tally = []
         monkeypatch.setattr(debug_info, "open", lambda p, m: _CountingFile(p, m, tally), raising=False)
         debug_info._read_log_tail(str(path), 4000)
-        assert sum(tally) <= 4000  # never the whole 3 MB
+        assert sum(tally) <= 4000 + debug_info._LOG_HEADER_PEEK_BYTES  # tail and bounded header
 
     def test_a_missing_file_raises_for_the_caller_to_record(self, tmp_path):
         with pytest.raises(FileNotFoundError):

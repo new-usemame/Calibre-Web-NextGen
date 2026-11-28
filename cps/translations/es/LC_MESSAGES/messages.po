@@ -404,7 +404,7 @@ msgstr ""
 "Calibre-Web NextGen buscará portadas actualizadas y actualizará las "
 "miniaturas de portada; esto puede tardar un rato. ¿Continuar?"
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -701,10 +701,6 @@ msgid "Oops! An unknown error occurred. Please try again later."
 msgstr ""
 "¡Ups! Ha ocurrido un error desconocido. Por favor, vuelva a intentarlo más "
 "tarde."
-
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "título"
 
 #: cps/admin.py
 #, python-format
@@ -2519,10 +2515,6 @@ msgid "Books organized in smart shelves"
 msgstr "Libros organizados en estanterías inteligentes"
 
 #: cps/opds.py
-msgid "description"
-msgstr "descripción"
-
-#: cps/opds.py
 #, python-format
 msgid "Books by %(name)s"
 msgstr ""
@@ -2965,6 +2957,13 @@ msgstr "Modificado (más antiguo → más reciente)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Manual (arrastra abajo)"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"
@@ -20827,6 +20826,12 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#~ msgid "title"
+#~ msgstr "título"
+
+#~ msgid "description"
+#~ msgstr "descripción"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Una selección aleatoria de tu biblioteca"

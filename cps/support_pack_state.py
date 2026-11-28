@@ -469,6 +469,21 @@ def _section_ok(value) -> bool:
     return True
 
 
+def _koreader_enabled(cwa_db_path):
+    """Look up the flag without initializing or writing the live CWA database."""
+    if not cwa_db_path or not os.path.isfile(cwa_db_path):
+        return None
+    try:
+        conn = _open_readonly(cwa_db_path)
+        try:
+            row = conn.execute("SELECT koreader_sync_enabled FROM cwa_settings LIMIT 1").fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+    return bool(row[0]) if row is not None and row[0] is not None else None
+
+
 def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, environ=None,
                 integrations=None) -> dict:
     """Return ``{archive filename: bytes}`` for the manifest and every section.
@@ -478,8 +493,8 @@ def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, envir
     ``cwa_db``, ``metadata_db`` (files). Any may be ``None``.
 
     ``integrations`` carries the live inputs for the per-integration sections
-    (see ``support_pack_integrations``): ``mail_settings``, ``worker_tasks``
-    and ``koreader_enabled``. Missing keys report that input as unavailable.
+    such as mail settings and worker tasks. Missing keys report that input
+    as unavailable. The KOReader setting is read from the CWA database.
     """
     from . import support_pack_integrations as integ
 
@@ -503,7 +518,7 @@ def collect_all(paths: dict, sanitized: bool, mounts=None, scheduler=None, envir
         ),
         "state/devices.json": lambda: integ.collect_devices(paths.get("app_db")),
         "state/koreader.json": lambda: integ.collect_koreader(
-            paths.get("app_db"), inputs.get("koreader_enabled")
+            paths.get("app_db"), _koreader_enabled(paths.get("cwa_db"))
         ),
         "state/email.json": lambda: integ.collect_email(
             inputs.get("mail_settings"), inputs.get("worker_tasks"), paths.get("app_db")

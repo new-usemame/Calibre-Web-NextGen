@@ -225,7 +225,8 @@ $("#back").click(function() {
 
 function confirmDialog(id, dialogid, dataValue, yesFn, noFn, message) {
     var $confirm = $("#" + dialogid);
-    $("#btnConfirmYes-"+ dialogid).off('click').click(function () {
+    var $yes = $("#btnConfirmYes-" + dialogid);
+    $yes.off('click').click(function () {
         yesFn(dataValue);
         $confirm.modal("hide");
     });
@@ -242,9 +243,12 @@ function confirmDialog(id, dialogid, dataValue, yesFn, noFn, message) {
         previousTextRequest.abort();
         $confirm.removeData('confirmTextRequest');
     }
+    $header.empty();
+    $text.empty();
+    $yes.prop('disabled', true);
     if (typeof message === 'string') {
-        $header.empty();
         $text.text(message);
+        $yes.prop('disabled', false);
     } else {
         $confirm.data('confirmTextRequest', $.ajax({
             method: "post",
@@ -253,6 +257,7 @@ function confirmDialog(id, dialogid, dataValue, yesFn, noFn, message) {
             success: function success(data) {
                 $header.html(data.header);
                 $text.html(data.main);
+                $yes.prop('disabled', !data.main);
             }
         }));
     }

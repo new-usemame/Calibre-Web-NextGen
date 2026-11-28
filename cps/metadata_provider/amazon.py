@@ -205,7 +205,9 @@ class Amazon(Metadata):
                 )
                 results.raise_for_status()
             except requests.exceptions.HTTPError as e:
-                log.error_or_exception(e)
+                # Reported to the UI through ProviderRefused below; a traceback
+                # here would repeat the refusal at DEBUG level.
+                log.warning("Amazon search refused: %s", e)
                 code = getattr(getattr(e, "response", None), "status_code", None)
                 status = {429: "rate_limited", 403: "blocked", 503: "blocked"}.get(code, "error")
                 raise ProviderRefused(status, (

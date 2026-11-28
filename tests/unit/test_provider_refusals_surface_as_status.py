@@ -239,6 +239,37 @@ def test_amazon_503_is_reported_as_blocked(monkeypatch):
     assert refused.value.status == "blocked"
 
 
+@pytest.mark.parametrize("module_name,class_name", [("amazon", "Amazon"), ("amazonjp", "AmazonJp")])
+def test_amazon_refusal_logs_one_warning_and_no_traceback(monkeypatch, module_name, class_name):
+    """The refusal reaches the UI as ProviderRefused, so the log carries one
+    WARN line. error_or_exception() prints a full traceback at DEBUG level,
+    which repeated the same 503 as a stack trace on every cover-picker open."""
+    import importlib
+    from cps.services.Metadata import ProviderRefused
+
+    module = importlib.import_module(f"cps.metadata_provider.{module_name}")
+    calls = []
+    spy = types.SimpleNamespace(
+        warning=lambda msg, *a, **k: calls.append(("warning", msg % a if a else msg)),
+        error_or_exception=lambda *a, **k: calls.append(("error_or_exception", a)),
+        exception=lambda *a, **k: calls.append(("exception", a)),
+        error=lambda *a, **k: calls.append(("error", a)),
+        info=lambda *a, **k: None,
+        debug=lambda *a, **k: None,
+    )
+    monkeypatch.setattr(module, "log", spy)
+    cls = getattr(module, class_name)
+    monkeypatch.setattr(cls.session, "get", _raise(_http_error(503)))
+    provider = cls()
+    provider.active = True
+
+    with pytest.raises(ProviderRefused) as refused:
+        provider.search("dune")
+    assert refused.value.status == "blocked"
+    assert [kind for kind, _ in calls] == ["warning"]
+    assert "refused" in calls[0][1]
+
+
 def test_classifier_passes_a_refusal_through_unchanged():
     from cps.search_metadata import _classify_provider_failure
     from cps.services.Metadata import ProviderRefused

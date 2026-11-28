@@ -647,11 +647,6 @@ msgstr "Thiết lập cơ sở dữ lieu đã được cập nhật"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Lỗi không xác định xảy ra. Xin hãy thử lại sau."
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "Tên"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2361,11 +2356,6 @@ msgstr "Giá sách thông minh"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Sách được sắp xếp trong giá sách thông minh"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "Mô tả"
 
 #: cps/opds.py
 #, python-format
@@ -19997,6 +19987,14 @@ msgstr "Đồng bộ những giá sách đã chọn với Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Hiển thị đã đọc và chưa đọc"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "Tên"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "Mô tả"
 
 #~ msgid "Categories"
 #~ msgstr "Chủ đề"

@@ -645,11 +645,6 @@ msgstr ""
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr ""
 
-#: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
-msgid "title"
-msgstr "ចំណងជើង"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2355,11 +2350,6 @@ msgstr "ធ្នើឆ្លាតវៃ"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "សៀវភៅដែលរៀបចំក្នុងធ្នើឆ្លាតវៃ"
-
-#: cps/opds.py
-#, fuzzy
-msgid "description"
-msgstr "ពិពណ៌នា"
 
 #: cps/opds.py
 #, python-format
@@ -19979,6 +19969,14 @@ msgstr ""
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "បង្ហាញជម្រើសស៊េរី"
+
+#, fuzzy
+#~ msgid "title"
+#~ msgstr "ចំណងជើង"
+
+#, fuzzy
+#~ msgid "description"
+#~ msgstr "ពិពណ៌នា"
 
 #~ msgid "Categories"
 #~ msgstr "ប្រភេទនានា"

@@ -689,10 +689,6 @@ msgstr "Impostazioni delle attività pianificate aggiornate"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Si è verificato un errore sconosciuto. Per favore riprova più tardi."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titolo"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2492,10 +2488,6 @@ msgstr "Scaffali intelligenti"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Libri organizzati in scaffali intelligenti"
-
-#: cps/opds.py
-msgid "description"
-msgstr "descrizione"
 
 #: cps/opds.py
 #, python-format
@@ -20864,6 +20856,12 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid "title"
+#~ msgstr "titolo"
+
+#~ msgid "description"
+#~ msgstr "descrizione"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Alcune selezioni casuali dalla tua biblioteca"

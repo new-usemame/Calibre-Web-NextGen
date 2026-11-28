@@ -695,10 +695,6 @@ msgstr "Instellingen van geplande taken bijgewerkt"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Onbekende fout opgetreden. Probeer het later nog eens."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titel"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2451,10 +2447,6 @@ msgstr "Slimme boekenplanken"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Boeken ingedeeld in slimme boekenplanken"
-
-#: cps/opds.py
-msgid "description"
-msgstr "omschrijving"
 
 #: cps/opds.py
 #, python-format
@@ -20814,6 +20806,12 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "title"
+#~ msgstr "titel"
+
+#~ msgid "description"
+#~ msgstr "omschrijving"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Enkele willekeurige keuzes uit je bibliotheek"

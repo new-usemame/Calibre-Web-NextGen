@@ -740,10 +740,6 @@ msgstr "Paramètres des tâches planifiées mis à jour"
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Une erreur inconnue est survenue. Veuillez réessayer plus tard."
 
-#: cps/admin.py cps/opds.py cps/web.py
-msgid "title"
-msgstr "titre"
-
 #: cps/admin.py
 #, python-format
 msgid "Edit User %(nick)s"
@@ -2618,10 +2614,6 @@ msgstr "Étagères intelligentes"
 #: cps/opds.py
 msgid "Books organized in smart shelves"
 msgstr "Livres organisés en étagères intelligentes"
-
-#: cps/opds.py
-msgid "description"
-msgstr "description"
 
 #: cps/opds.py
 #, python-format
@@ -21618,6 +21610,12 @@ msgstr "Exposer les étagères sélectionnées dans OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "title"
+#~ msgstr "titre"
+
+#~ msgid "description"
+#~ msgstr "description"
 
 #~ msgid "A few random picks from your library"
 #~ msgstr "Une sélection aléatoire de votre bibliothèque"

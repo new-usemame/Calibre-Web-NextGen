@@ -98,6 +98,135 @@ class TestBuildDebugZipSanitized:
         assert "<library>/" in log_blob
         assert "Bearer <redacted>" in log_blob
 
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_smtp_fields_and_configured_paths_are_private(self, fake_config_and_logs, sanitize):
+        from cps.debug_info import _build_debug_zip
+
+        _, _, _, settings = fake_config_and_logs
+        private = {
+            "mail_server": "smtp.private.test",
+            "mail_login": "login@private.test",
+            "mail_from": "Private Sender <sender@private.test>",
+            "config_calibre_dir": "/srv/Private Reader",
+            "config_logfile": "/srv/private-logs/cwng.log",
+            "config_ldap_cacert_path": "/etc/private-certs/ldap.pem",
+            "config_limiter_uri": "redis+unix:///var/run/private-limiter.sock",
+        }
+        settings.update(private)
+        with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
+            exported = json.loads(zf.read("settings.txt"))
+        assert exported["config_port"] == 8083
+        for key, value in private.items():
+            assert exported[key] == ("<redacted>" if sanitize else value), key
+
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_old_progress_payloads_are_private(self, fake_config_and_logs, sanitize):
+        from cps.debug_info import _build_debug_zip
+
+        _, log_path, _, _ = fake_config_and_logs
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(
+                "[2026-05-26 12:01:00] DEBUG {cps.progress_syncing.protocols.kosync:2546} "
+                "PUT /kosync/syncs/progress/<document> with: {'device': 'private-device'}\n"
+                "private-continuation\n"
+                "[2026-05-26 12:01:01] DEBUG {cps.progress_syncing.protocols.kosync:1439} "
+                "GET /kosync/syncs/progress/old-request-document\n"
+                "[2026-05-26 12:01:01] DEBUG {cps.progress_syncing.protocols.kosync:1550} "
+                "GET /kosync/syncs/progress/old-document-id Response: {'progress': 'private-position'}\n"
+                "[2026-05-26 12:01:02] INFO {cps.progress_syncing.protocols.kosync:50} "
+                "Progress request completed\n"
+            )
+        with zipfile.ZipFile(_build_debug_zip(sanitize=sanitize)) as zf:
+            log = zf.read("calibre-web.log").decode("utf-8")
+        for value in ("private-device", "private-continuation", "old-request-document",
+                      "old-document-id", "private-position"):
+            assert (value in log) is not sanitize
+        assert "Progress request completed" in log
+
+    def test_truncated_app_log_starts_at_a_complete_record(self, fake_config_and_logs, monkeypatch):
+        from cps import debug_info
+
+        _, log_path, _, _ = fake_config_and_logs
+        continuation = "private-continued-request\n"
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        # The cut starts in the old request's continuation, followed by a
+        # complete line in that same record. Neither belongs in the archive.
+        partial_record = "private-second-line\n"
+        log_path.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            + continuation + partial_record + next_record,
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(partial_record + next_record) + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read("calibre-web.log").decode("utf-8") == next_record
+
+    @pytest.mark.parametrize(("app_name", "access_name"), [
+        ("server.log", "server.log.access"), ("server.log.app", "server.log"),
+    ])
+    def test_log_type_follows_the_more_specific_path(self, fake_config_and_logs, monkeypatch,
+                                                     app_name, access_name):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        app_log = directory / app_name
+        access_log = directory / access_name
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        app_log.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            "private-continued-request\nprivate-second-line\n" + next_record,
+            encoding="utf-8",
+        )
+        access_record = '"GET /api/v1/books HTTP/1.1" 200 10\n'
+        access_log.write_text(access_record * 4, encoding="utf-8")
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(app_log))
+        monkeypatch.setattr(debug_info.config, "config_access_logfile", str(access_log))
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(next_record) + len("private-second-line\n") + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read(app_name).decode("utf-8") == next_record
+            assert zf.read(access_name).decode("utf-8").endswith(access_record)
+
+    def test_app_rotation_keeps_its_format_when_it_matches_an_access_path(
+            self, fake_config_and_logs, monkeypatch):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        app_log = directory / "server.log"
+        rotated = directory / "server.log.1"
+        next_record = "[2026-05-26 12:01:01] INFO {cps.web:12} Reader ready\n"
+        rotated.write_text(
+            "[2026-05-26 12:01:00] DEBUG {cps.kosync:2546} "
+            "PUT /kosync/syncs/progress/<document> with: private-start\n"
+            "private-continued-request\nprivate-second-line\n" + next_record,
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(app_log))
+        monkeypatch.setattr(debug_info.config, "config_access_logfile", str(rotated))
+        monkeypatch.setattr(debug_info, "_PER_FILE_MAX_BYTES", len(next_record) + len("private-second-line\n") + 8)
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
+            assert zf.read(rotated.name).decode("utf-8") == next_record
+
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_pack_only_selects_configured_logs_and_their_rotations(
+            self, fake_config_and_logs, monkeypatch, sanitize):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        configured = directory / "application"
+        rotated = directory / "application.2"
+        neighboring = directory / "application-notes.txt"
+        for path, line in ((configured, "active record"), (rotated, "rotated record"),
+                           (neighboring, "unrelated note")):
+            path.write_text(line + "\n", encoding="utf-8")
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(configured))
+
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=sanitize)) as archive:
+            assert archive.read(configured.name) == b"active record\n"
+            assert archive.read(rotated.name) == b"rotated record\n"
+            assert neighboring.name not in archive.namelist()
+
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip
 

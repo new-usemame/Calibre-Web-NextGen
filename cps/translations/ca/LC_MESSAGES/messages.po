@@ -400,7 +400,7 @@ msgstr ""
 "Calibre-Web NextGen cercarà cobertes actualitzades i en renovarà les "
 "miniatures. L'operació pot trigar una estona. Voleu continuar?"
 
-#: cps/admin.py
+#: cps/admin.py cps/templates/user_edit.html
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
@@ -2975,6 +2975,13 @@ msgstr "Data de modificació (de més antiga a més recent)"
 #: cps/shelf.py
 msgid "Manual (drag below)"
 msgstr "Manual (arrossega els elements)"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Allow direct DRM-free MOBI 6 books"

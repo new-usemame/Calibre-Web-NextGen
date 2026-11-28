@@ -223,9 +223,10 @@ $("#back").click(function() {
 
 });
 
-function confirmDialog(id, dialogid, dataValue, yesFn, noFn) {
+function confirmDialog(id, dialogid, dataValue, yesFn, noFn, message) {
     var $confirm = $("#" + dialogid);
-    $("#btnConfirmYes-"+ dialogid).off('click').click(function () {
+    var $yes = $("#btnConfirmYes-" + dialogid);
+    $yes.off('click').click(function () {
         yesFn(dataValue);
         $confirm.modal("hide");
     });
@@ -235,15 +236,31 @@ function confirmDialog(id, dialogid, dataValue, yesFn, noFn) {
         }
         $confirm.modal("hide");
     });
-    $.ajax({
-        method:"post",
-        dataType: "json",
-        url: getPath() + "/ajax/loaddialogtexts/" + id,
-        success: function success(data) {
-            $("#header-"+ dialogid).html(data.header);
-            $("#text-"+ dialogid).html(data.main);
-        }
-    });
+    var $header = $("#header-" + dialogid);
+    var $text = $("#text-" + dialogid);
+    var previousTextRequest = $confirm.data('confirmTextRequest');
+    if (previousTextRequest) {
+        previousTextRequest.abort();
+        $confirm.removeData('confirmTextRequest');
+    }
+    $header.empty();
+    $text.empty();
+    $yes.prop('disabled', true);
+    if (typeof message === 'string') {
+        $text.text(message);
+        $yes.prop('disabled', false);
+    } else {
+        $confirm.data('confirmTextRequest', $.ajax({
+            method: "post",
+            dataType: "json",
+            url: getPath() + "/ajax/loaddialogtexts/" + id,
+            success: function success(data) {
+                $header.html(data.header);
+                $text.html(data.main);
+                $yes.prop('disabled', !data.main);
+            }
+        }));
+    }
     $confirm.modal('show');
 }
 
@@ -941,7 +958,9 @@ $(function() {
                         });
                     }
                 });
-            }
+            },
+            undefined,
+            $(this).attr('data-confirm-message')
         );
     });
 

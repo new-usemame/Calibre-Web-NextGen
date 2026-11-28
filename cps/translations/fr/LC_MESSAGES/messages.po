@@ -10698,6 +10698,17 @@ msgstr ""
 "Renvoyer tous les livres vers votre Kobo lors de sa prochaine "
 "synchronisation ? Les livres déjà présents sont aussi renvoyés."
 
+#: cps/admin.py cps/spa_strings.py
+msgid ""
+"A large library then arrives about 100 books per sync, so it can take many "
+"syncs to finish. Forcing another full sync part-way through starts again "
+"from the beginning."
+msgstr ""
+"Une grande bibliothèque arrive alors par lots d’environ 100 livres par "
+"synchronisation ; il peut donc falloir plusieurs synchronisations pour "
+"terminer. Forcer une nouvelle synchronisation complète en cours de route "
+"repart du début."
+
 #: cps/spa_strings.py
 msgid "Send failed."
 msgstr "Échec de l’envoi."

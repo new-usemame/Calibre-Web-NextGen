@@ -1461,6 +1461,7 @@ def _sync_observability(
     share_place_mode=None,
     withheld_box_off=0,
     withheld_own_newer=0,
+    candidates_ahead=None,
 ):
     counts = _sync_entitlement_counts(sync_results)
     return {
@@ -1480,6 +1481,12 @@ def _sync_observability(
         "share_place_mode": share_place_mode or "none",
         "withheld_box_off": int(withheld_box_off),
         "withheld_own_newer": int(withheld_own_newer),
+        # Books in this account's Kobo scope still ahead of the incoming
+        # cursor, this page included.  Books the Kobo already holds are in it
+        # and get skipped, so it bounds the walk rather than counting what the
+        # device will receive.
+        "candidates_ahead": (
+            None if candidates_ahead is None else int(candidates_ahead)),
     }
 
 
@@ -1511,7 +1518,12 @@ def _empty_sync_observability():
         "share_place_mode": "none",
         "withheld_box_off": 0,
         "withheld_own_newer": 0,
+        "candidates_ahead": None,
     }
+
+
+def _format_candidates_ahead(value):
+    return "n/a" if value is None else str(int(value))
 
 
 def _format_reemit_reasons(reasons):
@@ -1533,6 +1545,10 @@ def _log_sync_observability(
     capture_session=None,
 ):
     """Emit the PII-free one-line incident record for one response attempt."""
+    if response_mode not in {"new_page", "delivered_page_not_durable"}:
+        # A replay can carry a snapshot built for an earlier incoming cursor.
+        # An error sends no page. Neither has a count for the current page.
+        observability = {**observability, "candidates_ahead": None}
     incoming_cursor_log = None
     outgoing_cursor_log = None
     try:
@@ -1547,6 +1563,7 @@ def _log_sync_observability(
             "reemit_reasons=%s reseeded_shape_change=%d "
             "replay_suppression enabled=%s eligible=%s "
             "share_place mode=%s withheld box_off=%d own_newer=%d "
+            "candidates_ahead=%s "
             "cursors in=%s out=%s",
             _sync_device_log_id(requesting_device_id),
             capture_id,
@@ -1565,6 +1582,7 @@ def _log_sync_observability(
             observability.get("share_place_mode", "none"),
             observability.get("withheld_box_off", 0),
             observability.get("withheld_own_newer", 0),
+            _format_candidates_ahead(observability.get("candidates_ahead")),
             incoming_cursor_log,
             outgoing_cursor_log,
         )
@@ -3640,6 +3658,7 @@ def HandleSyncRequest():
         share_place_mode=sync_place_mode,
         withheld_box_off=len(withheld_box_off),
         withheld_own_newer=len(withheld_own_newer),
+        candidates_ahead=book_count,
     )
 
     if requesting_device_id:

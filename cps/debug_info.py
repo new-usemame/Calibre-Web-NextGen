@@ -516,11 +516,14 @@ def _build_debug_zip(sanitize: bool):
         (logger.get_logfile(config.config_logfile), True),
     )
     log_files = {}
-    # Both rotation globs can match a file when their names overlap.
-    # Process the more specific path last so it decides the file's format.
+    # RotatingFileHandler appends a positive integer to the full log path.
+    # Check that suffix to distinguish a rotation from a neighboring file.
     for log_path, app_log in sorted(log_sources, key=lambda source: len(source[0])):
-        for file_path in glob.glob(glob.escape(log_path) + '*'):
-            if file_path not in (logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR):
+        if log_path in (logger.LOG_TO_STDOUT, logger.LOG_TO_STDERR):
+            continue
+        for file_path in glob.iglob(glob.escape(log_path) + '*'):
+            suffix = file_path[len(log_path):]
+            if not suffix or re.fullmatch(r"\.[1-9][0-9]*", suffix):
                 log_files[file_path] = app_log
 
     settings_dict = config.to_dict()

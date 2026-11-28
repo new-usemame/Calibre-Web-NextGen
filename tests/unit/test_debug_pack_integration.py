@@ -208,6 +208,25 @@ class TestBuildDebugZipSanitized:
         with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=True)) as zf:
             assert zf.read(rotated.name).decode("utf-8") == next_record
 
+    @pytest.mark.parametrize("sanitize", [True, False])
+    def test_pack_only_selects_configured_logs_and_their_rotations(
+            self, fake_config_and_logs, monkeypatch, sanitize):
+        from cps import debug_info
+
+        directory, _, _, _ = fake_config_and_logs
+        configured = directory / "application"
+        rotated = directory / "application.2"
+        neighboring = directory / "application-notes.txt"
+        for path, line in ((configured, "active record"), (rotated, "rotated record"),
+                           (neighboring, "unrelated note")):
+            path.write_text(line + "\n", encoding="utf-8")
+        monkeypatch.setattr(debug_info.config, "config_logfile", str(configured))
+
+        with zipfile.ZipFile(debug_info._build_debug_zip(sanitize=sanitize)) as archive:
+            assert archive.read(configured.name) == b"active record\n"
+            assert archive.read(rotated.name) == b"rotated record\n"
+            assert neighboring.name not in archive.namelist()
+
     def test_sanitized_pack_includes_marker(self, fake_config_and_logs):
         from cps.debug_info import _build_debug_zip
 

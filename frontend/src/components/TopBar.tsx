@@ -1,17 +1,20 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud, LifeBuoy } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud, LifeBuoy, FileArchive } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { KofiMark, KOFI_URL } from './KofiMark';
 import { BrandName } from './BrandName';
 import { Avatar } from './Avatar';
+import { Spinner } from './Spinner';
 import { useMe } from '../lib/queries';
 import { AUTH_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
 import { collectContext, reportTarget } from '../lib/reportBuilder';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
-import { canUploadBooks, showsProjectSupport } from '../lib/permissions';
+import { canDownloadSupportPack, canUploadBooks, showsProjectSupport, SUPPORT_PACK_URL } from '../lib/permissions';
+import { usePackDownload, type PackStatus } from '../lib/usePackDownload';
+import { apiUrl } from '../lib/api';
 
 interface TopBarProps {
   userName: string;
@@ -107,6 +110,12 @@ interface MenuItemProps {
   to?: string;
   /** External URL — opens in a new tab. */
   href?: string;
+  /** With `href`: a same-origin file download. Saves in place instead of opening a tab. */
+  download?: boolean;
+  /** With `download`: take over a plain click (for progress feedback). The menu stays
+   *  open so the progress is visible; modified clicks keep the browser's behaviour. */
+  onDownload?: () => void;
+  busy?: boolean;
   danger?: boolean;
   /** Optional trailing element (e.g. an unread dot), pinned to the right. */
   trailing?: ReactNode;
@@ -114,7 +123,7 @@ interface MenuItemProps {
   onSelect: () => void;
 }
 
-function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }: MenuItemProps) {
+function MenuItem({ icon, label, to, href, download, onDownload, busy, danger, trailing, onClick, onSelect }: MenuItemProps) {
   const cls = danger ? `${styles.menuItem} ${styles.menuItemDanger}` : styles.menuItem;
   const handle = () => { onClick?.(); onSelect(); };
   // Disclosure pattern (not an ARIA menu): plain links/buttons, icons decorative.
@@ -133,6 +142,25 @@ function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }
       </Link>
     );
   }
+  if (href && download) {
+    // File download from this server (the classic /admin/... endpoint): the
+    // browser saves it, so no new tab and no SPA navigation.
+    const activate = (event: MouseEvent<HTMLAnchorElement>) => {
+      const modified = event.defaultPrevented || event.button > 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      if (!onDownload || modified) {
+        onSelect();
+        return;
+      }
+      event.preventDefault(); // the hook runs the download and reports its progress
+      onDownload();
+    };
+    return (
+      <a className={cls} href={href} download aria-busy={busy || undefined} onClick={activate}>
+        {inner}
+      </a>
+    );
+  }
   if (href) {
     return (
       <a className={cls} href={href} target="_blank" rel="noopener noreferrer" onClick={onSelect}>
@@ -147,6 +175,18 @@ function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }
   );
 }
 
+/** What to tell the person about a support pack download, in their language. */
+function packStatusMessage(status: PackStatus, t: (key: string) => string): string | null {
+  switch (status) {
+    case 'preparing': return t("Preparing the pack… this can take a little while. Please don't click again.");
+    case 'started': return t('Your download has started.');
+    case 'busy': return t('A pack is already being prepared. Please wait a few seconds, then try again.');
+    case 'failed': return t('The pack could not be created. Please try again, or check the logs.');
+    case 'timeout': return t('This is taking longer than expected. If nothing downloads, wait a minute and try again.');
+    default: return null;
+  }
+}
+
 function HelpMenu() {
   const t = useT();
   const me = useMe().data;
@@ -154,6 +194,8 @@ function HelpMenu() {
   const hostSupport = !showProjectLinks && me?.support?.url;
   const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const unread = useWhatsNewUnread();
+  const pack = usePackDownload(apiUrl(SUPPORT_PACK_URL));
+  const packMessage = packStatusMessage(pack.status, t);
   // Prefill the issue with the version, the route SHAPE and a coarse browser,
   // instead of handing over a blank form and asking the reporter to look all
   // that up, which is what the .github/ISSUE_TEMPLATE/bug_report.yml form does.
@@ -193,6 +235,17 @@ function HelpMenu() {
             label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />}
           {showProjectLinks && <MenuItem icon={<DiscordMark size={15} />} label={t('Ask in Discord')} href={HELP_LINKS.discord} onSelect={close} />}
           {hostSupport && <MenuItem icon={<LifeBuoy size={15} />} label={me.support?.label || t('Contact support')} href={hostSupport} onSelect={close} />}
+          {canDownloadSupportPack(me) && <MenuItem
+            icon={<FileArchive size={15} />}
+            label={t('Get Support Pack')} href={apiUrl(SUPPORT_PACK_URL)} download
+            onDownload={pack.start} busy={pack.preparing}
+            trailing={pack.preparing ? <Spinner size={14} /> : undefined}
+            onSelect={close} />}
+          {canDownloadSupportPack(me) && packMessage && (
+            <p role="status" className={pack.status === 'started' || pack.preparing ? styles.menuStatus : styles.menuStatusError}>
+              {packMessage}
+            </p>
+          )}
           <MenuItem icon={<BookOpen size={15} />} label={t('Documentation')} href={HELP_LINKS.docs} onSelect={close} />
           {showProjectLinks && <MenuItem icon={<KofiMark size={16} />} label={t('Support on Ko-fi →')} href={KOFI_URL} onSelect={close} />}
         </div>

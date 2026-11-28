@@ -29,10 +29,15 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("A pack is already being prepared. Please wait a few seconds, then try again.")
 _("Allow direct DRM-free MOBI 6 books")
 _("Applies only to this catalog. The server upload-format setting must also allow MOBI. Normal conversion settings apply; without conversion, MOBI can be downloaded but cannot be opened in the web reader. Download clients have a separate format opt-in.")
 
 
+_("Preparing the pack… this can take a little while. Please don't click again.")
+_("The pack could not be created. Please try again, or check the logs.")
+_("This is taking longer than expected. If nothing downloads, wait a minute and try again.")
+_("Your download has started.")
 _("{succeeded} added to the shelf; {failed} failed.")
 _("{succeeded} book(s) deleted; {failed} failed.")
 _("{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.")
@@ -1280,6 +1285,7 @@ _("Generate a new link")
 _("Generate a private sync URL for this account. You can delete it at any time.")
 _("Generate sync URL")
 _("Generating…")
+_("Get Support Pack")
 _("Give your smart shelf a name.")
 _("Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.")
 _("Go to note")

@@ -382,3 +382,18 @@
     box-shadow: var(--elev-2);
   }
 }
+
+/* Progress line under a menu item that runs a slow action (support pack download). */
+.menuStatus,
+.menuStatusError {
+  margin: 0;
+  padding: 0 var(--sp-2) var(--sp-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.menuStatusError {
+  color: var(--danger-text);
+}

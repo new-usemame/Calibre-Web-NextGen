@@ -32,6 +32,22 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(logging.CRITICAL, "CRIT")
 
 
+class _SchedulerRunLevel(logging.Filter):
+    """Relabel APScheduler's routine per-run INFO records as DEBUG (#3043).
+
+    The executor logs "Running job" / "executed successfully" with logger.info(),
+    and logger.setup() only lets them through at DEBUG. Without this they print
+    as INFO even though they exist only at DEBUG, so level-based filtering and
+    counting get them wrong. WARNING and above (missed or failed runs) are kept.
+    """
+
+    def filter(self, record):
+        if record.levelno == logging.INFO:
+            record.levelno = logging.DEBUG
+            record.levelname = logging.getLevelName(logging.DEBUG)
+        return True
+
+
 class _Logger(logging.Logger):
 
     # `stacklevel` is keyword-only on purpose: it used to sit in front of
@@ -258,8 +274,12 @@ def _setup(log_file, log_level=None):
     # run, and the acquisition queue runs every 5 seconds (#2673). Failed and
     # missed runs log at ERROR/WARNING. At DEBUG the per-run lines come back,
     # set on this logger itself because the root level is left alone below INFO.
-    logging.getLogger('apscheduler.executors.default').setLevel(
+    # They are relabelled DEBUG so the label matches when they appear (#3043).
+    executor_logger = logging.getLogger('apscheduler.executors.default')
+    executor_logger.setLevel(
         max(logging.WARNING, log_level) if log_level >= logging.INFO else log_level)
+    if not any(isinstance(f, _SchedulerRunLevel) for f in executor_logger.filters):
+        executor_logger.addFilter(_SchedulerRunLevel())
 
     # Decide whether to also attach a file handler. The legacy
     # stream-only tokens disable file logging; anything else resolves

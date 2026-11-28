@@ -50,9 +50,3 @@ def test_a_settled_kobo_has_nothing_ahead(kw, caplog):
     kw.sync(kw.a)
 
     assert _candidates_ahead(caplog) == "0"
-
-
-def test_a_replayed_page_does_not_claim_a_count():
-    assert kobo._empty_sync_observability()["candidates_ahead"] is None
-    assert kobo._format_candidates_ahead(None) == "n/a"
-    assert kobo._format_candidates_ahead(7) == "7"

@@ -1545,6 +1545,10 @@ def _log_sync_observability(
     capture_session=None,
 ):
     """Emit the PII-free one-line incident record for one response attempt."""
+    if response_mode not in {"new_page", "delivered_page_not_durable"}:
+        # A replay can carry a snapshot built for an earlier incoming cursor.
+        # An error sends no page. Neither has a count for the current page.
+        observability = {**observability, "candidates_ahead": None}
     incoming_cursor_log = None
     outgoing_cursor_log = None
     try:

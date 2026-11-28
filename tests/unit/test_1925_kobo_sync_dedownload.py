@@ -1309,6 +1309,8 @@ def test_pending_page_replay_logs_the_stored_response_counts(
     ]
     assert len(summaries) == 2
     assert "response_mode=pending_replay" in summaries[-1]
+    assert "candidates_ahead=1 " in summaries[0]
+    assert "candidates_ahead=n/a " in summaries[-1]
     assert "entitlements new=1 changed=0 removed=0" in summaries[-1]
     assert "suppressed_replay=0" in summaries[-1]
     assert "fingerprint_mismatch_reemitted=0" in summaries[-1]
@@ -3464,12 +3466,13 @@ def test_sync_has_one_checked_commit_after_all_response_state_is_staged(
 
 
 def test_failed_only_sync_commit_leaves_all_response_state_retryable(
-        sync_harness, monkeypatch):
+        sync_harness, monkeypatch, caplog):
     """A 503 cannot durably suppress an entitlement the device never got."""
     from werkzeug.exceptions import ServiceUnavailable
     from cps import kobo, ub
 
     calls = []
+    caplog.set_level(logging.INFO, logger="cps.kobo")
 
     def reject_commit(*_args, **_kwargs):
         calls.append("rejected")
@@ -3481,6 +3484,12 @@ def test_failed_only_sync_commit_leaves_all_response_state_retryable(
     with pytest.raises(ServiceUnavailable):
         sync_harness.sync()
 
+    failed_summary, = [
+        record.getMessage() for record in caplog.records
+        if "Kobo Sync summary:" in record.getMessage()
+    ]
+    assert "response_mode=commit_failed " in failed_summary
+    assert "candidates_ahead=n/a " in failed_summary
     assert calls == ["rejected"]
     assert sync_harness.session.query(ub.KoboSyncedBooks).count() == 0
     assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0

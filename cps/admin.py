@@ -1538,12 +1538,8 @@ def load_dialogtexts(element_id):
         texts["main"] = _('Calibre-Web NextGen will search for updated Covers '
                           'and update Cover Thumbnails, this may take a while?')
     elif element_id == "btnfullsync":
-        texts["main"] = (
-            _("Are you sure you want delete Calibre-Web NextGen's sync database "
-              "to force a full sync with your Kobo Reader?")
-            + " "
-            + _("A large library then arrives about 100 books per sync, so it can take many syncs to finish. Forcing another full sync part-way through starts again from the beginning.")
-        )
+        texts["main"] = _("Are you sure you want delete Calibre-Web NextGen's sync database "
+                          "to force a full sync with your Kobo Reader?")
     return json.dumps(texts)
 
 

@@ -223,7 +223,7 @@ $("#back").click(function() {
 
 });
 
-function confirmDialog(id, dialogid, dataValue, yesFn, noFn) {
+function confirmDialog(id, dialogid, dataValue, yesFn, noFn, message) {
     var $confirm = $("#" + dialogid);
     $("#btnConfirmYes-"+ dialogid).off('click').click(function () {
         yesFn(dataValue);
@@ -235,15 +235,27 @@ function confirmDialog(id, dialogid, dataValue, yesFn, noFn) {
         }
         $confirm.modal("hide");
     });
-    $.ajax({
-        method:"post",
-        dataType: "json",
-        url: getPath() + "/ajax/loaddialogtexts/" + id,
-        success: function success(data) {
-            $("#header-"+ dialogid).html(data.header);
-            $("#text-"+ dialogid).html(data.main);
-        }
-    });
+    var $header = $("#header-" + dialogid);
+    var $text = $("#text-" + dialogid);
+    var previousTextRequest = $confirm.data('confirmTextRequest');
+    if (previousTextRequest) {
+        previousTextRequest.abort();
+        $confirm.removeData('confirmTextRequest');
+    }
+    if (typeof message === 'string') {
+        $header.empty();
+        $text.text(message);
+    } else {
+        $confirm.data('confirmTextRequest', $.ajax({
+            method: "post",
+            dataType: "json",
+            url: getPath() + "/ajax/loaddialogtexts/" + id,
+            success: function success(data) {
+                $header.html(data.header);
+                $text.html(data.main);
+            }
+        }));
+    }
     $confirm.modal('show');
 }
 
@@ -941,7 +953,9 @@ $(function() {
                         });
                     }
                 });
-            }
+            },
+            undefined,
+            $(this).attr('data-confirm-message')
         );
     });
 
